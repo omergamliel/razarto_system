@@ -32,6 +32,13 @@ export default function ShiftCell({
           badge: 'bg-[#64B5F6]',
           icon: CheckCircle2
         };
+      case 'partially_covered':
+        return {
+          bg: 'bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2]',
+          border: 'border-[#FFB74D]',
+          badge: 'bg-[#FFB74D]',
+          icon: AlertCircle
+        };
       default:
         return {
           bg: 'bg-white',
@@ -98,9 +105,21 @@ export default function ShiftCell({
             `}>
               <StatusIcon className="w-3 h-3 text-gray-600" />
               <span className="text-[10px] md:text-xs text-gray-600">
-                {shift.status === 'swap_requested' ? 'בקשה להחלפה' : 'אושר'}
+                {shift.status === 'swap_requested' && 'בקשה להחלפה'}
+                {shift.status === 'swap_confirmed' && 'אושר'}
+                {shift.status === 'partially_covered' && '⚠️ פער'}
               </span>
             </div>
+          )}
+
+          {/* Full Swap Display with Date Range */}
+          {shift.swap_type === 'full' && shift.status === 'swap_requested' && (
+            <p className={`
+              text-[10px] md:text-xs text-gray-500 mt-1
+              ${isWeekView ? 'text-center' : ''}
+            `}>
+              24 שעות ({format(date, 'd/M')} - {format(new Date(date.getTime() + 86400000), 'd/M')})
+            </p>
           )}
 
           {/* Partial Time Display */}
@@ -111,6 +130,23 @@ export default function ShiftCell({
             `}>
               {shift.swap_start_time} - {shift.swap_end_time}
             </p>
+          )}
+
+          {/* Gap Display for Partially Covered */}
+          {shift.status === 'partially_covered' && shift.gap_hours && (
+            <div className={`
+              mt-1 bg-white/80 rounded px-2 py-1
+              ${isWeekView ? 'text-center' : ''}
+            `}>
+              <p className="text-[10px] md:text-xs text-[#FFB74D] font-semibold">
+                פער: {shift.gap_hours}
+              </p>
+              {shift.covered_start_time && (
+                <p className="text-[9px] md:text-[10px] text-gray-500">
+                  מכוסה: {shift.covered_start_time}-{shift.covered_end_time}
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -44,11 +44,21 @@ export default function CalendarHeader({
       className="relative z-10 mb-6"
     >
       {/* Logo and Title */}
-      <div className="flex flex-col items-center mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight">
-          רזר תורן
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">מערכת ניהול משמרות</p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex-1"></div>
+        <div className="flex flex-col items-center">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight">
+            Razarto
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">מערכת ניהול משמרות</p>
+        </div>
+        <div className="flex-1 flex justify-end">
+          <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-md flex items-center justify-center">
+            <div className="text-white text-xs md:text-sm font-bold text-center leading-tight">
+              חטיבת<br/>מבצעים
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Controls Bar */}

@@ -9,6 +9,8 @@ import CalendarHeader from './CalendarHeader';
 import CalendarGrid from './CalendarGrid';
 import SwapRequestModal from './SwapRequestModal';
 import PendingRequestsModal from './PendingRequestsModal';
+import AddShiftModal from './AddShiftModal';
+import AcceptSwapModal from './AcceptSwapModal';
 
 export default function ShiftCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -17,6 +19,8 @@ export default function ShiftCalendar() {
   const [selectedShift, setSelectedShift] = useState(null);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
   const queryClient = useQueryClient();
@@ -36,6 +40,28 @@ export default function ShiftCalendar() {
     queryFn: () => base44.entities.Shift.list(),
   });
 
+  // Add shift mutation
+  const addShiftMutation = useMutation({
+    mutationFn: async ({ date, shiftData }) => {
+      return base44.entities.Shift.create({
+        date: format(date, 'yyyy-MM-dd'),
+        department: shiftData.department,
+        role: shiftData.role,
+        assigned_person: currentUser?.full_name || currentUser?.email,
+        assigned_email: currentUser?.email,
+        status: 'regular'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShowAddModal(false);
+      toast.success('המשמרת נוספה בהצלחה');
+    },
+    onError: () => {
+      toast.error('שגיאה בהוספת המשמרת');
+    }
+  });
+
   // Create/Update shift mutation
   const swapRequestMutation = useMutation({
     mutationFn: async ({ date, swapData }) => {
@@ -47,8 +73,7 @@ export default function ShiftCalendar() {
           swap_request_by: currentUser?.email,
           swap_type: swapData.swapType,
           swap_start_time: swapData.startTime,
-          swap_end_time: swapData.endTime,
-          swap_reason: swapData.reason
+          swap_end_time: swapData.endTime
         });
       }
       return null;
@@ -65,15 +90,35 @@ export default function ShiftCalendar() {
 
   // Accept swap mutation
   const acceptSwapMutation = useMutation({
-    mutationFn: async (shift) => {
-      return base44.entities.Shift.update(shift.id, {
-        status: 'swap_confirmed',
+    mutationFn: async ({ shift, acceptData }) => {
+      const updateData = {
         confirmed_by: currentUser?.full_name || currentUser?.email,
         confirmed_by_email: currentUser?.email
-      });
+      };
+
+      if (acceptData.coverFull) {
+        // Full coverage
+        updateData.status = 'swap_confirmed';
+      } else {
+        // Partial coverage - calculate gap
+        const requestedStart = shift.swap_type === 'full' ? '09:00' : shift.swap_start_time;
+        const requestedEnd = shift.swap_type === 'full' ? '09:00 (למחרת)' : shift.swap_end_time;
+        
+        updateData.status = 'partially_covered';
+        updateData.covered_start_time = acceptData.startTime;
+        updateData.covered_end_time = acceptData.endTime;
+        
+        // Simple gap description
+        if (acceptData.startTime !== requestedStart || acceptData.endTime !== requestedEnd) {
+          updateData.gap_hours = `${requestedStart}-${acceptData.startTime}, ${acceptData.endTime}-${requestedEnd}`;
+        }
+      }
+
+      return base44.entities.Shift.update(shift.id, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShowAcceptModal(false);
       toast.success('ההחלפה אושרה בהצלחה');
     },
     onError: () => {
@@ -84,11 +129,24 @@ export default function ShiftCalendar() {
   const handleCellClick = (date, shift) => {
     setSelectedDate(date);
     setSelectedShift(shift);
-    if (shift && shift.status === 'regular') {
+    
+    if (!shift) {
+      // Empty cell - show add modal
+      setShowAddModal(true);
+    } else if (shift.status === 'regular' && shift.assigned_email === currentUser?.email) {
+      // Own shift - request swap
       setShowSwapModal(true);
-    } else if (shift) {
-      setShowSwapModal(true);
+    } else if (shift.status === 'swap_requested' && shift.assigned_email !== currentUser?.email) {
+      // Someone else's swap request - show accept modal
+      setShowAcceptModal(true);
     }
+  };
+
+  const handleAddShift = (shiftData) => {
+    addShiftMutation.mutate({
+      date: selectedDate,
+      shiftData
+    });
   };
 
   const handleSwapSubmit = (swapData) => {
@@ -98,8 +156,17 @@ export default function ShiftCalendar() {
     });
   };
 
-  const handleAcceptSwap = (shift) => {
-    acceptSwapMutation.mutate(shift);
+  const handleAcceptSwap = (acceptData) => {
+    acceptSwapMutation.mutate({
+      shift: selectedShift,
+      acceptData
+    });
+  };
+
+  const handleAcceptFromList = (shift) => {
+    setSelectedShift(shift);
+    setShowPendingModal(false);
+    setShowAcceptModal(true);
   };
 
   const pendingCount = shifts.filter(
@@ -144,9 +211,26 @@ export default function ShiftCalendar() {
           isOpen={showPendingModal}
           onClose={() => setShowPendingModal(false)}
           requests={shifts}
-          onAccept={handleAcceptSwap}
-          isAccepting={acceptSwapMutation.isPending ? acceptSwapMutation.variables?.id : null}
+          onAccept={handleAcceptFromList}
+          isAccepting={false}
           currentUserEmail={currentUser?.email}
+        />
+
+        <AddShiftModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          date={selectedDate}
+          onSubmit={handleAddShift}
+          isSubmitting={addShiftMutation.isPending}
+          currentUser={currentUser}
+        />
+
+        <AcceptSwapModal
+          isOpen={showAcceptModal}
+          onClose={() => setShowAcceptModal(false)}
+          shift={selectedShift}
+          onAccept={handleAcceptSwap}
+          isAccepting={acceptSwapMutation.isPending}
         />
       </div>
 

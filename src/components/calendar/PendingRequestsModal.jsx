@@ -111,35 +111,19 @@ export default function PendingRequestsModal({
                         }
                       </span>
                     </div>
-                    {request.swap_reason && (
-                      <p className="text-sm text-gray-600 mt-2 pt-2 border-t border-gray-200">
-                        "{request.swap_reason}"
-                      </p>
-                    )}
+
                   </div>
 
                   {/* Accept Button */}
                   <Button
                     onClick={() => onAccept(request)}
-                    disabled={isAccepting === request.id}
+                    disabled={isAccepting}
                     className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white rounded-xl"
                   >
-                    {isAccepting === request.id ? (
-                      <span className="flex items-center gap-2">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ repeat: Infinity, duration: 1 }}
-                        >
-                          ⏳
-                        </motion.div>
-                        מאשר...
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        אני אכסה את המשמרת
-                      </span>
-                    )}
+                    <span className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      אני אכסה את המשמרת
+                    </span>
                   </Button>
                 </motion.div>
               ))

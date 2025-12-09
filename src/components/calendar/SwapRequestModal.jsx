@@ -20,15 +20,12 @@ export default function SwapRequestModal({
   const [swapType, setSwapType] = useState('full');
   const [startTime, setStartTime] = useState('14:00');
   const [endTime, setEndTime] = useState('18:00');
-  const [reason, setReason] = useState('');
-
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit({
       swapType,
       startTime: swapType === 'partial' ? startTime : null,
-      endTime: swapType === 'partial' ? endTime : null,
-      reason
+      endTime: swapType === 'partial' ? endTime : null
     });
   };
 
@@ -165,17 +162,6 @@ export default function SwapRequestModal({
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Reason */}
-            <div className="space-y-2">
-              <Label className="text-gray-700 font-medium">סיבה (אופציונלי)</Label>
-              <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="הסבר קצר לבקשה..."
-                className="resize-none h-20"
-              />
-            </div>
 
             {/* Submit Button */}
             <Button
