@@ -80,8 +80,8 @@ export default function ShiftCell({
       {/* Day Name (Week View) */}
       {isWeekView && (
         <div className="text-center mb-2 pt-8">
-          <span className="text-sm text-gray-500">
-            {format(date, 'EEEE', { locale: he })}
+          <span className="text-base font-semibold text-gray-600">
+            {['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'][date.getDay()]}
           </span>
         </div>
       )}
@@ -89,6 +89,15 @@ export default function ShiftCell({
       {/* Shift Content */}
       {shift && (
         <div className={`${isWeekView ? 'mt-4' : 'mt-8 md:mt-10'}`}>
+          {/* Role Name */}
+          {shift.role && (
+            <p className={`
+              font-semibold text-[#E57373] truncate mb-1
+              ${isWeekView ? 'text-sm text-center' : 'text-[10px] md:text-xs'}
+            `}>
+              {shift.role}
+            </p>
+          )}
           {/* Person Name */}
           <p className={`
             font-medium text-gray-800 truncate

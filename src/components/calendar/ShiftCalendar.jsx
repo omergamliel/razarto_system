@@ -11,6 +11,9 @@ import SwapRequestModal from './SwapRequestModal';
 import PendingRequestsModal from './PendingRequestsModal';
 import AddShiftModal from './AddShiftModal';
 import AcceptSwapModal from './AcceptSwapModal';
+import ShiftActionModal from './ShiftActionModal';
+import EditRoleModal from './EditRoleModal';
+import PendingRequestsSidebar from './PendingRequestsSidebar';
 
 export default function ShiftCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -21,6 +24,8 @@ export default function ShiftCalendar() {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [showEditRoleModal, setShowEditRoleModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
   const queryClient = useQueryClient();
@@ -88,6 +93,24 @@ export default function ShiftCalendar() {
     }
   });
 
+  // Edit role mutation
+  const editRoleMutation = useMutation({
+    mutationFn: async ({ shift, roleData }) => {
+      return base44.entities.Shift.update(shift.id, {
+        department: roleData.department,
+        role: roleData.role
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShowEditRoleModal(false);
+      toast.success('התפקיד עודכן בהצלחה');
+    },
+    onError: () => {
+      toast.error('שגיאה בעדכון התפקיד');
+    }
+  });
+
   // Accept swap mutation
   const acceptSwapMutation = useMutation({
     mutationFn: async ({ shift, acceptData }) => {
@@ -133,10 +156,10 @@ export default function ShiftCalendar() {
     if (!shift) {
       // Empty cell - show add modal
       setShowAddModal(true);
-    } else if (shift.status === 'regular' && shift.assigned_email === currentUser?.email) {
-      // Own shift - request swap
-      setShowSwapModal(true);
-    } else if (shift.status === 'swap_requested' && shift.assigned_email !== currentUser?.email) {
+    } else if (shift.assigned_email === currentUser?.email) {
+      // Own shift - show action modal (swap or edit)
+      setShowActionModal(true);
+    } else if (shift.status === 'swap_requested') {
       // Someone else's swap request - show accept modal
       setShowAcceptModal(true);
     }
@@ -169,6 +192,19 @@ export default function ShiftCalendar() {
     setShowAcceptModal(true);
   };
 
+  const handleEditRole = (roleData) => {
+    editRoleMutation.mutate({
+      shift: selectedShift,
+      roleData
+    });
+  };
+
+  const handleCoverFromSidebar = (shift) => {
+    setSelectedShift(shift);
+    setSelectedDate(new Date(shift.date));
+    setShowAcceptModal(true);
+  };
+
   const pendingCount = shifts.filter(
     s => s.status === 'swap_requested' && s.assigned_email !== currentUser?.email
   ).length;
@@ -191,12 +227,26 @@ export default function ShiftCalendar() {
           pendingCount={pendingCount}
         />
 
-        <CalendarGrid
-          currentDate={currentDate}
-          viewMode={viewMode}
-          shifts={shifts}
-          onCellClick={handleCellClick}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          {/* Calendar - Takes 2 columns on large screens */}
+          <div className="lg:col-span-2">
+            <CalendarGrid
+              currentDate={currentDate}
+              viewMode={viewMode}
+              shifts={shifts}
+              onCellClick={handleCellClick}
+            />
+          </div>
+
+          {/* Pending Requests Sidebar - Takes 1 column on large screens */}
+          <div className="lg:col-span-1">
+            <PendingRequestsSidebar
+              requests={shifts}
+              onCoverShift={handleCoverFromSidebar}
+              currentUserEmail={currentUser?.email}
+            />
+          </div>
+        </div>
 
         <SwapRequestModal
           isOpen={showSwapModal}
@@ -231,6 +281,30 @@ export default function ShiftCalendar() {
           shift={selectedShift}
           onAccept={handleAcceptSwap}
           isAccepting={acceptSwapMutation.isPending}
+        />
+
+        <ShiftActionModal
+          isOpen={showActionModal}
+          onClose={() => setShowActionModal(false)}
+          shift={selectedShift}
+          date={selectedDate}
+          onRequestSwap={() => {
+            setShowActionModal(false);
+            setShowSwapModal(true);
+          }}
+          onEditRole={() => {
+            setShowActionModal(false);
+            setShowEditRoleModal(true);
+          }}
+        />
+
+        <EditRoleModal
+          isOpen={showEditRoleModal}
+          onClose={() => setShowEditRoleModal(false)}
+          date={selectedDate}
+          shift={selectedShift}
+          onSubmit={handleEditRole}
+          isSubmitting={editRoleMutation.isPending}
         />
       </div>
 

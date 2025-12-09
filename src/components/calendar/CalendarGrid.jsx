@@ -12,7 +12,8 @@ import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import ShiftCell from './ShiftCell';
 
-const HEBREW_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const HEBREW_DAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+const HEBREW_DAYS_FULL = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
 export default function CalendarGrid({ 
   currentDate, 
@@ -54,10 +55,10 @@ export default function CalendarGrid({
         {HEBREW_DAYS.map((day, index) => (
           <div 
             key={index}
-            className="text-center py-2 text-sm font-medium text-gray-500"
+            className="text-center py-2 text-sm md:text-base font-semibold text-gray-600"
+            title={HEBREW_DAYS_FULL[index]}
           >
-            <span className="hidden md:inline">{day}</span>
-            <span className="md:hidden">{day.charAt(0)}</span>
+            {day}
           </div>
         ))}
       </div>
