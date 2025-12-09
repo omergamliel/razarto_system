@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, Calendar, Clock } from 'lucide-react';
+import { X, CheckCircle, Calendar, Clock, Users, Briefcase } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getDepartmentList, getRolesForDepartment } from './departmentData';
 
 export default function AcceptSwapModal({ 
   isOpen, 
@@ -17,17 +19,31 @@ export default function AcceptSwapModal({
   const [coverFull, setCoverFull] = useState(true);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
+  const [department, setDepartment] = useState('');
+  const [role, setRole] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!department || !role) return;
+    
     onAccept({
       coverFull,
       startTime: coverFull ? null : startTime,
-      endTime: coverFull ? null : endTime
+      endTime: coverFull ? null : endTime,
+      department,
+      role
     });
   };
 
+  const handleDepartmentChange = (value) => {
+    setDepartment(value);
+    setRole(''); // Reset role when department changes
+  };
+
   if (!isOpen || !shift) return null;
+
+  const departments = getDepartmentList();
+  const roles = department ? getRolesForDepartment(department) : [];
 
   return (
     <AnimatePresence>
@@ -85,6 +101,62 @@ export default function AcceptSwapModal({
                   }
                 </div>
               </div>
+            </div>
+
+            {/* Covering Person Info */}
+            <div className="space-y-3">
+              <Label className="text-gray-700 font-medium text-lg">
+                זיהוי המכסה
+              </Label>
+              
+              {/* Department Selection */}
+              <div className="space-y-2">
+                <Label className="text-gray-700 font-medium flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#64B5F6]" />
+                  בחר מחלקה שלך
+                </Label>
+                <Select value={department} onValueChange={handleDepartmentChange}>
+                  <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
+                    <SelectValue placeholder="בחר מחלקה..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Role Selection */}
+              <AnimatePresence>
+                {department && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <Label className="text-gray-700 font-medium flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-[#64B5F6]" />
+                      בחר בע"ת שלך
+                    </Label>
+                    <Select value={role} onValueChange={setRole}>
+                      <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
+                        <SelectValue placeholder="בחר בע״ת..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Cover Full Shift Question */}
@@ -171,8 +243,8 @@ export default function AcceptSwapModal({
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={isAccepting}
-              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium"
+              disabled={isAccepting || !department || !role}
+              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
             >
               {isAccepting ? (
                 <span className="flex items-center gap-2">

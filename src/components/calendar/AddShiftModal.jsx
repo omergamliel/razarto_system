@@ -122,11 +122,11 @@ export default function AddShiftModal({
                 >
                   <Label className="text-gray-700 font-medium flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                    בחר תפקיד
+                    בחר בע"ת
                   </Label>
                   <Select value={role} onValueChange={setRole}>
                     <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
-                      <SelectValue placeholder="בחר תפקיד..." />
+                      <SelectValue placeholder="בחר בע״ת..." />
                     </SelectTrigger>
                     <SelectContent>
                       {roles.map((r) => (

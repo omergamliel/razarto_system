@@ -94,7 +94,7 @@ export default function EditRoleModal({
               <p className="text-sm text-gray-500 mb-1">משובץ</p>
               <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
               {shift.role && (
-                <p className="text-sm text-[#E57373] mt-1">תפקיד נוכחי: {shift.role}</p>
+                <p className="text-sm text-[#E57373] mt-1">בע"ת נוכחי: {shift.role}</p>
               )}
             </div>
 
@@ -129,11 +129,11 @@ export default function EditRoleModal({
                 >
                   <Label className="text-gray-700 font-medium flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                    בחר תפקיד חדש
+                    בחר בע"ת חדש
                   </Label>
                   <Select value={role} onValueChange={setRole}>
                     <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
-                      <SelectValue placeholder="בחר תפקיד..." />
+                      <SelectValue placeholder="בחר בע״ת..." />
                     </SelectTrigger>
                     <SelectContent>
                       {roles.map((r) => (

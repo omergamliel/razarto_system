@@ -13,7 +13,6 @@ import AddShiftModal from './AddShiftModal';
 import AcceptSwapModal from './AcceptSwapModal';
 import ShiftActionModal from './ShiftActionModal';
 import EditRoleModal from './EditRoleModal';
-import PendingRequestsSidebar from './PendingRequestsSidebar';
 
 export default function ShiftCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -27,6 +26,7 @@ export default function ShiftCalendar() {
   const [showActionModal, setShowActionModal] = useState(false);
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [logoUrl, setLogoUrl] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -116,12 +116,18 @@ export default function ShiftCalendar() {
     mutationFn: async ({ shift, acceptData }) => {
       const updateData = {
         confirmed_by: currentUser?.full_name || currentUser?.email,
-        confirmed_by_email: currentUser?.email
+        confirmed_by_email: currentUser?.email,
+        covering_department: acceptData.department,
+        covering_role: acceptData.role
       };
 
       if (acceptData.coverFull) {
-        // Full coverage
+        // Full coverage - Replace role with covering person's role
         updateData.status = 'swap_confirmed';
+        updateData.department = acceptData.department;
+        updateData.role = acceptData.role;
+        updateData.assigned_person = currentUser?.full_name || currentUser?.email;
+        updateData.assigned_email = currentUser?.email;
       } else {
         // Partial coverage - calculate gap
         const requestedStart = shift.swap_type === 'full' ? '09:00' : shift.swap_start_time;
@@ -199,10 +205,8 @@ export default function ShiftCalendar() {
     });
   };
 
-  const handleCoverFromSidebar = (shift) => {
-    setSelectedShift(shift);
-    setSelectedDate(new Date(shift.date));
-    setShowAcceptModal(true);
+  const handleLogoUpload = (url) => {
+    setLogoUrl(url);
   };
 
   const pendingCount = shifts.filter(
@@ -225,28 +229,16 @@ export default function ShiftCalendar() {
           setViewMode={setViewMode}
           onOpenPendingRequests={() => setShowPendingModal(true)}
           pendingCount={pendingCount}
+          logoUrl={logoUrl}
+          onLogoUpload={handleLogoUpload}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-          {/* Calendar - Takes 2 columns on large screens */}
-          <div className="lg:col-span-2">
-            <CalendarGrid
-              currentDate={currentDate}
-              viewMode={viewMode}
-              shifts={shifts}
-              onCellClick={handleCellClick}
-            />
-          </div>
-
-          {/* Pending Requests Sidebar - Takes 1 column on large screens */}
-          <div className="lg:col-span-1">
-            <PendingRequestsSidebar
-              requests={shifts}
-              onCoverShift={handleCoverFromSidebar}
-              currentUserEmail={currentUser?.email}
-            />
-          </div>
-        </div>
+        <CalendarGrid
+          currentDate={currentDate}
+          viewMode={viewMode}
+          shifts={shifts}
+          onCellClick={handleCellClick}
+        />
 
         <SwapRequestModal
           isOpen={showSwapModal}
