@@ -1,11 +1,9 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Calendar, List, Upload } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Calendar, List } from 'lucide-react';
 import { format, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
-import { base44 } from "@/api/base44Client";
-import { toast } from "sonner";
 
 export default function CalendarHeader({ 
   currentDate, 
@@ -13,11 +11,8 @@ export default function CalendarHeader({
   viewMode, 
   setViewMode,
   onOpenPendingRequests,
-  pendingCount,
-  logoUrl,
-  onLogoUpload
+  pendingCount
 }) {
-  const fileInputRef = useRef(null);
   const navigatePrev = () => {
     if (viewMode === 'month') {
       setCurrentDate(subMonths(currentDate, 1));
@@ -42,62 +37,12 @@ export default function CalendarHeader({
     }
   };
 
-  const handleLogoClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      onLogoUpload(file_url);
-      toast.success('הלוגו עודכן בהצלחה');
-    } catch (error) {
-      toast.error('שגיאה בהעלאת הלוגו');
-    }
-  };
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className="relative z-10 mb-6"
     >
-      {/* Logo - Absolute Position with Upload */}
-      <div className="absolute top-4 right-4 z-20">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleLogoClick}
-          className="relative w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center cursor-pointer hover:shadow-xl transition-all group"
-        >
-          {logoUrl ? (
-            <img 
-              src={logoUrl} 
-              alt="לוגו" 
-              className="w-full h-full object-cover rounded-xl"
-            />
-          ) : (
-            <div className="text-white text-[10px] md:text-xs font-bold text-center leading-tight">
-              חטיבת<br/>מבצעים
-            </div>
-          )}
-          {/* Upload Icon Overlay */}
-          <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Upload className="w-5 h-5 md:w-6 md:h-6 text-white" />
-          </div>
-        </motion.div>
-      </div>
-
       {/* Logo and Title */}
       <div className="flex flex-col items-center mb-6 pt-2">
         <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.15em' }}>

@@ -88,11 +88,11 @@ export default function ShiftCell({
 
       {/* Shift Content */}
       {shift && (
-        <div className={`${isWeekView ? 'mt-4' : 'mt-8 md:mt-10'}`}>
+        <div className={`${isWeekView ? 'mt-4' : 'mt-8 md:mt-10'} space-y-1`}>
           {/* Role Name */}
           {shift.role && (
             <p className={`
-              font-semibold text-[#E57373] truncate mb-1
+              font-semibold text-[#E57373] truncate
               ${isWeekView ? 'text-sm text-center' : 'text-[10px] md:text-xs'}
             `}>
               {shift.role}
@@ -105,6 +105,21 @@ export default function ShiftCell({
           `}>
             {shift.assigned_person}
           </p>
+          
+          {/* Covering Person (for confirmed swaps) */}
+          {shift.status === 'swap_confirmed' && shift.covering_role && (
+            <div className={`
+              bg-white/80 rounded px-2 py-1 border border-[#64B5F6]
+              ${isWeekView ? 'text-center' : ''}
+            `}>
+              <p className="text-[10px] md:text-xs text-[#64B5F6] font-semibold truncate">
+                {shift.covering_role}
+              </p>
+              <p className="text-[9px] md:text-[10px] text-gray-600 truncate">
+                {shift.confirmed_by}
+              </p>
+            </div>
+          )}
 
           {/* Status Badge */}
           {shift.status !== 'regular' && (

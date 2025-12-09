@@ -13,6 +13,8 @@ import AddShiftModal from './AddShiftModal';
 import AcceptSwapModal from './AcceptSwapModal';
 import ShiftActionModal from './ShiftActionModal';
 import EditRoleModal from './EditRoleModal';
+import ShiftDetailsModal from './ShiftDetailsModal';
+import CoverSegmentModal from './CoverSegmentModal';
 
 export default function ShiftCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -25,8 +27,9 @@ export default function ShiftCalendar() {
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showCoverSegmentModal, setShowCoverSegmentModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [logoUrl, setLogoUrl] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -90,6 +93,46 @@ export default function ShiftCalendar() {
     },
     onError: () => {
       toast.error('שגיאה בשליחת הבקשה');
+    }
+  });
+
+  // Delete shift mutation
+  const deleteShiftMutation = useMutation({
+    mutationFn: async (shiftId) => {
+      return base44.entities.Shift.delete(shiftId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShowDetailsModal(false);
+      toast.success('השיבוץ נמחק בהצלחה');
+    },
+    onError: () => {
+      toast.error('שגיאה במחיקת השיבוץ');
+    }
+  });
+
+  // Cover segment mutation
+  const coverSegmentMutation = useMutation({
+    mutationFn: async ({ shift, segmentData }) => {
+      return base44.entities.ShiftSegment.create({
+        shift_id: shift.id,
+        date: shift.date,
+        start_time: segmentData.startTime,
+        end_time: segmentData.endTime,
+        assigned_person: currentUser?.full_name || currentUser?.email,
+        assigned_email: currentUser?.email,
+        department: segmentData.department,
+        role: segmentData.role
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-segments'] });
+      setShowCoverSegmentModal(false);
+      toast.success('המקטע נוסף בהצלחה');
+    },
+    onError: () => {
+      toast.error('שגיאה בכיסוי המקטע');
     }
   });
 
@@ -165,6 +208,9 @@ export default function ShiftCalendar() {
     } else if (shift.assigned_email === currentUser?.email) {
       // Own shift - show action modal (swap or edit)
       setShowActionModal(true);
+    } else if (shift.status === 'swap_requested' || shift.status === 'partially_covered') {
+      // Gaps or swap requests - show details modal
+      setShowDetailsModal(true);
     } else if (shift.status === 'swap_requested') {
       // Someone else's swap request - show accept modal
       setShowAcceptModal(true);
@@ -205,8 +251,17 @@ export default function ShiftCalendar() {
     });
   };
 
-  const handleLogoUpload = (url) => {
-    setLogoUrl(url);
+  const handleDeleteShift = (shift) => {
+    if (window.confirm('האם אתה בטוח שברצונך למחוק את השיבוץ?')) {
+      deleteShiftMutation.mutate(shift.id);
+    }
+  };
+
+  const handleCoverSegmentSubmit = (segmentData) => {
+    coverSegmentMutation.mutate({
+      shift: selectedShift,
+      segmentData
+    });
   };
 
   const pendingCount = shifts.filter(
@@ -229,8 +284,6 @@ export default function ShiftCalendar() {
           setViewMode={setViewMode}
           onOpenPendingRequests={() => setShowPendingModal(true)}
           pendingCount={pendingCount}
-          logoUrl={logoUrl}
-          onLogoUpload={handleLogoUpload}
         />
 
         <CalendarGrid
@@ -297,6 +350,28 @@ export default function ShiftCalendar() {
           shift={selectedShift}
           onSubmit={handleEditRole}
           isSubmitting={editRoleMutation.isPending}
+        />
+
+        <ShiftDetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          shift={selectedShift}
+          date={selectedDate}
+          onCoverSegment={(shift) => {
+            setSelectedShift(shift);
+            setShowCoverSegmentModal(true);
+          }}
+          onDelete={handleDeleteShift}
+          currentUserEmail={currentUser?.email}
+        />
+
+        <CoverSegmentModal
+          isOpen={showCoverSegmentModal}
+          onClose={() => setShowCoverSegmentModal(false)}
+          shift={selectedShift}
+          date={selectedDate}
+          onSubmit={handleCoverSegmentSubmit}
+          isSubmitting={coverSegmentMutation.isPending}
         />
       </div>
 
