@@ -15,9 +15,7 @@ export default function CalendarHeader({
   setViewMode,
   isAdmin,
   onOpenAdminSettings,
-  currentUser,
-  pendingApprovalCount,
-  onOpenPendingApproval
+  currentUser
 }) {
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
@@ -166,22 +164,6 @@ export default function CalendarHeader({
           )}
         </div>
       </div>
-
-      {/* Pending Approval Button - Always shown for Admins */}
-      {isAdmin && (
-        <div className="mb-4">
-          <Button
-            onClick={onOpenPendingApproval}
-            className="relative bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl shadow-md w-full md:w-auto"
-          >
-            <CheckCircle className="w-4 h-4 mr-2" />
-            בקשות לאישורך
-            <span className="absolute -top-2 -left-2 bg-white text-purple-600 text-xs font-bold min-w-[24px] h-6 rounded-full flex items-center justify-center shadow-sm px-1">
-              {pendingApprovalCount}
-            </span>
-          </Button>
-        </div>
-      )}
 
       {/* Controls Bar */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">

@@ -38,7 +38,7 @@ export default function ShiftCalendar() {
   const [showKPIList, setShowKPIList] = useState(false);
   const [kpiType, setKPIType] = useState('');
   const [showAdminSettings, setShowAdminSettings] = useState(false);
-  const [showPendingApproval, setShowPendingApproval] = useState(false);
+
   const [currentUser, setCurrentUser] = useState(null);
 
   const queryClient = useQueryClient();
@@ -114,28 +114,46 @@ export default function ShiftCalendar() {
     }
   });
 
-  // Offer to cover mutation (moves to pending_approval)
+  // Offer to cover mutation (auto-approve, no admin needed)
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
       const updateData = {
-        status: 'pending_approval',
         covering_person: currentUser?.full_name || currentUser?.email,
         covering_email: currentUser?.email,
         covering_department: currentUser?.department,
-        covering_role: currentUser?.assigned_role
+        covering_role: currentUser?.assigned_role,
+        approved_by: currentUser?.full_name || currentUser?.email,
+        approved_by_email: currentUser?.email
       };
 
       if (coverData.coverFull) {
+        // Full coverage - status becomes approved
+        updateData.status = 'approved';
         updateData.covered_start_time = '09:00';
         updateData.covered_end_time = '09:00';
+        // Replace original assignment
+        updateData.assigned_person = currentUser?.full_name || currentUser?.email;
+        updateData.assigned_email = currentUser?.email;
+        updateData.role = currentUser?.assigned_role;
+        updateData.department = currentUser?.department;
       } else {
+        // Partial coverage - check if fully covered or still has gaps
         updateData.covered_start_time = coverData.startTime;
         updateData.covered_end_time = coverData.endTime;
         
-        // Calculate remaining hours
         const requestedStart = shift.swap_type === 'full' ? '09:00' : shift.swap_start_time;
         const requestedEnd = shift.swap_type === 'full' ? '09:00 (למחרת)' : shift.swap_end_time;
-        if (coverData.startTime !== requestedStart || coverData.endTime !== requestedEnd) {
+        
+        if (coverData.startTime === requestedStart && coverData.endTime === requestedEnd) {
+          // Fully covered
+          updateData.status = 'approved';
+          updateData.assigned_person = currentUser?.full_name || currentUser?.email;
+          updateData.assigned_email = currentUser?.email;
+          updateData.role = currentUser?.assigned_role;
+          updateData.department = currentUser?.department;
+        } else {
+          // Still has gaps
+          updateData.status = 'partially_covered';
           updateData.remaining_hours = `${requestedStart}-${coverData.startTime}, ${coverData.endTime}-${requestedEnd}`;
         }
       }
@@ -145,10 +163,10 @@ export default function ShiftCalendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setShowAcceptModal(false);
-      toast.success('ההצעה נשלחה לאישור מנהל');
+      toast.success('ההחלפה בוצעה בהצלחה!');
     },
     onError: () => {
-      toast.error('שגיאה בשליחת ההצעה');
+      toast.error('שגיאה בביצוע ההחלפה');
     }
   });
 
@@ -274,7 +292,6 @@ export default function ShiftCalendar() {
   };
 
   const isAdmin = currentUser?.user_type === 'admin';
-  const pendingApprovalCount = shifts.filter(s => s.status === 'pending_approval').length;
 
   return (
     <div 
@@ -293,8 +310,6 @@ export default function ShiftCalendar() {
           isAdmin={isAdmin}
           onOpenAdminSettings={() => setShowAdminSettings(true)}
           currentUser={currentUser}
-          pendingApprovalCount={pendingApprovalCount}
-          onOpenPendingApproval={() => setShowPendingApproval(true)}
         />
 
         <KPIHeader
@@ -332,13 +347,7 @@ export default function ShiftCalendar() {
           onClose={() => setShowAdminSettings(false)}
         />
 
-        <PendingApprovalModal
-          isOpen={showPendingApproval}
-          onClose={() => setShowPendingApproval(false)}
-          requests={shifts}
-          onApprove={(shift) => approveSwapMutation.mutate(shift)}
-          isApproving={approveSwapMutation.isPending}
-        />
+
 
         <SwapRequestModal
           isOpen={showSwapModal}

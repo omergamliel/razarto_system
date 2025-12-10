@@ -23,7 +23,7 @@ export default function ShiftCell({
       return;
     }
 
-    // Regular shift - only owner can click
+    // Regular shift - only owner can click (must match role exactly)
     if (shift.status === 'regular') {
       if (isMyShift) {
         onClick(date, shift);
@@ -32,12 +32,12 @@ export default function ShiftCell({
     }
 
     // Swap requested or partial - everyone can click
-    if (shift.status === 'swap_requested' || shift.status === 'partially_covered' || shift.status === 'pending_approval') {
+    if (shift.status === 'swap_requested' || shift.status === 'partially_covered') {
       onClick(date, shift);
       return;
     }
 
-    // Approved - read-only, everyone can view
+    // Approved - everyone can view
     if (shift.status === 'approved') {
       onClick(date, shift);
       return;

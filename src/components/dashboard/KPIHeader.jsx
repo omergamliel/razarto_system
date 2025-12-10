@@ -44,7 +44,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
     },
     {
       id: 'approved',
-      title: 'החלפות שאושרו',
+      title: 'החלפות שבוצעו',
       count: approved,
       icon: CheckCircle,
       color: 'from-green-500 to-green-600',
@@ -54,7 +54,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
     },
     {
       id: 'my_shifts',
-      title: 'המשמרות שלי',
+      title: 'המשמרות העתידיות שלי',
       count: myShifts,
       icon: Calendar,
       color: 'from-blue-500 to-blue-600',
