@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings, Plus, Trash2, Users, Edit2, AlertCircle } from 'lucide-react';
+import { X, Settings, Plus, Trash2, Users, Edit2, AlertCircle, Save } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,6 +21,8 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   const [editMode, setEditMode] = useState(false);
   const [newRoles, setNewRoles] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [editingRole, setEditingRole] = useState(null);
+  const [editedName, setEditedName] = useState('');
   const queryClient = useQueryClient();
 
   const { data: roles = [] } = useQuery({
@@ -38,6 +40,16 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
       toast.success('התפקיד נוסף בהצלחה');
+    }
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ id, roleName }) =>
+      base44.entities.RoleDefinition.update(id, { role_name: roleName }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
+      toast.success('התפקיד עודכן');
+      setEditingRole(null);
     }
   });
 
@@ -81,6 +93,16 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     }
   };
 
+  const handleEditStart = (role) => {
+    setEditingRole(role.id);
+    setEditedName(role.role_name);
+  };
+
+  const handleEditSave = (id) => {
+    if (!editedName) return;
+    updateRoleMutation.mutate({ id, roleName: editedName });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -98,9 +120,9 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col"
         >
-          <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-6 text-white">
+          <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-6 text-white flex-shrink-0">
             <button
               onClick={onClose}
               className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors"
@@ -125,7 +147,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          <ScrollArea className="flex-1 p-6">
+          <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: '70vh' }}>
             <div className="space-y-6">
               {departments.map((dept) => (
                 <Card key={dept} className="p-6 border-2">
@@ -134,7 +156,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                     {dept}
                   </h3>
 
-                  <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                  <div className="space-y-3 mb-4">
                     {roles
                       .filter(r => r.department === dept)
                       .map((role) => (
@@ -143,18 +165,52 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                           className="bg-gray-50 rounded-xl p-4 flex items-center justify-between"
                         >
                           <div className="flex-1">
-                            <p className="font-semibold text-gray-800">{role.role_name}</p>
-                            {role.assigned_user_name && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <Users className="w-3 h-3 text-gray-500" />
-                                <span className="text-sm text-gray-600">
-                                  {role.assigned_user_name}
-                                </span>
+                            {editingRole === role.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={editedName}
+                                  onChange={(e) => setEditedName(e.target.value)}
+                                  className="max-w-xs"
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleEditSave(role.id)}
+                                  className="bg-green-500 hover:bg-green-600"
+                                >
+                                  <Save className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingRole(null)}
+                                >
+                                  ביטול
+                                </Button>
                               </div>
+                            ) : (
+                              <>
+                                <p className="font-semibold text-gray-800">{role.role_name}</p>
+                                {role.assigned_user_name && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Users className="w-3 h-3 text-gray-500" />
+                                    <span className="text-sm text-gray-600">
+                                      {role.assigned_user_name}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
-                          {editMode && (
+                          {editMode && editingRole !== role.id && (
                             <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditStart(role)}
+                                className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
                               {role.assigned_user_email && (
                                 <Button
                                   size="sm"
@@ -197,7 +253,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                 </Card>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         </motion.div>
 
         {/* Delete Confirmation Dialog */}

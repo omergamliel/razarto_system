@@ -2,7 +2,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, Calendar, Clock, User, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, Calendar, Clock, User, AlertCircle, ArrowRight } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -34,6 +34,34 @@ export default function PendingApprovalModal({
       onApprove(confirmApprove);
       setConfirmApprove(null);
     }
+  };
+
+  const formatTimeBreakdown = (request) => {
+    const isFull = request.covered_start_time === '09:00' && 
+                   (request.covered_end_time === '09:00' || request.covered_end_time === '09:00 (למחרת)');
+    
+    if (isFull) {
+      return '09:00 - 09:00 (למחרת) - החלפה מלאה';
+    }
+
+    return (
+      <div className="space-y-1 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-red-400" />
+          <span>09:00 - {request.covered_start_time}: {request.role} (מקורי)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-blue-400" />
+          <span>{request.covered_start_time} - {request.covered_end_time}: {request.covering_role} (מחליף)</span>
+        </div>
+        {request.remaining_hours && (
+          <div className="flex items-center gap-2 text-orange-600">
+            <div className="w-2 h-2 rounded-full bg-orange-400" />
+            <span>פער נותר: {request.remaining_hours}</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -86,41 +114,45 @@ export default function PendingApprovalModal({
                 {pendingApprovalRequests.map((request) => (
                   <div
                     key={request.id}
-                    className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border-2 border-purple-200"
+                    className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 border-2 border-purple-200"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Calendar className="w-5 h-5 text-purple-600" />
+                        <span className="font-bold text-gray-800 text-lg">
+                          {format(new Date(request.date), 'EEEE, d בMMMM', { locale: he })}
+                        </span>
+                      </div>
+
+                      {/* Swap Parties */}
+                      <div className="bg-white rounded-xl p-4 mb-3">
+                        <div className="flex items-center justify-center gap-3 text-center">
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 mb-1">תפקיד מקורי</div>
+                            <div className="font-bold text-red-600 text-lg">{request.role}</div>
+                            <div className="text-xs text-gray-600 mt-1">{request.assigned_person}</div>
+                          </div>
+                          
+                          <div className="flex flex-col items-center">
+                            <ArrowRight className="w-6 h-6 text-purple-600" />
+                            <span className="text-xs text-purple-600 font-medium">מחליף עם</span>
+                          </div>
+                          
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 mb-1">תפקיד מחליף</div>
+                            <div className="font-bold text-blue-600 text-lg">{request.covering_role}</div>
+                            <div className="text-xs text-gray-600 mt-1">{request.covering_person}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Time Breakdown */}
+                      <div className="bg-white rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <Calendar className="w-4 h-4 text-purple-600" />
-                          <span className="font-semibold text-gray-800">
-                            {format(new Date(request.date), 'EEEE, d בMMMM', { locale: he })}
-                          </span>
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-semibold text-gray-700">פילוח שעות:</span>
                         </div>
-                        <div className="bg-white/60 rounded-lg p-3 space-y-2">
-                          <div className="flex items-center gap-2 text-sm">
-                            <User className="w-4 h-4 text-red-500" />
-                            <span className="text-gray-700">
-                              <span className="font-medium">מבקש:</span> {request.assigned_person}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <User className="w-4 h-4 text-blue-500" />
-                            <span className="text-gray-700">
-                              <span className="font-medium">מכסה:</span> {request.covering_person}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <Clock className="w-4 h-4 text-gray-500" />
-                            <span className="text-gray-700">
-                              {request.covered_start_time} - {request.covered_end_time}
-                            </span>
-                          </div>
-                          {request.remaining_hours && (
-                            <div className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-1">
-                              פער נותר: {request.remaining_hours}
-                            </div>
-                          )}
-                        </div>
+                        {formatTimeBreakdown(request)}
                       </div>
                     </div>
 

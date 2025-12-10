@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Calendar, List, Settings, Upload, CheckCircle } from 'lucide-react';
 import { format, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
@@ -6,6 +6,7 @@ import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export default function CalendarHeader({ 
   currentDate, 
@@ -15,12 +16,34 @@ export default function CalendarHeader({
   isAdmin,
   onOpenAdminSettings,
   currentUser,
-  logoUrl,
-  onLogoUpdate,
   pendingApprovalCount,
   onOpenPendingApproval
 }) {
   const fileInputRef = useRef(null);
+  const queryClient = useQueryClient();
+
+  // Fetch logo from DB
+  const { data: appSettings = [] } = useQuery({
+    queryKey: ['app-settings'],
+    queryFn: () => base44.entities.AppSettings.list(),
+  });
+
+  const logoUrl = appSettings.find(s => s.setting_key === 'logo')?.logo_url || '';
+
+  // Update logo mutation
+  const updateLogoMutation = useMutation({
+    mutationFn: async (url) => {
+      const existing = appSettings.find(s => s.setting_key === 'logo');
+      if (existing) {
+        return base44.entities.AppSettings.update(existing.id, { logo_url: url });
+      } else {
+        return base44.entities.AppSettings.create({ setting_key: 'logo', logo_url: url });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['app-settings'] });
+    }
+  });
 
   const navigatePrev = () => {
     if (viewMode === 'month') {
@@ -58,7 +81,7 @@ export default function CalendarHeader({
 
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      onLogoUpdate(file_url);
+      updateLogoMutation.mutate(file_url);
       toast.success('הלוגו עודכן בהצלחה');
     } catch (error) {
       toast.error('שגיאה בהעלאת הלוגו');
@@ -74,17 +97,19 @@ export default function CalendarHeader({
       <div className="flex items-start justify-between mb-6 pt-2">
         {/* Logo - Right */}
         <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
+          {isAdmin && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          )}
           <motion.div
             whileHover={isAdmin ? { scale: 1.05 } : {}}
             whileTap={isAdmin ? { scale: 0.95 } : {}}
-            onClick={handleLogoClick}
+            onClick={isAdmin ? handleLogoClick : undefined}
             className={`w-16 h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer group' : ''}`}
           >
             {logoUrl ? (

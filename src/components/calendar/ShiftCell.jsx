@@ -10,8 +10,38 @@ export default function ShiftCell({
   onClick, 
   currentMonth,
   isWeekView = false,
-  currentUserEmail
+  currentUserEmail,
+  currentUserRole
 }) {
+  const handleClick = () => {
+    if (!shift) {
+      onClick(date, shift);
+      return;
+    }
+
+    // Regular shift - only owner can click
+    if (shift.status === 'regular') {
+      if (shift.role === currentUserRole) {
+        onClick(date, shift);
+      }
+      return;
+    }
+
+    // Swap requested or partial - everyone can click
+    if (shift.status === 'swap_requested' || shift.status === 'partially_covered') {
+      onClick(date, shift);
+      return;
+    }
+
+    // Approved - read-only, everyone can view
+    if (shift.status === 'approved') {
+      onClick(date, shift);
+      return;
+    }
+
+    // Default - allow click
+    onClick(date, shift);
+  };
   const isCurrentMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
   const isMyShift = shift && shift.assigned_email === currentUserEmail;
@@ -80,7 +110,7 @@ export default function ShiftCell({
     <motion.div
       whileHover={{ scale: 1.02, y: -2 }}
       whileTap={{ scale: 0.98 }}
-      onClick={() => onClick(date, shift)}
+      onClick={handleClick}
       className={`
         relative cursor-pointer rounded-xl transition-all duration-200
         ${isWeekView ? 'min-h-[140px] p-4' : 'min-h-[90px] md:min-h-[110px] p-2 md:p-3'}

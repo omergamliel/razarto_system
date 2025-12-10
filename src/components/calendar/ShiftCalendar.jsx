@@ -40,7 +40,6 @@ export default function ShiftCalendar() {
   const [showAdminSettings, setShowAdminSettings] = useState(false);
   const [showPendingApproval, setShowPendingApproval] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [logoUrl, setLogoUrl] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -274,10 +273,6 @@ export default function ShiftCalendar() {
     base44.auth.me().then(user => setCurrentUser(user));
   };
 
-  const handleLogoUpdate = (url) => {
-    setLogoUrl(url);
-  };
-
   const isAdmin = currentUser?.user_type === 'admin';
   const pendingApprovalCount = shifts.filter(s => s.status === 'pending_approval').length;
 
@@ -298,8 +293,6 @@ export default function ShiftCalendar() {
           isAdmin={isAdmin}
           onOpenAdminSettings={() => setShowAdminSettings(true)}
           currentUser={currentUser}
-          logoUrl={logoUrl}
-          onLogoUpdate={handleLogoUpdate}
           pendingApprovalCount={pendingApprovalCount}
           onOpenPendingApproval={() => setShowPendingApproval(true)}
         />
@@ -316,6 +309,7 @@ export default function ShiftCalendar() {
           shifts={shifts}
           onCellClick={handleCellClick}
           currentUserEmail={currentUser?.email}
+          currentUserRole={currentUser?.assigned_role}
         />
 
         <OnboardingModal
