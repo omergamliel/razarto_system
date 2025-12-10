@@ -48,12 +48,11 @@ export default function ShiftCell({
   };
   const isCurrentMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
-  const isMyShift = shift && shift.assigned_email === currentUserEmail;
   
   const getStatusStyles = () => {
     if (!shift) return {};
     
-    // My shifts always get blue background
+    // My shifts always get blue background (containment logic)
     if (isMyShift) {
       return {
         bg: 'bg-gradient-to-br from-[#E3F2FD] to-[#BBDEFB]',
@@ -64,6 +63,14 @@ export default function ShiftCell({
     }
     
     switch (shift.status) {
+      case 'pending_approval':
+        // Orange - waiting for admin approval
+        return {
+          bg: 'bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2]',
+          border: 'border-[#FF9800]',
+          badge: 'bg-[#FF9800]',
+          icon: Clock
+        };
       case 'swap_requested':
         return {
           bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2]',
@@ -72,10 +79,11 @@ export default function ShiftCell({
           icon: AlertCircle
         };
       case 'partially_covered':
+        // Yellow - partial coverage
         return {
-          bg: 'bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2]',
-          border: 'border-[#FFB74D]',
-          badge: 'bg-[#FFB74D]',
+          bg: 'bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4]',
+          border: 'border-[#FDD835]',
+          badge: 'bg-[#FDD835]',
           icon: AlertCircle
         };
       case 'approved':
@@ -117,7 +125,7 @@ export default function ShiftCell({
       onClick={handleClick}
       className={`
         relative cursor-pointer rounded-xl transition-all duration-200
-        ${isWeekView ? 'min-h-[140px] p-4' : 'min-h-[90px] md:min-h-[110px] p-2 md:p-3'}
+        ${isWeekView ? 'min-h-[140px] p-3 md:p-4' : 'min-h-[70px] md:min-h-[110px] p-1.5 md:p-3'}
         ${statusStyles.bg}
         ${statusStyles.border ? `border-2 ${statusStyles.border}` : 'border border-gray-100'}
         ${!isCurrentMonth ? 'opacity-40' : ''}
@@ -128,9 +136,9 @@ export default function ShiftCell({
     >
       {/* Date Badge */}
       <div className={`
-        absolute top-2 right-2 w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center
+        absolute top-1 right-1 md:top-2 md:right-2 w-6 h-6 md:w-8 md:h-8 rounded-lg flex items-center justify-center
         ${today ? 'bg-[#64B5F6] text-white' : 'bg-gray-100 text-gray-600'}
-        font-semibold text-sm
+        font-semibold text-xs md:text-sm
       `}>
         {format(date, 'd')}
       </div>
@@ -146,12 +154,12 @@ export default function ShiftCell({
 
       {/* Shift Content */}
       {shift && (
-        <div className={`${isWeekView ? 'mt-4' : 'mt-8 md:mt-10'} space-y-1`}>
+        <div className={`${isWeekView ? 'mt-4' : 'mt-6 md:mt-10'} space-y-0.5 md:space-y-1`}>
           {/* Role Name Only */}
           {shift.role && (
             <p className={`
-              font-bold text-gray-800 truncate text-center
-              ${isWeekView ? 'text-lg' : 'text-sm md:text-base'}
+              font-normal md:font-semibold text-gray-800 truncate text-center
+              ${isWeekView ? 'text-base md:text-lg' : 'text-xs md:text-base'}
             `}>
               {getCleanRoleName(shift.role)}
             </p>
@@ -179,10 +187,11 @@ export default function ShiftCell({
               ${isWeekView ? 'justify-center' : ''}
             `}>
               <StatusIcon className="w-3 h-3 text-gray-600" />
-              <span className="text-[10px] md:text-xs text-gray-600">
+              <span className="text-[9px] md:text-xs text-gray-600 font-normal">
+                {shift.status === 'pending_approval' && 'ממתין לאישור מנהל'}
                 {shift.status === 'swap_requested' && 'בקשה להחלפה'}
-                {shift.status === 'swap_confirmed' && 'אושר'}
-                {shift.status === 'partially_covered' && '⚠️ פער'}
+                {shift.status === 'approved' && 'אושר'}
+                {shift.status === 'partially_covered' && shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'פער חלקי'}
               </span>
             </div>
           )}
