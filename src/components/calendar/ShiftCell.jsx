@@ -63,14 +63,6 @@ export default function ShiftCell({
     }
     
     switch (shift.status) {
-      case 'pending_approval':
-        // Orange - waiting for admin approval
-        return {
-          bg: 'bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2]',
-          border: 'border-[#FF9800]',
-          badge: 'bg-[#FF9800]',
-          icon: Clock
-        };
       case 'swap_requested':
         return {
           bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2]',
@@ -188,9 +180,8 @@ export default function ShiftCell({
             `}>
               <StatusIcon className="w-3 h-3 text-gray-600" />
               <span className="text-[9px] md:text-xs text-gray-600 font-normal">
-                {shift.status === 'pending_approval' && 'ממתין לאישור מנהל'}
                 {shift.status === 'swap_requested' && 'בקשה להחלפה'}
-                {shift.status === 'approved' && 'אושר'}
+                {shift.status === 'approved' && 'הוחלף'}
                 {shift.status === 'partially_covered' && shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'פער חלקי'}
               </span>
             </div>

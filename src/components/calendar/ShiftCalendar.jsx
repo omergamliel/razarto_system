@@ -340,6 +340,11 @@ export default function ShiftCalendar() {
           shifts={shifts}
           currentUser={currentUser}
           onOfferCover={handleOfferCover}
+          onRequestSwap={(shift) => {
+            setSelectedShift(shift);
+            setSelectedDate(new Date(shift.date));
+            setShowSwapModal(true);
+          }}
         />
 
         <AdminSettingsModal

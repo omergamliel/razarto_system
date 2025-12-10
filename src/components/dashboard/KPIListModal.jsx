@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover }) {
+export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover, onRequestSwap }) {
   if (!isOpen) return null;
 
   const formatTimeBreakdown = (shift) => {
@@ -40,9 +40,9 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
       case 'partial_gaps':
         return { title: 'משמרות בפער חלקי', color: 'from-yellow-500 to-yellow-600' };
       case 'approved':
-        return { title: 'החלפות שאושרו', color: 'from-green-500 to-green-600' };
+        return { title: 'החלפות שבוצעו', color: 'from-green-500 to-green-600' };
       case 'my_shifts':
-        return { title: 'המשמרות שלי', color: 'from-blue-500 to-blue-600' };
+        return { title: 'המשמרות העתידיות שלי', color: 'from-blue-500 to-blue-600' };
       default:
         return { title: '', color: '' };
     }
@@ -178,6 +178,19 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white"
                         >
                           אני אחליף
+                          <ArrowRight className="w-4 h-4 mr-1" />
+                        </Button>
+                      )}
+                      {type === 'my_shifts' && onRequestSwap && (
+                        <Button
+                          onClick={() => {
+                            onClose();
+                            onRequestSwap(shift);
+                          }}
+                          size="sm"
+                          className="bg-gradient-to-r from-[#E57373] to-[#EF5350] hover:from-[#EF5350] hover:to-[#F44336] text-white"
+                        >
+                          בקש החלפה
                           <ArrowRight className="w-4 h-4 mr-1" />
                         </Button>
                       )}
