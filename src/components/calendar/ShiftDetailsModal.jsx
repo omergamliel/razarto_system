@@ -2,9 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Trash2, Plus, AlertCircle } from 'lucide-react';
+import { X, Calendar, Clock, User, Trash2, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
@@ -15,8 +23,11 @@ export default function ShiftDetailsModal({
   date,
   onCoverSegment,
   onDelete,
-  currentUserEmail
+  onApprove,
+  currentUserEmail,
+  isAdmin
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [segments, setSegments] = useState([]);
 
   // Fetch shift segments
@@ -60,6 +71,11 @@ export default function ShiftDetailsModal({
   const { covered, gaps } = calculateCoverage();
   const hasGaps = gaps.length > 0 || shift.status === 'swap_requested';
   const isOwnShift = shift.assigned_email === currentUserEmail;
+
+  const handleDelete = () => {
+    onDelete(shift.id);
+    setShowDeleteConfirm(false);
+  };
 
   return (
     <AnimatePresence>
@@ -114,9 +130,9 @@ export default function ShiftDetailsModal({
                   <div className="flex-1">
                     <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
                   </div>
-                  {isOwnShift && (
+                  {isAdmin && (
                     <Button
-                      onClick={() => onDelete(shift)}
+                      onClick={() => setShowDeleteConfirm(true)}
                       variant="ghost"
                       size="sm"
                       className="text-red-500 hover:text-red-700 hover:bg-red-50"
@@ -193,9 +209,48 @@ export default function ShiftDetailsModal({
                   </div>
                 </Button>
               )}
+
+              {/* Approve Button - Admin Only */}
+              {isAdmin && shift.status === 'pending_approval' && (
+                <Button
+                  onClick={() => {
+                    onApprove();
+                    onClose();
+                  }}
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-6 rounded-xl text-lg font-medium shadow-md"
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <CheckCircle className="w-5 h-5" />
+                    <span>אשר החלפה</span>
+                  </div>
+                </Button>
+              )}
             </div>
           </ScrollArea>
         </motion.div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                אישור מחיקה
+              </DialogTitle>
+              <DialogDescription>
+                האם אתה בטוח שברצונך למחוק את השיבוץ הזה?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                ביטול
+              </Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                אישור מחיקה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AnimatePresence>
   );

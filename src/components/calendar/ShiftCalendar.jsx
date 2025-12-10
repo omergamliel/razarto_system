@@ -19,6 +19,7 @@ import OnboardingModal from '../onboarding/OnboardingModal';
 import KPIHeader from '../dashboard/KPIHeader';
 import KPIListModal from '../dashboard/KPIListModal';
 import AdminSettingsModal from '../admin/AdminSettingsModal';
+import PendingApprovalModal from './PendingApprovalModal';
 
 export default function ShiftCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -37,7 +38,9 @@ export default function ShiftCalendar() {
   const [showKPIList, setShowKPIList] = useState(false);
   const [kpiType, setKPIType] = useState('');
   const [showAdminSettings, setShowAdminSettings] = useState(false);
+  const [showPendingApproval, setShowPendingApproval] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [logoUrl, setLogoUrl] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -119,8 +122,8 @@ export default function ShiftCalendar() {
         status: 'pending_approval',
         covering_person: currentUser?.full_name || currentUser?.email,
         covering_email: currentUser?.email,
-        covering_department: coverData.department,
-        covering_role: coverData.role
+        covering_department: currentUser?.department,
+        covering_role: currentUser?.assigned_role
       };
 
       if (coverData.coverFull) {
@@ -271,7 +274,12 @@ export default function ShiftCalendar() {
     base44.auth.me().then(user => setCurrentUser(user));
   };
 
+  const handleLogoUpdate = (url) => {
+    setLogoUrl(url);
+  };
+
   const isAdmin = currentUser?.user_type === 'admin';
+  const pendingApprovalCount = shifts.filter(s => s.status === 'pending_approval').length;
 
   return (
     <div 
@@ -289,6 +297,11 @@ export default function ShiftCalendar() {
           setViewMode={setViewMode}
           isAdmin={isAdmin}
           onOpenAdminSettings={() => setShowAdminSettings(true)}
+          currentUser={currentUser}
+          logoUrl={logoUrl}
+          onLogoUpdate={handleLogoUpdate}
+          pendingApprovalCount={pendingApprovalCount}
+          onOpenPendingApproval={() => setShowPendingApproval(true)}
         />
 
         <KPIHeader
@@ -324,6 +337,14 @@ export default function ShiftCalendar() {
           onClose={() => setShowAdminSettings(false)}
         />
 
+        <PendingApprovalModal
+          isOpen={showPendingApproval}
+          onClose={() => setShowPendingApproval(false)}
+          requests={shifts}
+          onApprove={(shift) => approveSwapMutation.mutate(shift)}
+          isApproving={approveSwapMutation.isPending}
+        />
+
         <SwapRequestModal
           isOpen={showSwapModal}
           onClose={() => setShowSwapModal(false)}
@@ -338,10 +359,8 @@ export default function ShiftCalendar() {
           onClose={() => setShowPendingModal(false)}
           requests={shifts}
           onAccept={handleOfferCover}
-          onApprove={approveSwapMutation.mutate}
           isAccepting={false}
           currentUserEmail={currentUser?.email}
-          isAdmin={isAdmin}
         />
 
         <AddShiftModal
