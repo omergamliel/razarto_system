@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ArrowRight } from 'lucide-react';
+import { X, Calendar, User, ArrowRight, Clock, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
@@ -8,6 +8,30 @@ import { he } from 'date-fns/locale';
 
 export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover }) {
   if (!isOpen) return null;
+
+  const formatTimeBreakdown = (shift) => {
+    if (!shift.covered_start_time) return null;
+    
+    const isFull = shift.covered_start_time === '09:00' && 
+                   (shift.covered_end_time === '09:00' || shift.covered_end_time === '09:00 (למחרת)');
+    
+    if (isFull) {
+      return '09:00 - 09:00 (למחרת) - החלפה מלאה';
+    }
+
+    return (
+      <div className="space-y-1 text-xs mt-2">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+          <span>09:00 - {shift.covered_start_time}: {shift.role}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          <span>{shift.covered_start_time} - {shift.covered_end_time}: {shift.covering_role}</span>
+        </div>
+      </div>
+    );
+  };
 
   const getTitleAndColor = () => {
     switch (type) {
@@ -95,15 +119,45 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             {format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <User className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm text-gray-700">{shift.assigned_person}</span>
-                        </div>
-                        <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
+
+                        {type === 'approved' && shift.covering_role ? (
+                          <div className="bg-white rounded-lg p-3 mb-2">
+                            <div className="flex items-center justify-center gap-2 text-sm mb-2">
+                              <div className="text-center flex-1">
+                                <div className="text-xs text-gray-500">תפקיד מקורי</div>
+                                <div className="font-bold text-red-600">{shift.role}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">{shift.swap_request_by}</div>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-gray-400" />
+                              <div className="text-center flex-1">
+                                <div className="text-xs text-gray-500">תפקיד מחליף</div>
+                                <div className="font-bold text-blue-600">{shift.covering_role}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">{shift.covering_person}</div>
+                              </div>
+                            </div>
+                            <div className="border-t border-gray-200 pt-2">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Clock className="w-3 h-3 text-gray-500" />
+                                <span className="text-xs font-semibold text-gray-700">פילוח שעות:</span>
+                              </div>
+                              {formatTimeBreakdown(shift)}
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 mb-1">
+                              <User className="w-4 h-4 text-gray-500" />
+                              <span className="text-sm text-gray-700">{shift.assigned_person}</span>
+                            </div>
+                            <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
+                          </>
+                        )}
+
                         {shift.remaining_hours && (
-                          <p className="text-xs text-yellow-600 mt-1">
-                            נותרו לכיסוי: {shift.remaining_hours}
-                          </p>
+                          <div className="flex items-center gap-2 text-xs text-orange-600 mt-2">
+                            <AlertCircle className="w-3 h-3" />
+                            <span>נותרו לכיסוי: {shift.remaining_hours}</span>
+                          </div>
                         )}
                       </div>
                       {type === 'swap_requests' && shift.assigned_email !== currentUser?.email && (
