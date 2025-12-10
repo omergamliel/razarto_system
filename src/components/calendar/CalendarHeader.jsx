@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Calendar, List, Settings } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Calendar, List, Settings, Upload, CheckCircle } from 'lucide-react';
 import { format, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 
 export default function CalendarHeader({ 
   currentDate, 
@@ -11,8 +13,15 @@ export default function CalendarHeader({
   viewMode, 
   setViewMode,
   isAdmin,
-  onOpenAdminSettings
+  onOpenAdminSettings,
+  currentUser,
+  logoUrl,
+  onLogoUpdate,
+  pendingApprovalCount,
+  onOpenPendingApproval
 }) {
+  const fileInputRef = useRef(null);
+
   const navigatePrev = () => {
     if (viewMode === 'month') {
       setCurrentDate(subMonths(currentDate, 1));
@@ -37,39 +46,117 @@ export default function CalendarHeader({
     }
   };
 
+  const handleLogoClick = () => {
+    if (isAdmin) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      onLogoUpdate(file_url);
+      toast.success('הלוגו עודכן בהצלחה');
+    } catch (error) {
+      toast.error('שגיאה בהעלאת הלוגו');
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className="relative z-10 mb-6"
     >
-      {/* Logo and Title */}
-      <div className="flex items-center justify-between mb-6 pt-2">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center">
-            <div className="text-white text-xs font-bold text-center leading-tight">
-              חטיבת<br/>מבצעים
-            </div>
-          </div>
-          <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-wider" style={{ letterSpacing: '0.15em' }}>
-              Razarto
-            </h1>
-            <p className="text-gray-600 text-sm md:text-base font-medium">
-              מערכת לניהול משמרות רז"ר תורן
-            </p>
-          </div>
-        </div>
-        {isAdmin && (
-          <Button
-            onClick={onOpenAdminSettings}
-            variant="outline"
-            className="rounded-xl border-2 border-gray-300 hover:border-gray-400"
+      <div className="flex items-start justify-between mb-6 pt-2">
+        {/* Logo - Right */}
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <motion.div
+            whileHover={isAdmin ? { scale: 1.05 } : {}}
+            whileTap={isAdmin ? { scale: 0.95 } : {}}
+            onClick={handleLogoClick}
+            className={`w-16 h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer group' : ''}`}
           >
-            <Settings className="w-5 h-5 text-gray-600" />
-          </Button>
-        )}
+            {logoUrl ? (
+              <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-white text-xs font-bold text-center leading-tight">
+                חטיבת<br/>מבצעים
+              </div>
+            )}
+            {isAdmin && (
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Upload className="w-6 h-6 text-white" />
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Center - Title */}
+        <div className="flex-1 text-center">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-wider mb-1" style={{ letterSpacing: '0.15em' }}>
+            Razarto
+          </h1>
+          <p className="text-gray-600 text-sm md:text-base font-medium">
+            מערכת לניהול משמרות רז"ר תורן
+          </p>
+          <p className="text-gray-400 text-xs md:text-sm mt-0.5">
+            צפייה במשמרות | ביצוע החלפות מסודרות
+          </p>
+        </div>
+
+        {/* Left - User Info & Settings */}
+        <div className="flex flex-col items-start gap-2">
+          {currentUser && (
+            <div className="text-left">
+              <p className="font-semibold text-gray-800 text-sm">
+                שלום, {currentUser.full_name || currentUser.email}
+              </p>
+              {currentUser.assigned_role && (
+                <p className="text-xs text-gray-500">
+                  תפקידך: {currentUser.assigned_role}
+                </p>
+              )}
+            </div>
+          )}
+          {isAdmin && (
+            <Button
+              onClick={onOpenAdminSettings}
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-2"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Pending Approval Button - Only for Admins */}
+      {isAdmin && pendingApprovalCount > 0 && (
+        <div className="mb-4">
+          <Button
+            onClick={onOpenPendingApproval}
+            className="relative bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl shadow-md w-full md:w-auto"
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            החלפות לאישורך
+            <span className="absolute -top-2 -left-2 bg-white text-purple-600 text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-sm">
+              {pendingApprovalCount}
+            </span>
+          </Button>
+        </div>
+      )}
 
       {/* Controls Bar */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -124,8 +211,6 @@ export default function CalendarHeader({
               <ChevronLeft className="w-5 h-5" />
             </Button>
           </div>
-
-
         </div>
       </div>
     </motion.div>

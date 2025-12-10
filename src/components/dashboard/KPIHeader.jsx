@@ -57,7 +57,7 @@ export default function KPIHeader({ shifts, currentUserEmail, onKPIClick }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
       {kpis.map((kpi, index) => (
         <motion.div
           key={kpi.id}
@@ -67,17 +67,17 @@ export default function KPIHeader({ shifts, currentUserEmail, onKPIClick }) {
         >
           <Card
             onClick={() => onKPIClick(kpi.id)}
-            className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 ${kpi.borderColor} ${kpi.bgColor} p-4`}
+            className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 ${kpi.borderColor} ${kpi.bgColor} p-2 md:p-4`}
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className={`p-2 rounded-lg bg-gradient-to-br ${kpi.color}`}>
-                <kpi.icon className="w-5 h-5 text-white" />
+            <div className="flex flex-col md:flex-row items-center justify-between mb-1 md:mb-3">
+              <div className={`p-1 md:p-2 rounded-lg bg-gradient-to-br ${kpi.color}`}>
+                <kpi.icon className="w-3 h-3 md:w-5 md:h-5 text-white" />
               </div>
-              <span className={`text-3xl font-bold ${kpi.textColor}`}>
+              <span className={`text-xl md:text-3xl font-bold ${kpi.textColor}`}>
                 {kpi.count}
               </span>
             </div>
-            <h3 className="text-sm font-semibold text-gray-700">
+            <h3 className="text-[10px] md:text-sm font-semibold text-gray-700 leading-tight">
               {kpi.title}
             </h3>
           </Card>

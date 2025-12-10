@@ -105,15 +105,14 @@ export default function ShiftDetailsModal({
           {/* Content */}
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-4">
-              {/* Original Assignment */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
-                <p className="text-sm text-gray-500 mb-1">משובץ במקור</p>
+              {/* Role Title - Emphasized */}
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 text-center">
+                {shift.role && (
+                  <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
+                )}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
-                    {shift.role && (
-                      <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
-                    )}
+                  <div className="flex-1">
+                    <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
                   </div>
                   {isOwnShift && (
                     <Button

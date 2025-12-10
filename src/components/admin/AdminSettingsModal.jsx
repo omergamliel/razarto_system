@@ -1,17 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings, Plus, Trash2, Users } from 'lucide-react';
+import { X, Settings, Plus, Trash2, Users, Edit2, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
 export default function AdminSettingsModal({ isOpen, onClose }) {
-  const [newDepartment, setNewDepartment] = useState('');
+  const [editMode, setEditMode] = useState(false);
   const [newRoles, setNewRoles] = useState({});
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: roles = [] } = useQuery({
@@ -37,6 +46,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
       toast.success('התפקיד נמחק');
+      setDeleteConfirm(null);
     }
   });
 
@@ -49,6 +59,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
       toast.success('המשתמש הוסר מהתפקיד');
+      setDeleteConfirm(null);
     }
   });
 
@@ -60,6 +71,14 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
     addRoleMutation.mutate({ department, roleName });
     setNewRoles({ ...newRoles, [department]: '' });
+  };
+
+  const handleDelete = (item) => {
+    if (item.type === 'role') {
+      deleteRoleMutation.mutate(item.id);
+    } else if (item.type === 'user') {
+      removeUserMutation.mutate({ id: item.id });
+    }
   };
 
   if (!isOpen) return null;
@@ -88,12 +107,21 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-3">
-              <Settings className="w-8 h-8" />
-              <div>
-                <h2 className="text-2xl font-bold">ניהול מערכת</h2>
-                <p className="text-white/80 text-sm">מבנה ארגוני ותפקידים</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Settings className="w-8 h-8" />
+                <div>
+                  <h2 className="text-2xl font-bold">ניהול מערכת</h2>
+                  <p className="text-white/80 text-sm">מבנה ארגוני ותפקידים</p>
+                </div>
               </div>
+              <Button
+                onClick={() => setEditMode(!editMode)}
+                className={`${editMode ? 'bg-white text-gray-800' : 'bg-white/20'} hover:bg-white hover:text-gray-800`}
+              >
+                <Edit2 className="w-4 h-4 mr-2" />
+                {editMode ? 'סיום עריכה' : 'מצב עריכה'}
+              </Button>
             </div>
           </div>
 
@@ -106,7 +134,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                     {dept}
                   </h3>
 
-                  <div className="space-y-3 mb-4">
+                  <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
                     {roles
                       .filter(r => r.department === dept)
                       .map((role) => (
@@ -125,26 +153,28 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                               </div>
                             )}
                           </div>
-                          <div className="flex gap-2">
-                            {role.assigned_user_email && (
+                          {editMode && (
+                            <div className="flex gap-2">
+                              {role.assigned_user_email && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setDeleteConfirm({ type: 'user', id: role.id, name: role.assigned_user_name })}
+                                  className="text-orange-500 hover:text-orange-700 hover:bg-orange-50"
+                                >
+                                  הסר משתמש
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => removeUserMutation.mutate({ id: role.id })}
-                                className="text-orange-500 hover:text-orange-700 hover:bg-orange-50"
+                                onClick={() => setDeleteConfirm({ type: 'role', id: role.id, name: role.role_name })}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
                               >
-                                הסר משתמש
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => deleteRoleMutation.mutate(role.id)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                   </div>
@@ -169,6 +199,35 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             </div>
           </ScrollArea>
         </motion.div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                אישור מחיקה
+              </DialogTitle>
+              <DialogDescription>
+                {deleteConfirm?.type === 'role' 
+                  ? `האם אתה בטוח שברצונך למחוק את התפקיד "${deleteConfirm?.name}"?`
+                  : `האם אתה בטוח שברצונך להסיר את המשתמש "${deleteConfirm?.name}" מהתפקיד?`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+                ביטול
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(deleteConfirm)}
+              >
+                אישור מחיקה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AnimatePresence>
   );

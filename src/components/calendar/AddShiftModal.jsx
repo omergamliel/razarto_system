@@ -82,15 +82,6 @@ export default function AddShiftModal({
 
           {/* Content */}
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Current User Info */}
-            {currentUser && (
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
-                <p className="text-sm text-gray-500 mb-1">משובץ</p>
-                <p className="font-semibold text-gray-800">{currentUser.full_name || currentUser.email}</p>
-                <p className="text-xs text-gray-400 mt-1">09:00 - 09:00 (למחרת)</p>
-              </div>
-            )}
-
             {/* Department Selection */}
             <div className="space-y-2">
               <Label className="text-gray-700 font-medium flex items-center gap-2">
