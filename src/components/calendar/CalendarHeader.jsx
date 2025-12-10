@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Calendar, List } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Calendar, List, Settings } from 'lucide-react';
 import { format, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
@@ -10,8 +10,8 @@ export default function CalendarHeader({
   setCurrentDate, 
   viewMode, 
   setViewMode,
-  onOpenPendingRequests,
-  pendingCount
+  isAdmin,
+  onOpenAdminSettings
 }) {
   const navigatePrev = () => {
     if (viewMode === 'month') {
@@ -44,16 +44,31 @@ export default function CalendarHeader({
       className="relative z-10 mb-6"
     >
       {/* Logo and Title */}
-      <div className="flex flex-col items-center mb-6 pt-2">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.15em' }}>
-          Razarto
-        </h1>
-        <p className="text-gray-600 text-base md:text-lg font-medium">
-          מערכת לניהול משמרות רז"ר תורן
-        </p>
-        <p className="text-gray-400 text-sm mt-1">
-          צפייה במשמרות | ביצוע החלפות מסודרות
-        </p>
+      <div className="flex items-center justify-between mb-6 pt-2">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center">
+            <div className="text-white text-xs font-bold text-center leading-tight">
+              חטיבת<br/>מבצעים
+            </div>
+          </div>
+          <div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-wider" style={{ letterSpacing: '0.15em' }}>
+              Razarto
+            </h1>
+            <p className="text-gray-600 text-sm md:text-base font-medium">
+              מערכת לניהול משמרות רז"ר תורן
+            </p>
+          </div>
+        </div>
+        {isAdmin && (
+          <Button
+            onClick={onOpenAdminSettings}
+            variant="outline"
+            className="rounded-xl border-2 border-gray-300 hover:border-gray-400"
+          >
+            <Settings className="w-5 h-5 text-gray-600" />
+          </Button>
+        )}
       </div>
 
       {/* Controls Bar */}
@@ -110,18 +125,7 @@ export default function CalendarHeader({
             </Button>
           </div>
 
-          {/* Pending Requests Button */}
-          <Button
-            onClick={onOpenPendingRequests}
-            className="relative bg-gradient-to-r from-[#E57373] to-[#EF5350] hover:from-[#EF5350] hover:to-[#E53935] text-white rounded-xl shadow-md hover:shadow-lg transition-all"
-          >
-            בקשות ממתינות
-            {pendingCount > 0 && (
-              <span className="absolute -top-2 -left-2 bg-white text-[#E57373] text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-sm">
-                {pendingCount}
-              </span>
-            )}
-          </Button>
+
         </div>
       </div>
     </motion.div>

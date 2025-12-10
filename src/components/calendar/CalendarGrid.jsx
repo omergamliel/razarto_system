@@ -19,7 +19,8 @@ export default function CalendarGrid({
   currentDate, 
   viewMode, 
   shifts, 
-  onCellClick 
+  onCellClick,
+  currentUserEmail
 }) {
   const getDaysToDisplay = () => {
     if (viewMode === 'month') {

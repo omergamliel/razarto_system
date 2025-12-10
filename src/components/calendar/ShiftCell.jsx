@@ -9,13 +9,25 @@ export default function ShiftCell({
   shift, 
   onClick, 
   currentMonth,
-  isWeekView = false
+  isWeekView = false,
+  currentUserEmail
 }) {
   const isCurrentMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
+  const isMyShift = shift && shift.assigned_email === currentUserEmail;
   
   const getStatusStyles = () => {
     if (!shift) return {};
+    
+    // My shifts always get blue background
+    if (isMyShift) {
+      return {
+        bg: 'bg-gradient-to-br from-[#E3F2FD] to-[#BBDEFB]',
+        border: 'border-[#64B5F6]',
+        badge: 'bg-[#64B5F6]',
+        icon: Clock
+      };
+    }
     
     switch (shift.status) {
       case 'swap_requested':
@@ -25,19 +37,19 @@ export default function ShiftCell({
           badge: 'bg-[#E57373]',
           icon: AlertCircle
         };
-      case 'swap_confirmed':
-        return {
-          bg: 'bg-gradient-to-br from-[#E3F2FD] to-[#BBDEFB]',
-          border: 'border-[#64B5F6]',
-          badge: 'bg-[#64B5F6]',
-          icon: CheckCircle2
-        };
       case 'partially_covered':
         return {
           bg: 'bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2]',
           border: 'border-[#FFB74D]',
           badge: 'bg-[#FFB74D]',
           icon: AlertCircle
+        };
+      case 'approved':
+        return {
+          bg: 'bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9]',
+          border: 'border-[#66BB6A]',
+          badge: 'bg-[#66BB6A]',
+          icon: CheckCircle2
         };
       default:
         return {
@@ -51,6 +63,18 @@ export default function ShiftCell({
 
   const statusStyles = getStatusStyles();
   const StatusIcon = statusStyles.icon || Clock;
+  
+  // Extract clean role name (remove prefix like רז"ר, רע"ן)
+  const getCleanRoleName = (role) => {
+    if (!role) return '';
+    // Remove common prefixes
+    return role
+      .replace(/^רז"ר\s+/, '')
+      .replace(/^רע"ן\s+/, '')
+      .replace(/^רז״ר\s+/, '')
+      .replace(/^רע״ן\s+/, '')
+      .trim();
+  };
 
   return (
     <motion.div
@@ -89,22 +113,15 @@ export default function ShiftCell({
       {/* Shift Content */}
       {shift && (
         <div className={`${isWeekView ? 'mt-4' : 'mt-8 md:mt-10'} space-y-1`}>
-          {/* Role Name */}
+          {/* Role Name Only */}
           {shift.role && (
             <p className={`
-              font-semibold text-[#E57373] truncate
-              ${isWeekView ? 'text-sm text-center' : 'text-[10px] md:text-xs'}
+              font-bold text-gray-800 truncate text-center
+              ${isWeekView ? 'text-lg' : 'text-sm md:text-base'}
             `}>
-              {shift.role}
+              {getCleanRoleName(shift.role)}
             </p>
           )}
-          {/* Person Name */}
-          <p className={`
-            font-medium text-gray-800 truncate
-            ${isWeekView ? 'text-base text-center' : 'text-xs md:text-sm'}
-          `}>
-            {shift.assigned_person}
-          </p>
           
           {/* Covering Person (for confirmed swaps) */}
           {shift.status === 'swap_confirmed' && shift.covering_role && (
