@@ -13,6 +13,10 @@ export default function ShiftCell({
   currentUserEmail,
   currentUserRole
 }) {
+  // Check if shift role matches user role (containment logic)
+  const isMyShift = shift && currentUserRole && shift.role && 
+    shift.role.includes(currentUserRole);
+
   const handleClick = () => {
     if (!shift) {
       onClick(date, shift);
@@ -21,14 +25,14 @@ export default function ShiftCell({
 
     // Regular shift - only owner can click
     if (shift.status === 'regular') {
-      if (shift.role === currentUserRole) {
+      if (isMyShift) {
         onClick(date, shift);
       }
       return;
     }
 
     // Swap requested or partial - everyone can click
-    if (shift.status === 'swap_requested' || shift.status === 'partially_covered') {
+    if (shift.status === 'swap_requested' || shift.status === 'partially_covered' || shift.status === 'pending_approval') {
       onClick(date, shift);
       return;
     }

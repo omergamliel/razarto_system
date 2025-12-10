@@ -167,16 +167,16 @@ export default function CalendarHeader({
         </div>
       </div>
 
-      {/* Pending Approval Button - Only for Admins */}
-      {isAdmin && pendingApprovalCount > 0 && (
+      {/* Pending Approval Button - Always shown for Admins */}
+      {isAdmin && (
         <div className="mb-4">
           <Button
             onClick={onOpenPendingApproval}
             className="relative bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl shadow-md w-full md:w-auto"
           >
             <CheckCircle className="w-4 h-4 mr-2" />
-            החלפות לאישורך
-            <span className="absolute -top-2 -left-2 bg-white text-purple-600 text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-sm">
+            בקשות לאישורך
+            <span className="absolute -top-2 -left-2 bg-white text-purple-600 text-xs font-bold min-w-[24px] h-6 rounded-full flex items-center justify-center shadow-sm px-1">
               {pendingApprovalCount}
             </span>
           </Button>

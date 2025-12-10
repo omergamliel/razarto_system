@@ -300,6 +300,7 @@ export default function ShiftCalendar() {
         <KPIHeader
           shifts={shifts}
           currentUserEmail={currentUser?.email}
+          currentUserRole={currentUser?.assigned_role}
           onKPIClick={handleKPIClick}
         />
 

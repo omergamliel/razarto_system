@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { AlertCircle, Clock, CheckCircle, Calendar } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 
-export default function KPIHeader({ shifts, currentUserEmail, onKPIClick }) {
+export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, onKPIClick }) {
   // Calculate KPIs
   const swapRequests = shifts.filter(s => s.status === 'swap_requested').length;
   const partialGaps = shifts.filter(s => s.status === 'partially_covered').length;
