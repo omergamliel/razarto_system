@@ -141,7 +141,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                 <div className="text-lg font-bold text-gray-800">
                                   {shift.role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
                                 </div>
-                                <div className="text-xs text-gray-500 mt-1">{shift.assigned_person}</div>
+                                <div className="text-xs text-gray-500 mt-1">{shift.swap_request_by}</div>
                               </div>
                               <ArrowRight className="w-5 h-5 text-green-600 flex-shrink-0" />
                               <div className="text-center">
