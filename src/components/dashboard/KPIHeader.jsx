@@ -10,7 +10,13 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
   const approved = shifts.filter(s => s.status === 'approved').length;
   // My shifts count with containment logic - regardless of status
   const myShifts = shifts.filter(s => {
-    const isFutureShift = new Date(s.date) >= new Date();
+    // Compare dates without time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const shiftDate = new Date(s.date);
+    shiftDate.setHours(0, 0, 0, 0);
+    const isFutureShift = shiftDate >= today;
+    
     if (!isFutureShift) return false;
     
     // Check if user role is contained in shift's role AND user is assigned
