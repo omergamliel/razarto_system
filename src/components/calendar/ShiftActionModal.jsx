@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowLeftRight, Edit3 } from 'lucide-react';
+import { X, Calendar, ArrowLeftRight, Edit3, Trash2, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function ShiftActionModal({ 
   isOpen, 
@@ -11,8 +19,18 @@ export default function ShiftActionModal({
   shift,
   date,
   onRequestSwap,
-  onEditRole
+  onEditRole,
+  onDelete,
+  isAdmin
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDelete = () => {
+    onDelete(shift.id);
+    setShowDeleteConfirm(false);
+    onClose();
+  };
+
   if (!isOpen || !shift) return null;
 
   return (
@@ -85,6 +103,20 @@ export default function ShiftActionModal({
               </div>
             </Button>
 
+            {/* Delete (Admin Only) */}
+            {isAdmin && (
+              <Button
+                onClick={() => setShowDeleteConfirm(true)}
+                variant="outline"
+                className="w-full py-4 rounded-xl border-2 border-red-300 hover:bg-red-50 text-red-600 hover:text-red-700"
+              >
+                <div className="flex items-center justify-center gap-3">
+                  <Trash2 className="w-5 h-5" />
+                  <span>מחק משמרת</span>
+                </div>
+              </Button>
+            )}
+
             {/* Cancel */}
             <Button
               onClick={onClose}
@@ -95,6 +127,29 @@ export default function ShiftActionModal({
             </Button>
           </div>
         </motion.div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                אישור מחיקה
+              </DialogTitle>
+              <DialogDescription>
+                האם אתה בטוח שברצונך למחוק את המשמרת הזו?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                ביטול
+              </Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                אישור מחיקה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AnimatePresence>
   );

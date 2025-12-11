@@ -440,6 +440,8 @@ export default function ShiftCalendar() {
             setShowActionModal(false);
             setShowEditRoleModal(true);
           }}
+          onDelete={deleteShiftMutation.mutate}
+          isAdmin={isAdmin}
         />
 
         <EditRoleModal
