@@ -14,7 +14,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
     if (!isFutureShift) return false;
     
     // Containment logic: if user role is contained in shift's role
-    if (currentUserRole && s.role && s.role.includes(currentUserRole)) {
+    if (currentUserRole && s.role && typeof s.role === 'string' && s.role.includes(currentUserRole)) {
       return true;
     }
     

@@ -15,7 +15,7 @@ export default function ShiftCell({
 }) {
   // Check if shift role matches user role (containment logic)
   const isMyShift = shift && currentUserRole && shift.role && 
-    shift.role.includes(currentUserRole);
+    typeof shift.role === 'string' && shift.role.includes(currentUserRole);
 
   const handleClick = () => {
     if (!shift) {

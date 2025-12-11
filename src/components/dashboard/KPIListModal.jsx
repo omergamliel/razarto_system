@@ -63,7 +63,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
           if (!isFutureShift) return false;
           
           // Check if user's role is contained in shift's role
-          if (currentUser?.assigned_role && s.role && s.role.includes(currentUser.assigned_role)) {
+          if (currentUser?.assigned_role && s.role && typeof s.role === 'string' && s.role.includes(currentUser.assigned_role)) {
             return true;
           }
           
