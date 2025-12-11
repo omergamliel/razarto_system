@@ -8,7 +8,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
   const swapRequests = shifts.filter(s => s.status === 'swap_requested').length;
   const partialGaps = shifts.filter(s => s.status === 'partially_covered').length;
   const approved = shifts.filter(s => s.status === 'approved').length;
-  // My shifts count with containment logic - regardless of status
+  // My shifts count - all shifts with my role, regardless of status or assignment
   const myShifts = shifts.filter(s => {
     // Compare dates without time
     const today = new Date();
@@ -19,10 +19,9 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
     
     if (!isFutureShift) return false;
     
-    // Check if user role is contained in shift's role AND user is assigned
+    // Check if shift role contains user role (regardless of who is currently assigned)
     if (currentUserRole && s.role && typeof s.role === 'string' && 
-        s.role.includes(currentUserRole) && 
-        s.assigned_email === currentUserEmail) {
+        s.role.includes(currentUserRole)) {
       return true;
     }
     

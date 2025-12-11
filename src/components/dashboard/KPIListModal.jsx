@@ -57,20 +57,24 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
       case 'approved':
         return shifts.filter(s => s.status === 'approved');
       case 'my_shifts':
-        // Containment logic for "my shifts" - must match role AND be assigned to user
+        // All shifts with my role (regardless of current assignment status)
         return shifts.filter(s => {
-          const isFutureShift = new Date(s.date) >= new Date();
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const shiftDate = new Date(s.date);
+          shiftDate.setHours(0, 0, 0, 0);
+          const isFutureShift = shiftDate >= today;
+
           if (!isFutureShift) return false;
-          
-          // Check if user's role is contained in shift's role AND user is assigned
+
+          // Check if shift role contains user role
           if (currentUser?.assigned_role && s.role && typeof s.role === 'string' && 
-              s.role.includes(currentUser.assigned_role) && 
-              s.assigned_email === currentUser?.email) {
+              s.role.includes(currentUser.assigned_role)) {
             return true;
           }
-          
+
           return false;
-        });
+        }).sort((a, b) => new Date(a.date) - new Date(b.date));
       default:
         return [];
     }
