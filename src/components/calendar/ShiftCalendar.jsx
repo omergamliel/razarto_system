@@ -284,12 +284,18 @@ export default function ShiftCalendar() {
       return;
     }
 
-    // Regular user - check if it's their shift (role match only)
+    // Regular user logic
     const isMyShift = shift.role && currentUser?.assigned_role && 
                       typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role);
 
+    // Allow clicking on: my shifts, swap requests, or partial coverage
+    const isSwapRequested = shift.status === 'swap_requested';
+    const isPartiallyCovered = shift.status === 'partially_covered';
+
     if (isMyShift) {
       setShowActionModal(true);
+    } else if (isSwapRequested || isPartiallyCovered) {
+      setShowDetailsModal(true);
     }
   };
 
