@@ -18,10 +18,9 @@ export default function ShiftCell({
     typeof shift.role === 'string' && shift.role.includes(currentUserRole);
 
   const handleClick = () => {
-    if (!shift) {
-      onClick(date, shift);
-      return;
-    }
+    // Always pass the click event - permission check is in parent
+    onClick(date, shift);
+    if (!shift) return;
 
     // Regular shift - only owner can click (must match role AND name exactly)
     if (shift.status === 'regular') {
@@ -65,7 +64,7 @@ export default function ShiftCell({
     switch (shift.status) {
       case 'swap_requested':
         return {
-          bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2]',
+          bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2] !important',
           border: 'border-[#E57373]',
           badge: 'bg-[#E57373]',
           icon: AlertCircle
@@ -180,9 +179,13 @@ export default function ShiftCell({
             `}>
               <StatusIcon className="w-3 h-3 text-gray-600" />
               <span className="text-[9px] md:text-xs text-gray-600 font-normal">
-                {shift.status === 'swap_requested' && 'בקשה להחלפה'}
+                {shift.status === 'swap_requested' && (
+                  shift.swap_type === 'full' 
+                    ? 'בקשה להחלפה למשמרת מלאה' 
+                    : 'בקשה להחלפה לכיסוי חלקי'
+                )}
                 {shift.status === 'approved' && 'הוחלף'}
-                {shift.status === 'partially_covered' && shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'פער חלקי'}
+                {shift.status === 'partially_covered' && (shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'פער חלקי')}
               </span>
             </div>
           )}

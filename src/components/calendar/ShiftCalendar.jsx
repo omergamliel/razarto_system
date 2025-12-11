@@ -264,6 +264,7 @@ export default function ShiftCalendar() {
     setSelectedDate(date);
     setSelectedShift(shift);
     
+    // Empty slot - only admin can add
     if (!shift) {
       if (isAdmin) {
         setShowAddModal(true);
