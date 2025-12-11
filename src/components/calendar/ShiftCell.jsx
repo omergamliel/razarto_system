@@ -11,7 +11,8 @@ export default function ShiftCell({
   currentMonth,
   isWeekView = false,
   currentUserEmail,
-  currentUserRole
+  currentUserRole,
+  isAdmin = false
 }) {
   // Check if shift role matches user role (containment logic)
   const isMyShift = shift && currentUserRole && shift.role && 
@@ -235,8 +236,8 @@ export default function ShiftCell({
         </div>
       )}
 
-      {/* Empty State */}
-      {!shift && isCurrentMonth && (
+      {/* Empty State - Admin Only */}
+      {!shift && isCurrentMonth && isAdmin && (
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="text-xs text-gray-400">לחץ להוספה</span>
         </div>
