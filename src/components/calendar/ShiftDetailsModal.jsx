@@ -61,11 +61,6 @@ export default function ShiftDetailsModal({
   const remainingHours = Math.max(0, shiftDuration - totalCoveredHours);
   const isOwnShift = shift.assigned_email === currentUserEmail;
 
-  const handleDelete = () => {
-    onDelete(shift.id);
-    setShowDeleteConfirm(false);
-  };
-
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -120,24 +115,9 @@ export default function ShiftDetailsModal({
                 {shift.role && (
                   <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
                 )}
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
-                  </div>
-                  {isAdmin && (
-                    <Button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      מחק שיבוץ
-                    </Button>
-                  )}
-                </div>
+                <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
                 <div className="mt-2 pt-2 border-t border-gray-300">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
                     <Clock className="w-4 h-4" />
                     <span>09:00 - 09:00 (למחרת)</span>
                   </div>
