@@ -283,19 +283,12 @@ export default function ShiftCalendar() {
       return;
     }
 
-    // Regular user - check if it's their shift (role match AND name match)
+    // Regular user - check if it's their shift (role match only)
     const isMyShift = shift.role && currentUser?.assigned_role && 
-                      typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role) &&
-                      shift.assigned_email === currentUser?.email;
+                      typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role);
 
-    if (shift.status === 'regular') {
-      if (isMyShift) {
-        setShowActionModal(true);
-      }
-    } else if (shift.status === 'swap_requested' || shift.status === 'partially_covered') {
-      setShowDetailsModal(true);
-    } else if (shift.status === 'approved') {
-      setShowDetailsModal(true);
+    if (isMyShift) {
+      setShowActionModal(true);
     }
   };
 
