@@ -51,8 +51,8 @@ export default function ShiftDetailsModal({
     totalCoveredHours += hours;
   });
 
-  const hasGap = totalCoveredHours < shiftDuration || shift.status === 'swap_requested';
-  const remainingHours = shiftDuration - totalCoveredHours;
+  const hasGap = shiftCoverages.length === 0 ? (shift.status === 'swap_requested') : (totalCoveredHours < shiftDuration);
+  const remainingHours = Math.max(0, shiftDuration - totalCoveredHours);
   const isOwnShift = shift.assigned_email === currentUserEmail;
 
   const handleDelete = () => {
