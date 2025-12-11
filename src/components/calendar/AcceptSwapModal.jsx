@@ -17,16 +17,22 @@ export default function AcceptSwapModal({
   isAccepting
 }) {
   const [coverFull, setCoverFull] = useState(true);
+  const [coverDate, setCoverDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    if (!coverFull && !coverDate) {
+      return;
+    }
+    
     onAccept({
       coverFull,
-      startTime: coverFull ? null : startTime,
-      endTime: coverFull ? null : endTime
+      coverDate: coverDate || shift?.date,
+      startTime: coverFull ? '09:00' : startTime,
+      endTime: coverFull ? '09:00' : endTime
     });
   };
 
@@ -129,6 +135,21 @@ export default function AcceptSwapModal({
               </div>
             </div>
 
+            {/* Existing Coverage Display */}
+            {shift.status === 'partially_covered' && shift.covered_start_time && (
+              <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
+                <p className="text-sm font-semibold text-yellow-800 mb-2">כיסוי קיים:</p>
+                <div className="text-sm text-yellow-700">
+                  {shift.covering_person}: {shift.covered_start_time} - {shift.covered_end_time}
+                </div>
+                {shift.remaining_hours && (
+                  <div className="text-sm text-yellow-700 mt-1 font-medium">
+                    נותר לכיסוי: {shift.remaining_hours}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Partial Coverage Time Selection */}
             <AnimatePresence>
               {!coverFull && (
@@ -138,7 +159,19 @@ export default function AcceptSwapModal({
                   exit={{ opacity: 0, height: 0 }}
                   className="space-y-3 overflow-hidden"
                 >
-                  <Label className="text-gray-700 font-medium">שעות הכיסוי שלך</Label>
+                  <Label className="text-gray-700 font-medium">פרטי הכיסוי שלך</Label>
+                  
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1 block">תאריך (לתמיכה במשמרות לילה)</Label>
+                    <Input
+                      type="date"
+                      value={coverDate}
+                      onChange={(e) => setCoverDate(e.target.value)}
+                      min={shift?.date}
+                      className="text-center h-12 rounded-xl"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-gray-500">משעה</Label>
@@ -162,9 +195,12 @@ export default function AcceptSwapModal({
                     </div>
                   </div>
                   
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                    <p className="text-xs text-yellow-800">
-                      ⚠️ השעות שלא יכוסו יופיעו כפער במערכת
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <p className="text-xs text-blue-800 font-medium mb-1">
+                      💡 כיסוי רב-משתמש
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      משתמשים נוספים יכולים לכסות את השעות הנותרות
                     </p>
                   </div>
                 </motion.div>

@@ -30,11 +30,20 @@ export default function ShiftDetailsModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [segments, setSegments] = useState([]);
 
-  // Fetch shift segments
+  // Fetch shift segments and coverages
   const { data: allSegments = [] } = useQuery({
     queryKey: ['shift-segments', shift?.id],
     queryFn: () => base44.entities.ShiftSegment.list(),
     enabled: !!shift?.id
+  });
+
+  const { data: shiftCoverages = [] } = useQuery({
+    queryKey: ['shift-coverages', shift?.id],
+    queryFn: async () => {
+      if (!shift?.id) return [];
+      return await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
+    },
+    enabled: !!shift?.id && isOpen
   });
 
   useEffect(() => {
@@ -150,8 +159,33 @@ export default function ShiftDetailsModal({
                 </div>
               </div>
 
-              {/* Coverage Breakdown */}
-              {covered.length > 0 && (
+              {/* Multi-User Coverage Display */}
+              {shiftCoverages.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    כיסויים ({shiftCoverages.length})
+                  </h3>
+                  {shiftCoverages.map((coverage) => (
+                    <div key={coverage.id} className="bg-[#E3F2FD] rounded-xl p-3 border border-[#64B5F6]">
+                      <p className="font-medium text-gray-800">{coverage.covering_person}</p>
+                      {coverage.covering_role && (
+                        <p className="text-xs text-[#64B5F6]">{coverage.covering_role}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                        <Clock className="w-3 h-3" />
+                        <span>{coverage.start_time} - {coverage.end_time}</span>
+                        {coverage.start_date !== coverage.end_date && (
+                          <span className="text-orange-600 text-xs">(לילה)</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Legacy Coverage Breakdown */}
+              {covered.length > 0 && shiftCoverages.length === 0 && (
                 <div className="space-y-2">
                   <h3 className="font-semibold text-gray-700 flex items-center gap-2">
                     <User className="w-4 h-4" />
