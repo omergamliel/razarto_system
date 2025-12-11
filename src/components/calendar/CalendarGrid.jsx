@@ -21,7 +21,8 @@ export default function CalendarGrid({
   shifts, 
   onCellClick,
   currentUserEmail,
-  currentUserRole
+  currentUserRole,
+  isAdmin = false
 }) {
   const getDaysToDisplay = () => {
     if (viewMode === 'month') {
@@ -85,6 +86,7 @@ export default function CalendarGrid({
               isWeekView={viewMode === 'week'}
               currentUserEmail={currentUserEmail}
               currentUserRole={currentUserRole}
+              isAdmin={isAdmin}
             />
           </motion.div>
         ))}

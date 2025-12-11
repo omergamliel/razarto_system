@@ -362,6 +362,7 @@ export default function ShiftCalendar() {
           onCellClick={handleCellClick}
           currentUserEmail={currentUser?.email}
           currentUserRole={currentUser?.assigned_role}
+          isAdmin={isAdmin}
         />
 
         <OnboardingModal
