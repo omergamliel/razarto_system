@@ -55,30 +55,35 @@ export default function ShiftDetailsModal({
 
   if (!isOpen || !shift) return null;
 
-  // Calculate covered and gap hours
+  // Calculate covered hours and gaps
   const calculateCoverage = () => {
-    if (segments.length === 0 && shift.status !== 'partially_covered') {
-      return { covered: [], gaps: [{ start: '09:00', end: '09:00 (למחרת)' }] };
-    }
+    const shiftDuration = 24; // Full shift is 24 hours
+    let totalCoveredHours = 0;
+    
+    // Calculate total covered hours from all coverages
+    shiftCoverages.forEach(cov => {
+      const start = parseInt(cov.start_time.split(':')[0]);
+      const end = parseInt(cov.end_time.split(':')[0]);
+      const hours = end > start ? end - start : (24 - start) + end;
+      totalCoveredHours += hours;
+    });
 
-    const covered = segments.map(s => ({
-      start: s.start_time,
-      end: s.end_time,
-      person: s.assigned_person,
-      role: s.role
-    }));
+    const hasGap = totalCoveredHours < shiftDuration;
+    const remainingHours = hasGap ? shiftDuration - totalCoveredHours : 0;
 
-    // Simple gap calculation - show if there are uncovered hours
-    const gaps = [];
-    if (shift.status === 'partially_covered' && shift.gap_hours) {
-      gaps.push({ description: shift.gap_hours });
-    }
-
-    return { covered, gaps };
+    return { 
+      totalCoveredHours, 
+      hasGap, 
+      remainingHours,
+      shiftDuration 
+    };
   };
 
-  const { covered, gaps } = calculateCoverage();
-  const hasGaps = gaps.length > 0 || shift.status === 'swap_requested';
+  const { totalCoveredHours, hasGap, remainingHours, shiftDuration } = shiftCoverages.length > 0 
+    ? calculateCoverage() 
+    : { totalCoveredHours: 0, hasGap: true, remainingHours: 24, shiftDuration: 24 };
+
+  const hasGaps = hasGap || shift.status === 'swap_requested';
   const isOwnShift = shift.assigned_email === currentUserEmail;
 
   const handleDelete = () => {
@@ -161,11 +166,19 @@ export default function ShiftDetailsModal({
 
               {/* Multi-User Coverage Display */}
               {shiftCoverages.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-gray-700 flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    כיסויים ({shiftCoverages.length})
-                  </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      כיסויים ({shiftCoverages.length})
+                    </h3>
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      hasGap ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {hasGap ? `פער: ${remainingHours} שעות` : 'מכוסה במלואו'}
+                    </div>
+                  </div>
+                  
                   {shiftCoverages.map((coverage) => (
                     <div key={coverage.id} className="bg-[#E3F2FD] rounded-xl p-3 border border-[#64B5F6]">
                       <p className="font-medium text-gray-800">{coverage.covering_person}</p>
@@ -176,55 +189,60 @@ export default function ShiftDetailsModal({
                         <Clock className="w-3 h-3" />
                         <span>{coverage.start_time} - {coverage.end_time}</span>
                         {coverage.start_date !== coverage.end_date && (
-                          <span className="text-orange-600 text-xs">(לילה)</span>
+                          <span className="text-orange-600 text-xs mr-1">(לילה)</span>
                         )}
                       </div>
                     </div>
                   ))}
+
+                  {/* Coverage Summary */}
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">סה"כ מכוסה:</span>
+                      <span className="font-semibold text-gray-800">{totalCoveredHours} / {shiftDuration} שעות</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Legacy Coverage Breakdown */}
-              {covered.length > 0 && shiftCoverages.length === 0 && (
+              {/* Legacy Coverage (for old segments system) */}
+              {segments.length > 0 && shiftCoverages.length === 0 && (
                 <div className="space-y-2">
                   <h3 className="font-semibold text-gray-700 flex items-center gap-2">
                     <User className="w-4 h-4" />
-                    כיסוי קיים
+                    כיסוי קיים (ישן)
                   </h3>
-                  {covered.map((cov, idx) => (
+                  {segments.map((seg, idx) => (
                     <div key={idx} className="bg-[#E3F2FD] rounded-xl p-3 border border-[#64B5F6]">
-                      <p className="font-medium text-gray-800">{cov.person}</p>
-                      {cov.role && (
-                        <p className="text-xs text-[#64B5F6]">{cov.role}</p>
+                      <p className="font-medium text-gray-800">{seg.assigned_person}</p>
+                      {seg.role && (
+                        <p className="text-xs text-[#64B5F6]">{seg.role}</p>
                       )}
                       <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
                         <Clock className="w-3 h-3" />
-                        <span>{cov.start} - {cov.end}</span>
+                        <span>{seg.start_time} - {seg.end_time}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Gaps */}
+              {/* Gap Alert */}
               {hasGaps && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-gray-700 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-[#FFB74D]" />
-                    פערים שנדרש לכסות
-                  </h3>
-                  {gaps.map((gap, idx) => (
-                    <div key={idx} className="bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2] rounded-xl p-4 border border-[#FFB74D]">
-                      {gap.description ? (
-                        <p className="text-sm text-gray-700">{gap.description}</p>
-                      ) : (
-                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                          <Clock className="w-4 h-4" />
-                          <span>{gap.start} - {gap.end}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2] rounded-xl p-4 border border-[#FFB74D]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-5 h-5 text-[#FFB74D]" />
+                    <h3 className="font-semibold text-gray-800">נדרש כיסוי נוסף</h3>
+                  </div>
+                  {shiftCoverages.length > 0 ? (
+                    <p className="text-sm text-gray-700">
+                      נותרו {remainingHours} שעות שטרם כוסו מתוך {shiftDuration} שעות המשמרת
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-700">
+                      המשמרת טרם כוסתה - נדרש כיסוי מלא של 24 שעות
+                    </p>
+                  )}
                 </div>
               )}
 
