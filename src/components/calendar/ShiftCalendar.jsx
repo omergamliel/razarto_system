@@ -20,6 +20,7 @@ import KPIHeader from '../dashboard/KPIHeader';
 import KPIListModal from '../dashboard/KPIListModal';
 import AdminSettingsModal from '../admin/AdminSettingsModal';
 import PendingApprovalModal from './PendingApprovalModal';
+import SeedRolesData from '../admin/SeedRolesData';
 
 export default function ShiftCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -322,6 +323,7 @@ export default function ShiftCalendar() {
       dir="rtl"
       style={{ fontFamily: 'Heebo, sans-serif' }}
     >
+      <SeedRolesData />
       <BackgroundShapes />
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 md:py-8">

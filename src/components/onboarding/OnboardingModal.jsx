@@ -38,6 +38,19 @@ export default function OnboardingModal({ isOpen, onComplete }) {
         department: department
       });
 
+      // Find and update the RoleDefinition record
+      const roleDefinitions = await base44.entities.RoleDefinition.filter({
+        department: department,
+        role_name: role
+      });
+
+      if (roleDefinitions.length > 0) {
+        await base44.entities.RoleDefinition.update(roleDefinitions[0].id, {
+          assigned_user_name: user.full_name,
+          assigned_user_email: user.email
+        });
+      }
+
       toast.success('התפקיד נשמר בהצלחה!');
       onComplete();
     } catch (error) {
