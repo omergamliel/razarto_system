@@ -154,6 +154,10 @@ export default function ShiftCalendar() {
       };
 
       if (isFullyCovered) {
+        // Save original assignment before replacing
+        updateData.original_assigned_person = shift.assigned_person;
+        updateData.original_role = shift.role;
+        // Replace with covering person
         updateData.assigned_person = currentUser?.full_name || currentUser?.email;
         updateData.assigned_email = currentUser?.email;
         updateData.role = currentUser?.assigned_role;
@@ -183,6 +187,9 @@ export default function ShiftCalendar() {
         status: 'approved',
         approved_by: currentUser?.full_name || currentUser?.email,
         approved_by_email: currentUser?.email,
+        // Save original assignment before replacing
+        original_assigned_person: shift.assigned_person,
+        original_role: shift.role,
         // Replace original assignment with covering person
         assigned_person: shift.covering_person,
         assigned_email: shift.covering_email,
