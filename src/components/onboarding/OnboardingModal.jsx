@@ -6,22 +6,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { DEPARTMENTS, getDepartmentList } from '../calendar/departmentData';
 
 export default function OnboardingModal({ isOpen, onComplete }) {
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState('');
-  const [roles, setRoles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const departments = ['שליטה', 'ביטחון', 'טכנולוגיה'];
+  const departments = getDepartmentList();
+  const roles = department ? DEPARTMENTS[department] || [] : [];
 
-  const handleDepartmentChange = async (value) => {
+  const handleDepartmentChange = (value) => {
     setDepartment(value);
     setRole('');
-    
-    // Fetch roles for this department
-    const allRoles = await base44.entities.RoleDefinition.filter({ department: value });
-    setRoles(allRoles.map(r => r.role_name));
   };
 
   const handleSubmit = async (e) => {
@@ -40,19 +37,6 @@ export default function OnboardingModal({ isOpen, onComplete }) {
         assigned_role: role,
         department: department
       });
-
-      // Update RoleDefinition with user assignment
-      const roleDefinitions = await base44.entities.RoleDefinition.filter({
-        department: department,
-        role_name: role
-      });
-
-      if (roleDefinitions.length > 0) {
-        await base44.entities.RoleDefinition.update(roleDefinitions[0].id, {
-          assigned_user_name: user.full_name,
-          assigned_user_email: user.email
-        });
-      }
 
       toast.success('התפקיד נשמר בהצלחה!');
       onComplete();
