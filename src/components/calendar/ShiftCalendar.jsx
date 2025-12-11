@@ -459,6 +459,11 @@ export default function ShiftCalendar() {
             setSelectedShift(shift);
             setShowCoverSegmentModal(true);
           }}
+          onOfferCover={(shift) => {
+            setSelectedShift(shift);
+            setShowDetailsModal(false);
+            setShowAcceptModal(true);
+          }}
           onDelete={deleteShiftMutation.mutate}
           onApprove={() => approveSwapMutation.mutate(selectedShift)}
           currentUserEmail={currentUser?.email}

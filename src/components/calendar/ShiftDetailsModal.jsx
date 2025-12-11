@@ -22,6 +22,7 @@ export default function ShiftDetailsModal({
   shift,
   date,
   onCoverSegment,
+  onOfferCover,
   onDelete,
   onApprove,
   currentUserEmail,
@@ -185,17 +186,17 @@ export default function ShiftDetailsModal({
                 </div>
               )}
 
-              {hasGap && !isOwnShift && (
+              {hasGap && !isOwnShift && onOfferCover && (
                 <Button
                   onClick={() => {
                     onClose();
-                    onCoverSegment(shift);
+                    onOfferCover(shift);
                   }}
                   className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium shadow-md"
                 >
                   <div className="flex items-center justify-center gap-3">
-                    <Plus className="w-5 h-5" />
-                    <span>לכיסוי מקטע במשמרת</span>
+                    <CheckCircle className="w-5 h-5" />
+                    <span>אני אחליף</span>
                   </div>
                 </Button>
               )}
