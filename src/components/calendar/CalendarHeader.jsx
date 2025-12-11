@@ -15,7 +15,9 @@ export default function CalendarHeader({
   setViewMode,
   isAdmin,
   onOpenAdminSettings,
-  currentUser
+  currentUser,
+  hideHeader = false,
+  hideNavigation = false
 }) {
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
@@ -92,6 +94,7 @@ export default function CalendarHeader({
       animate={{ opacity: 1, y: 0 }}
       className="relative z-10 mb-6"
     >
+      {!hideHeader && (
       <div className="flex items-start justify-between mb-6 pt-2">
         {/* Logo - Right */}
         <div>
@@ -164,8 +167,9 @@ export default function CalendarHeader({
           )}
         </div>
       </div>
+      )}
 
-      {/* Controls Bar */}
+      {!hideNavigation && (
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* View Toggle */}
@@ -220,6 +224,7 @@ export default function CalendarHeader({
           </div>
         </div>
       </div>
+      )}
     </motion.div>
   );
 }

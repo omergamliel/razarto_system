@@ -115,59 +115,59 @@ export default function ShiftCalendar() {
     }
   });
 
-  // Offer to cover mutation (auto-approve, no admin needed)
+  // Offer to cover mutation (multi-user partial support)
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
-      const updateData = {
+      // Create a coverage record
+      await base44.entities.ShiftCoverage.create({
+        shift_id: shift.id,
         covering_person: currentUser?.full_name || currentUser?.email,
         covering_email: currentUser?.email,
-        covering_department: currentUser?.department,
         covering_role: currentUser?.assigned_role,
-        approved_by: currentUser?.full_name || currentUser?.email,
-        approved_by_email: currentUser?.email
+        covering_department: currentUser?.department,
+        start_date: coverData.coverDate || shift.date,
+        start_time: coverData.startTime,
+        end_date: coverData.coverDate || shift.date,
+        end_time: coverData.endTime,
+        status: 'approved'
+      });
+
+      // Fetch all coverages for this shift
+      const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
+      
+      // Calculate if shift is fully covered
+      const requestedStart = shift.swap_type === 'full' ? '09:00' : shift.swap_start_time;
+      const requestedEnd = shift.swap_type === 'full' ? '09:00' : shift.swap_end_time;
+      
+      // Simple check: if coverage matches full request
+      const isFullyCovered = coverData.coverFull || 
+        (allCoverages.length === 1 && 
+         coverData.startTime === requestedStart && 
+         coverData.endTime === requestedEnd);
+
+      const updateData = {
+        status: isFullyCovered ? 'approved' : 'partially_covered',
+        covering_person: allCoverages.map(c => c.covering_person).join(', '),
+        covering_email: allCoverages.map(c => c.covering_email).join(', '),
+        covered_start_time: coverData.startTime,
+        covered_end_time: coverData.endTime
       };
 
-      if (coverData.coverFull) {
-        // Full coverage - status becomes approved
-        updateData.status = 'approved';
-        updateData.covered_start_time = '09:00';
-        updateData.covered_end_time = '09:00';
-        // Replace original assignment
+      if (isFullyCovered) {
         updateData.assigned_person = currentUser?.full_name || currentUser?.email;
         updateData.assigned_email = currentUser?.email;
-        updateData.role = currentUser?.assigned_role;
-        updateData.department = currentUser?.department;
-      } else {
-        // Partial coverage - check if fully covered or still has gaps
-        updateData.covered_start_time = coverData.startTime;
-        updateData.covered_end_time = coverData.endTime;
-        
-        const requestedStart = shift.swap_type === 'full' ? '09:00' : shift.swap_start_time;
-        const requestedEnd = shift.swap_type === 'full' ? '09:00 (למחרת)' : shift.swap_end_time;
-        
-        if (coverData.startTime === requestedStart && coverData.endTime === requestedEnd) {
-          // Fully covered
-          updateData.status = 'approved';
-          updateData.assigned_person = currentUser?.full_name || currentUser?.email;
-          updateData.assigned_email = currentUser?.email;
-          updateData.role = currentUser?.assigned_role;
-          updateData.department = currentUser?.department;
-        } else {
-          // Still has gaps
-          updateData.status = 'partially_covered';
-          updateData.remaining_hours = `${requestedStart}-${coverData.startTime}, ${coverData.endTime}-${requestedEnd}`;
-        }
       }
 
       return base44.entities.Shift.update(shift.id, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-coverages'] });
       setShowAcceptModal(false);
-      toast.success('ההחלפה בוצעה בהצלחה!');
+      toast.success('הכיסוי נוסף בהצלחה!');
     },
     onError: () => {
-      toast.error('שגיאה בביצוע ההחלפה');
+      toast.error('שגיאה בהוספת הכיסוי');
     }
   });
 
@@ -335,6 +335,7 @@ export default function ShiftCalendar() {
           isAdmin={isAdmin}
           onOpenAdminSettings={() => setShowAdminSettings(true)}
           currentUser={currentUser}
+          hideNavigation
         />
 
         <KPIHeader
@@ -342,6 +343,16 @@ export default function ShiftCalendar() {
           currentUserEmail={currentUser?.email}
           currentUserRole={currentUser?.assigned_role}
           onKPIClick={handleKPIClick}
+        />
+
+        <CalendarHeader
+          currentDate={currentDate}
+          setCurrentDate={setCurrentDate}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          isAdmin={isAdmin}
+          currentUser={currentUser}
+          hideHeader
         />
 
         <CalendarGrid
