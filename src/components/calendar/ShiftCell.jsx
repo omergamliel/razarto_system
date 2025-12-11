@@ -51,7 +51,37 @@ export default function ShiftCell({
   const getStatusStyles = () => {
     if (!shift) return {};
     
-    // My shifts always get blue background (containment logic)
+    // Priority 1: Red for swap requests (even if it's my shift)
+    if (shift.status === 'swap_requested') {
+      return {
+        bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2]',
+        border: 'border-[#E57373]',
+        badge: 'bg-[#E57373]',
+        icon: AlertCircle
+      };
+    }
+    
+    // Priority 2: Yellow for partial coverage
+    if (shift.status === 'partially_covered') {
+      return {
+        bg: 'bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4]',
+        border: 'border-[#FDD835]',
+        badge: 'bg-[#FDD835]',
+        icon: AlertCircle
+      };
+    }
+    
+    // Priority 3: Green for approved swaps
+    if (shift.status === 'approved') {
+      return {
+        bg: 'bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9]',
+        border: 'border-[#66BB6A]',
+        badge: 'bg-[#66BB6A]',
+        icon: CheckCircle2
+      };
+    }
+    
+    // Priority 4: Blue for my shifts (only if no special status)
     if (isMyShift) {
       return {
         bg: 'bg-gradient-to-br from-[#E3F2FD] to-[#BBDEFB]',
@@ -61,37 +91,13 @@ export default function ShiftCell({
       };
     }
     
-    switch (shift.status) {
-      case 'swap_requested':
-        return {
-          bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2] !important',
-          border: 'border-[#E57373]',
-          badge: 'bg-[#E57373]',
-          icon: AlertCircle
-        };
-      case 'partially_covered':
-        // Yellow - partial coverage
-        return {
-          bg: 'bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4]',
-          border: 'border-[#FDD835]',
-          badge: 'bg-[#FDD835]',
-          icon: AlertCircle
-        };
-      case 'approved':
-        return {
-          bg: 'bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9]',
-          border: 'border-[#66BB6A]',
-          badge: 'bg-[#66BB6A]',
-          icon: CheckCircle2
-        };
-      default:
-        return {
-          bg: 'bg-white',
-          border: 'border-gray-200',
-          badge: 'bg-gray-400',
-          icon: Clock
-        };
-    }
+    // Priority 5: Gray for others
+    return {
+      bg: 'bg-white',
+      border: 'border-gray-200',
+      badge: 'bg-gray-400',
+      icon: Clock
+    };
   };
 
   const statusStyles = getStatusStyles();
