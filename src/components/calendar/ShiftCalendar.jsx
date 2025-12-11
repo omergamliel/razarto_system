@@ -156,6 +156,7 @@ export default function ShiftCalendar() {
       if (isFullyCovered) {
         updateData.assigned_person = currentUser?.full_name || currentUser?.email;
         updateData.assigned_email = currentUser?.email;
+        updateData.role = currentUser?.assigned_role;
       }
 
       return base44.entities.Shift.update(shift.id, updateData);
