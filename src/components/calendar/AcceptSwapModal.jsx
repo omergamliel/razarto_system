@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, Calendar, Clock, Users, Briefcase } from 'lucide-react';
+import { X, CheckCircle, Clock } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 
 export default function AcceptSwapModal({ 
   isOpen, 
@@ -24,10 +22,6 @@ export default function AcceptSwapModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    if (!coverFull && !coverDate) {
-      return;
-    }
-    
     onAccept({
       coverFull,
       coverDate: coverDate || shift?.date,
@@ -41,7 +35,6 @@ export default function AcceptSwapModal({
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -50,14 +43,12 @@ export default function AcceptSwapModal({
           className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         />
 
-        {/* Modal */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
         >
-          {/* Header */}
           <div className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] p-6 text-white">
             <button
               onClick={onClose}
@@ -79,9 +70,7 @@ export default function AcceptSwapModal({
             </div>
           </div>
 
-          {/* Content */}
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Shift Details */}
             <div className="bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2] rounded-xl p-4">
               <p className="text-sm text-gray-600 mb-1">מבקש</p>
               <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
@@ -96,7 +85,20 @@ export default function AcceptSwapModal({
               </div>
             </div>
 
-            {/* Cover Full Shift Question */}
+            {shift.status === 'partially_covered' && shift.covered_start_time && (
+              <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
+                <p className="text-sm font-semibold text-yellow-800 mb-2">כיסוי קיים:</p>
+                <div className="text-sm text-yellow-700">
+                  {shift.covering_person}: {shift.covered_start_time} - {shift.covered_end_time}
+                </div>
+                {shift.remaining_hours && (
+                  <div className="text-sm text-yellow-700 mt-1 font-medium">
+                    נותר לכיסוי: {shift.remaining_hours}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-3">
               <Label className="text-gray-700 font-medium text-lg">
                 לכסות משמרת מלאה?
@@ -135,22 +137,6 @@ export default function AcceptSwapModal({
               </div>
             </div>
 
-            {/* Existing Coverage Display */}
-            {shift.status === 'partially_covered' && shift.covered_start_time && (
-              <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-                <p className="text-sm font-semibold text-yellow-800 mb-2">כיסוי קיים:</p>
-                <div className="text-sm text-yellow-700">
-                  {shift.covering_person}: {shift.covered_start_time} - {shift.covered_end_time}
-                </div>
-                {shift.remaining_hours && (
-                  <div className="text-sm text-yellow-700 mt-1 font-medium">
-                    נותר לכיסוי: {shift.remaining_hours}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Partial Coverage Time Selection */}
             <AnimatePresence>
               {!coverFull && (
                 <motion.div
@@ -207,7 +193,6 @@ export default function AcceptSwapModal({
               )}
             </AnimatePresence>
 
-            {/* Submit Button */}
             <Button
               type="submit"
               disabled={isAccepting}

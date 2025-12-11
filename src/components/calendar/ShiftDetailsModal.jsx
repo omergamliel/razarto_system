@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,15 +27,7 @@ export default function ShiftDetailsModal({
   currentUserEmail,
   isAdmin
 }) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
-  const [segments, setSegments] = useState([]);
-
-  // Fetch shift segments and coverages
-  const { data: allSegments = [] } = useQuery({
-    queryKey: ['shift-segments', shift?.id],
-    queryFn: () => base44.entities.ShiftSegment.list(),
-    enabled: !!shift?.id
-  });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: shiftCoverages = [] } = useQuery({
     queryKey: ['shift-coverages', shift?.id],
@@ -46,44 +38,21 @@ export default function ShiftDetailsModal({
     enabled: !!shift?.id && isOpen
   });
 
-  useEffect(() => {
-    if (shift && allSegments.length > 0) {
-      const shiftSegs = allSegments.filter(s => s.shift_id === shift.id);
-      setSegments(shiftSegs);
-    }
-  }, [shift, allSegments]);
-
   if (!isOpen || !shift) return null;
 
-  // Calculate covered hours and gaps
-  const calculateCoverage = () => {
-    const shiftDuration = 24; // Full shift is 24 hours
-    let totalCoveredHours = 0;
-    
-    // Calculate total covered hours from all coverages
-    shiftCoverages.forEach(cov => {
-      const start = parseInt(cov.start_time.split(':')[0]);
-      const end = parseInt(cov.end_time.split(':')[0]);
-      const hours = end > start ? end - start : (24 - start) + end;
-      totalCoveredHours += hours;
-    });
+  // Calculate coverage and gaps
+  const shiftDuration = 24;
+  let totalCoveredHours = 0;
+  
+  shiftCoverages.forEach(cov => {
+    const start = parseInt(cov.start_time.split(':')[0]);
+    const end = parseInt(cov.end_time.split(':')[0]);
+    const hours = end > start ? end - start : (24 - start) + end;
+    totalCoveredHours += hours;
+  });
 
-    const hasGap = totalCoveredHours < shiftDuration;
-    const remainingHours = hasGap ? shiftDuration - totalCoveredHours : 0;
-
-    return { 
-      totalCoveredHours, 
-      hasGap, 
-      remainingHours,
-      shiftDuration 
-    };
-  };
-
-  const { totalCoveredHours, hasGap, remainingHours, shiftDuration } = shiftCoverages.length > 0 
-    ? calculateCoverage() 
-    : { totalCoveredHours: 0, hasGap: true, remainingHours: 24, shiftDuration: 24 };
-
-  const hasGaps = hasGap || shift.status === 'swap_requested';
+  const hasGap = totalCoveredHours < shiftDuration || shift.status === 'swap_requested';
+  const remainingHours = shiftDuration - totalCoveredHours;
   const isOwnShift = shift.assigned_email === currentUserEmail;
 
   const handleDelete = () => {
@@ -94,7 +63,6 @@ export default function ShiftDetailsModal({
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -103,14 +71,12 @@ export default function ShiftDetailsModal({
           className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         />
 
-        {/* Modal */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
         >
-          {/* Header */}
           <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-6 text-white flex-shrink-0">
             <button
               onClick={onClose}
@@ -132,10 +98,8 @@ export default function ShiftDetailsModal({
             </div>
           </div>
 
-          {/* Content */}
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-4">
-              {/* Role Title - Emphasized */}
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 text-center">
                 {shift.role && (
                   <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
@@ -164,7 +128,6 @@ export default function ShiftDetailsModal({
                 </div>
               </div>
 
-              {/* Multi-User Coverage Display */}
               {shiftCoverages.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -195,7 +158,6 @@ export default function ShiftDetailsModal({
                     </div>
                   ))}
 
-                  {/* Coverage Summary */}
                   <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">סה"כ מכוסה:</span>
@@ -205,30 +167,7 @@ export default function ShiftDetailsModal({
                 </div>
               )}
 
-              {/* Legacy Coverage (for old segments system) */}
-              {segments.length > 0 && shiftCoverages.length === 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-gray-700 flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    כיסוי קיים (ישן)
-                  </h3>
-                  {segments.map((seg, idx) => (
-                    <div key={idx} className="bg-[#E3F2FD] rounded-xl p-3 border border-[#64B5F6]">
-                      <p className="font-medium text-gray-800">{seg.assigned_person}</p>
-                      {seg.role && (
-                        <p className="text-xs text-[#64B5F6]">{seg.role}</p>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{seg.start_time} - {seg.end_time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Gap Alert */}
-              {hasGaps && (
+              {hasGap && (
                 <div className="bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2] rounded-xl p-4 border border-[#FFB74D]">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="w-5 h-5 text-[#FFB74D]" />
@@ -246,8 +185,7 @@ export default function ShiftDetailsModal({
                 </div>
               )}
 
-              {/* Cover Segment Button */}
-              {hasGaps && !isOwnShift && (
+              {hasGap && !isOwnShift && (
                 <Button
                   onClick={() => {
                     onClose();
@@ -262,7 +200,6 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {/* Approve Button - Admin Only */}
               {isAdmin && shift.status === 'pending_approval' && (
                 <Button
                   onClick={() => {
@@ -281,7 +218,6 @@ export default function ShiftDetailsModal({
           </ScrollArea>
         </motion.div>
 
-        {/* Delete Confirmation Dialog */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <DialogContent>
             <DialogHeader>
