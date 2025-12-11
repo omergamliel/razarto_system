@@ -30,6 +30,11 @@ export default function ShiftDetailsModal({
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const handleDelete = () => {
+    onDelete(shift.id);
+    setShowDeleteConfirm(false);
+  };
+
   const { data: shiftCoverages = [] } = useQuery({
     queryKey: ['shift-coverages', shift?.id],
     queryFn: async () => {
@@ -79,12 +84,22 @@ export default function ShiftDetailsModal({
           className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
         >
           <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-6 text-white flex-shrink-0">
-            <button
-              onClick={onClose}
-              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="absolute top-4 left-4 flex gap-2">
+              {isAdmin && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/20 rounded-xl">
