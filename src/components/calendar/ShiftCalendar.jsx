@@ -368,6 +368,7 @@ export default function ShiftCalendar() {
           onRequestSwap={(shift) => {
             setSelectedShift(shift);
             setSelectedDate(new Date(shift.date));
+            setShowKPIList(false);
             setShowSwapModal(true);
           }}
         />

@@ -79,9 +79,9 @@ export default function OnboardingModal({ isOpen, onComplete }) {
           >
             <UserCircle className="w-12 h-12" />
           </motion.div>
-          <h2 className="text-2xl font-bold mb-2">שלום, מה התפקיד שלך?</h2>
+          <h2 className="text-2xl font-bold mb-2">שלום וברוכים הבאים!</h2>
           <p className="text-white/90 text-sm">
-            בחר את המחלקה והתפקיד שלך כדי להתחיל
+            בחר את המחלקה והתפקיד שלך כדי להתחיל לעבוד עם המערכת
           </p>
         </div>
 
@@ -91,7 +91,7 @@ export default function OnboardingModal({ isOpen, onComplete }) {
           <div className="space-y-2">
             <Label className="text-gray-700 font-medium flex items-center gap-2">
               <Building2 className="w-4 h-4 text-[#64B5F6]" />
-              בחר מחלקה
+              שלב 1: בחר מחלקה
             </Label>
             <Select value={department} onValueChange={handleDepartmentChange}>
               <SelectTrigger className="h-12 rounded-xl border-2">
@@ -100,7 +100,7 @@ export default function OnboardingModal({ isOpen, onComplete }) {
               <SelectContent>
                 {departments.map((dept) => (
                   <SelectItem key={dept} value={dept}>
-                    {dept}
+                    מחלקה {dept}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -116,11 +116,11 @@ export default function OnboardingModal({ isOpen, onComplete }) {
             >
               <Label className="text-gray-700 font-medium flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                בחר תפקיד
+                שלב 2: בחר תפקיד (מתוך מחלקה {department})
               </Label>
-              <Select value={role} onValueChange={setRole}>
+              <Select value={role} onValueChange={setRole} disabled={roles.length === 0}>
                 <SelectTrigger className="h-12 rounded-xl border-2">
-                  <SelectValue placeholder="בחר תפקיד..." />
+                  <SelectValue placeholder={roles.length > 0 ? "בחר תפקיד..." : "אין תפקידים זמינים"} />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (

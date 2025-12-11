@@ -181,7 +181,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           <ArrowRight className="w-4 h-4 mr-1" />
                         </Button>
                       )}
-                      {type === 'my_shifts' && onRequestSwap && (
+                      {(type === 'my_shifts' || (shift.assigned_email === currentUser?.email && shift.status === 'regular')) && onRequestSwap && (
                         <Button
                           onClick={() => {
                             onClose();
