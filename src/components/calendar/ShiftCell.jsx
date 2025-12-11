@@ -100,7 +100,7 @@ export default function ShiftCell({
   
   // Extract clean role name (remove prefix like רז"ר, רע"ן)
   const getCleanRoleName = (role) => {
-    if (!role) return '';
+    if (!role || typeof role !== 'string') return '';
     // Remove common prefixes
     return role
       .replace(/^רז"ר\s+/, '')
