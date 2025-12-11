@@ -23,7 +23,7 @@ export default function ShiftCell({
       return;
     }
 
-    // Regular shift - only owner can click (must match role exactly)
+    // Regular shift - only owner can click (must match role AND name exactly)
     if (shift.status === 'regular') {
       if (isMyShift) {
         onClick(date, shift);

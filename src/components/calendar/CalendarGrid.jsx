@@ -101,7 +101,7 @@ export default function CalendarGrid({
           <span className="text-gray-600">בקשה להחלפה</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-gradient-to-br from-[#E3F2FD] to-[#BBDEFB] border border-[#64B5F6]" />
+          <div className="w-4 h-4 rounded bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9] border border-[#66BB6A]" />
           <span className="text-gray-600">החלפה אושרה</span>
         </div>
         <div className="flex items-center gap-2">

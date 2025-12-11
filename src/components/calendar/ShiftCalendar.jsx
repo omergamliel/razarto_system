@@ -265,12 +265,34 @@ export default function ShiftCalendar() {
     setSelectedShift(shift);
     
     if (!shift) {
-      if (currentUser?.user_type === 'admin') {
+      if (isAdmin) {
         setShowAddModal(true);
       }
-    } else if (shift.assigned_email === currentUser?.email) {
-      setShowActionModal(true);
+      return;
+    }
+
+    // Admin can view all shifts
+    if (isAdmin) {
+      if (shift.status === 'regular') {
+        setShowActionModal(true);
+      } else {
+        setShowDetailsModal(true);
+      }
+      return;
+    }
+
+    // Regular user - check if it's their shift (role match AND name match)
+    const isMyShift = shift.role && currentUser?.assigned_role && 
+                      typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role) &&
+                      shift.assigned_email === currentUser?.email;
+
+    if (shift.status === 'regular') {
+      if (isMyShift) {
+        setShowActionModal(true);
+      }
     } else if (shift.status === 'swap_requested' || shift.status === 'partially_covered') {
+      setShowDetailsModal(true);
+    } else if (shift.status === 'approved') {
       setShowDetailsModal(true);
     }
   };
