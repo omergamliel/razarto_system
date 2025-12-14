@@ -73,7 +73,7 @@ export default function SwapRequestModal({
           </div>
 
           {/* Content */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
             {/* Current Assignment */}
             {shift && (
               <div className="bg-gray-50 rounded-xl p-4">

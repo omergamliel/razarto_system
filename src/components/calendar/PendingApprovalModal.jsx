@@ -4,7 +4,7 @@ import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, Calendar, Clock, User, AlertCircle, ArrowRight } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   Dialog,
   DialogContent,

@@ -70,7 +70,7 @@ export default function AcceptSwapModal({
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
             <div className="bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2] rounded-xl p-4">
               <p className="text-sm text-gray-600 mb-1">מבקש</p>
               <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
