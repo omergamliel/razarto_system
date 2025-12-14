@@ -79,7 +79,7 @@ export default function PendingApprovalModal({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
         >
           <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white flex-shrink-0">
             <button
@@ -102,7 +102,7 @@ export default function PendingApprovalModal({
             </div>
           </div>
 
-          <ScrollArea className="flex-1 p-6">
+          <div className="flex-1 p-6 overflow-y-auto">
             {pendingApprovalRequests.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <CheckCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -168,7 +168,7 @@ export default function PendingApprovalModal({
                 ))}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </motion.div>
 
         {/* Approval Confirmation Dialog */}

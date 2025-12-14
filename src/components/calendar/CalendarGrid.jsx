@@ -69,7 +69,7 @@ export default function CalendarGrid({
       {/* Calendar Grid */}
       <div className={`
         grid grid-cols-7 gap-2 md:gap-3
-        ${viewMode === 'week' ? 'min-h-[200px]' : ''}
+        ${viewMode === 'week' ? 'auto-rows-fr min-h-[400px]' : ''}
       `}>
         {days.map((day, index) => (
           <motion.div

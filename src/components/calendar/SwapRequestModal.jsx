@@ -48,7 +48,7 @@ export default function SwapRequestModal({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-[#E57373] to-[#EF5350] p-6 text-white">

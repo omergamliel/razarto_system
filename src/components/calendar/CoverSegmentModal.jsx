@@ -100,7 +100,7 @@ export default function CoverSegmentModal({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
         >
           <div className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] p-6 text-white">
             <button
