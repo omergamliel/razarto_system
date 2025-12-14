@@ -113,7 +113,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
             </p>
           </div>
 
-          <ScrollArea className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
+          <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
             {filteredShifts.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <p>אין משמרות להצגה</p>
@@ -208,7 +208,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                 ))}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

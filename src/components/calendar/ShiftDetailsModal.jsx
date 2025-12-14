@@ -4,7 +4,7 @@ import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, User, Trash2, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   Dialog,
   DialogContent,
@@ -109,7 +109,7 @@ export default function ShiftDetailsModal({
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto" style={{ maxHeight: '60vh' }}>
             <div className="p-6 space-y-4">
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 text-center">
                 {shift.role && (
@@ -181,6 +181,32 @@ export default function ShiftDetailsModal({
                 </div>
               )}
 
+              {shift.status === 'swap_requested' && isOwnShift && (
+                <Button
+                  onClick={() => {
+                    const updateMutation = async () => {
+                      await base44.entities.Shift.update(shift.id, {
+                        status: 'regular',
+                        swap_request_by: null,
+                        swap_type: null,
+                        swap_start_time: null,
+                        swap_end_time: null
+                      });
+                    };
+                    updateMutation().then(() => {
+                      onClose();
+                      window.location.reload();
+                    });
+                  }}
+                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-6 rounded-xl text-lg font-medium shadow-md"
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <X className="w-5 h-5" />
+                    <span>בטל בקשת החלפה</span>
+                  </div>
+                </Button>
+              )}
+
               {hasGap && !isOwnShift && onOfferCover && (
                 <Button
                   onClick={() => {
@@ -211,7 +237,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
             </div>
-          </ScrollArea>
+          </div>
         </motion.div>
 
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
