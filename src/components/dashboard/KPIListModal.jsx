@@ -7,6 +7,20 @@ import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover, onRequestSwap }) {
+  // Fetch all shift coverages for approved shifts
+  const { data: allCoverages = [] } = useQuery({
+    queryKey: ['all-shift-coverages'],
+    queryFn: async () => {
+      const approvedShifts = shifts.filter(s => s.status === 'approved');
+      const coveragePromises = approvedShifts.map(shift => 
+        base44.entities.ShiftCoverage.filter({ shift_id: shift.id })
+      );
+      const results = await Promise.all(coveragePromises);
+      return results.flat();
+    },
+    enabled: isOpen && type === 'approved'
+  });
+
   if (!isOpen) return null;
 
   const formatTimeBreakdown = (shift) => {
@@ -55,7 +69,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
       case 'partial_gaps':
         return shifts.filter(s => s.status === 'partially_covered');
       case 'approved':
-        return shifts.filter(s => s.status === 'approved');
+        // Sort by updated_date (most recent first)
+        return shifts
+          .filter(s => s.status === 'approved')
+          .sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
       case 'my_shifts':
         // All shifts with my role (regardless of current assignment status)
         return shifts.filter(s => {
@@ -120,47 +137,60 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredShifts.map((shift) => (
-                  <div
-                    key={shift.id}
-                    className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar className="w-4 h-4 text-gray-500" />
-                          <span className="font-semibold text-gray-800">
-                            {format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}
-                          </span>
-                        </div>
+                {filteredShifts.map((shift) => {
+                  const shiftCoverages = allCoverages
+                    .filter(c => c.shift_id === shift.id)
+                    .sort((a, b) => {
+                      const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+                      const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+                      return aTime - bTime;
+                    });
 
-                        {type === 'approved' ? (
-                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
-                            <div className="flex items-center justify-center gap-3 text-base">
-                              <div className="text-center">
-                                <div className="text-lg font-bold text-gray-800">
-                                  {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">{shift.original_assigned_person}</div>
-                              </div>
-                              <ArrowRight className="w-5 h-5 text-green-600 flex-shrink-0" />
-                              <div className="text-center">
-                                <div className="text-lg font-bold text-green-700">
-                                  {shift.role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">{shift.assigned_person}</div>
-                              </div>
-                            </div>
-                            {shift.covered_start_time && (
-                              <div className="mt-2 pt-2 border-t border-green-200">
-                                <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
-                                  <Clock className="w-3 h-3" />
-                                  <span>{shift.covered_start_time} - {shift.covered_end_time}</span>
-                                </div>
-                              </div>
-                            )}
+                  return (
+                    <div
+                      key={shift.id}
+                      className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Calendar className="w-4 h-4 text-gray-500" />
+                            <span className="font-semibold text-gray-800">
+                              {format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}
+                            </span>
                           </div>
-                        ) : (
+
+                          {type === 'approved' ? (
+                            <div className="space-y-2">
+                              {shiftCoverages.map((coverage, idx) => (
+                                <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                                  <div className="flex items-center justify-center gap-3 text-sm">
+                                    <div className="text-center flex-1">
+                                      <div className="text-sm font-bold text-gray-800">
+                                        {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">{shift.original_assigned_person}</div>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                    <div className="text-center flex-1">
+                                      <div className="text-sm font-bold text-green-700">
+                                        {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">{coverage.covering_person}</div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t border-green-200">
+                                    <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
+                                      <Clock className="w-3 h-3" />
+                                      <span>
+                                        {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
                           <>
                             <div className="flex items-center gap-2 mb-1">
                               <User className="w-4 h-4 text-gray-500" />

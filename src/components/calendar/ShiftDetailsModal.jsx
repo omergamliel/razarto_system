@@ -111,18 +111,65 @@ export default function ShiftDetailsModal({
 
           <div className="flex-1 overflow-y-auto" style={{ maxHeight: '60vh' }}>
             <div className="p-6 space-y-4">
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 text-center">
-                {shift.role && (
-                  <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
-                )}
-                <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
-                <div className="mt-2 pt-2 border-t border-gray-300">
-                  <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                    <Clock className="w-4 h-4" />
-                    <span>09:00 - 09:00 (למחרת)</span>
+              {shift.status !== 'approved' && (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 text-center">
+                  {shift.role && (
+                    <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
+                  )}
+                  <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
+                  <div className="mt-2 pt-2 border-t border-gray-300">
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                      <Clock className="w-4 h-4" />
+                      <span>09:00 - 09:00 (למחרת)</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {shift.status === 'approved' && shiftCoverages.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      כיסויים מלאים ({shiftCoverages.length})
+                    </h3>
+                    <div className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      מכוסה במלואו
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {shiftCoverages
+                      .sort((a, b) => {
+                        const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+                        const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+                        return aTime - bTime;
+                      })
+                      .map((coverage) => (
+                        <div key={coverage.id} className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-300">
+                          <p className="font-bold text-gray-800 text-lg">{coverage.covering_person}</p>
+                          {coverage.covering_role && (
+                            <p className="text-sm text-green-700 font-medium">{coverage.covering_role}</p>
+                          )}
+                          <div className="mt-2 pt-2 border-t border-green-200">
+                            <div className="text-sm text-gray-700 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3 h-3" />
+                                <span className="font-medium">מתאריך:</span>
+                                <span>{format(new Date(coverage.start_date), 'd/M')} בשעה {coverage.start_time}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3 h-3" />
+                                <span className="font-medium">עד תאריך:</span>
+                                <span>{format(new Date(coverage.end_date), 'd/M')} בשעה {coverage.end_time}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
 
 

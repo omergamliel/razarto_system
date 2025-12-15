@@ -125,9 +125,9 @@ export default function ShiftCalendar() {
         covering_email: currentUser?.email,
         covering_role: currentUser?.assigned_role,
         covering_department: currentUser?.department,
-        start_date: coverData.coverDate || shift.date,
+        start_date: coverData.startDate || coverData.coverDate || shift.date,
         start_time: coverData.startTime,
-        end_date: coverData.coverDate || shift.date,
+        end_date: coverData.endDate || coverData.coverDate || shift.date,
         end_time: coverData.endTime,
         status: 'approved'
       });
@@ -135,32 +135,34 @@ export default function ShiftCalendar() {
       // Fetch all coverages for this shift
       const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
       
-      // Calculate if shift is fully covered
-      const requestedStart = shift.swap_type === 'full' ? '09:00' : shift.swap_start_time;
-      const requestedEnd = shift.swap_type === 'full' ? '09:00' : shift.swap_end_time;
+      // Calculate total covered hours
+      let totalCoveredMinutes = 0;
+      allCoverages.forEach(cov => {
+        const startDateTime = new Date(`${cov.start_date}T${cov.start_time}:00`);
+        const endDateTime = new Date(`${cov.end_date}T${cov.end_time}:00`);
+        const minutes = (endDateTime - startDateTime) / (1000 * 60);
+        totalCoveredMinutes += minutes;
+      });
       
-      // Simple check: if coverage matches full request
-      const isFullyCovered = coverData.coverFull || 
-        (allCoverages.length === 1 && 
-         coverData.startTime === requestedStart && 
-         coverData.endTime === requestedEnd);
+      const totalCoveredHours = totalCoveredMinutes / 60;
+      const isFullyCovered = totalCoveredHours >= 24;
 
       const updateData = {
         status: isFullyCovered ? 'approved' : 'partially_covered',
         covering_person: allCoverages.map(c => c.covering_person).join(', '),
         covering_email: allCoverages.map(c => c.covering_email).join(', '),
-        covered_start_time: coverData.startTime,
-        covered_end_time: coverData.endTime
+        covered_start_time: allCoverages[0]?.start_time,
+        covered_end_time: allCoverages[allCoverages.length - 1]?.end_time
       };
 
       if (isFullyCovered) {
         // Save original assignment before replacing
         updateData.original_assigned_person = shift.assigned_person;
         updateData.original_role = shift.role;
-        // Replace with covering person
-        updateData.assigned_person = currentUser?.full_name || currentUser?.email;
-        updateData.assigned_email = currentUser?.email;
-        updateData.role = currentUser?.assigned_role;
+        // Replace with first covering person for display
+        updateData.assigned_person = allCoverages[0]?.covering_person;
+        updateData.assigned_email = allCoverages[0]?.covering_email;
+        updateData.role = allCoverages[0]?.covering_role;
       }
 
       return base44.entities.Shift.update(shift.id, updateData);
