@@ -198,6 +198,20 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                 <span className="text-sm text-gray-700">{shift.assigned_person}</span>
                               </div>
                               <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
+                              
+                              {/* Display timing for swap requests and partial gaps */}
+                              {(type === 'swap_requests' || type === 'partial_gaps') && (
+                                <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 bg-white/50 rounded-lg px-2 py-1">
+                                  <Clock className="w-3 h-3" />
+                                  {shift.swap_type === 'partial' && shift.swap_start_time && shift.swap_end_time ? (
+                                    <span>{format(new Date(shift.date), 'd/M')} {shift.swap_start_time} - {format(new Date(shift.date), 'd/M')} {shift.swap_end_time}</span>
+                                  ) : shift.covered_start_time && shift.covered_end_time ? (
+                                    <span>פער: {format(new Date(shift.date), 'd/M')} {shift.covered_end_time} - {format(new Date(shift.date), 'd/M')} 09:00</span>
+                                  ) : (
+                                    <span>{format(new Date(shift.date), 'd/M')} 09:00 - {format(new Date(shift.date), 'd/M')} 09:00 (למחרת)</span>
+                                  )}
+                                </div>
+                              )}
                             </>
                           )}
 

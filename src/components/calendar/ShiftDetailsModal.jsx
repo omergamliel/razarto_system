@@ -175,22 +175,35 @@ export default function ShiftDetailsModal({
 
 
 
-              {shift.status === 'swap_requested' && isOwnShift && (
+              {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && isOwnShift && (
                 <Button
-                  onClick={() => {
-                    const updateMutation = async () => {
+                  onClick={async () => {
+                    try {
+                      // Delete all coverages for this shift
+                      const coverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
+                      await Promise.all(coverages.map(c => base44.entities.ShiftCoverage.delete(c.id)));
+
+                      // Reset shift to regular status
                       await base44.entities.Shift.update(shift.id, {
                         status: 'regular',
                         swap_request_by: null,
                         swap_type: null,
                         swap_start_time: null,
-                        swap_end_time: null
+                        swap_end_time: null,
+                        covering_person: null,
+                        covering_email: null,
+                        covering_role: null,
+                        covering_department: null,
+                        covered_start_time: null,
+                        covered_end_time: null,
+                        remaining_hours: null
                       });
-                    };
-                    updateMutation().then(() => {
+
                       onClose();
                       window.location.reload();
-                    });
+                    } catch (error) {
+                      console.error('Error canceling request:', error);
+                    }
                   }}
                   className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-6 rounded-xl text-lg font-medium shadow-md"
                 >
