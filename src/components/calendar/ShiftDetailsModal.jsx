@@ -124,62 +124,9 @@ export default function ShiftDetailsModal({
                 </div>
               </div>
 
-              {shiftCoverages.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-700 flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      כיסויים ({shiftCoverages.length})
-                    </h3>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      hasGap ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                    }`}>
-                      {hasGap ? `פער: ${remainingHours} שעות` : 'מכוסה במלואו'}
-                    </div>
-                  </div>
-                  
-                  {shiftCoverages.map((coverage) => (
-                    <div key={coverage.id} className="bg-[#E3F2FD] rounded-xl p-3 border border-[#64B5F6]">
-                      <p className="font-medium text-gray-800">{coverage.covering_person}</p>
-                      {coverage.covering_role && (
-                        <p className="text-xs text-[#64B5F6]">{coverage.covering_role}</p>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{coverage.start_time} - {coverage.end_time}</span>
-                        {coverage.start_date !== coverage.end_date && (
-                          <span className="text-orange-600 text-xs mr-1">(לילה)</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
 
-                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">סה"כ מכוסה:</span>
-                      <span className="font-semibold text-gray-800">{totalCoveredHours} / {shiftDuration} שעות</span>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {hasGap && (
-                <div className="bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2] rounded-xl p-4 border border-[#FFB74D]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="w-5 h-5 text-[#FFB74D]" />
-                    <h3 className="font-semibold text-gray-800">נדרש כיסוי נוסף</h3>
-                  </div>
-                  {shiftCoverages.length > 0 ? (
-                    <p className="text-sm text-gray-700">
-                      נותרו {remainingHours} שעות שטרם כוסו מתוך {shiftDuration} שעות המשמרת
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-700">
-                      המשמרת טרם כוסתה - נדרש כיסוי מלא של 24 שעות
-                    </p>
-                  )}
-                </div>
-              )}
+
 
               {shift.status === 'swap_requested' && isOwnShift && (
                 <Button

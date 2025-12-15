@@ -123,7 +123,7 @@ export default function ShiftCell({
       onClick={handleClick}
       className={`
         relative cursor-pointer rounded-xl transition-all duration-200
-        ${isWeekView ? 'min-h-[140px] p-3 md:p-4' : 'min-h-[70px] md:min-h-[110px] p-1.5 md:p-3'}
+        min-h-[70px] md:min-h-[110px] p-1.5 md:p-3
         ${statusStyles.bg}
         ${statusStyles.border ? `border-2 ${statusStyles.border}` : 'border border-gray-100'}
         ${!isCurrentMonth ? 'opacity-40' : ''}
@@ -141,34 +141,21 @@ export default function ShiftCell({
         {format(date, 'd')}
       </div>
 
-      {/* Day Name (Week View) */}
-      {isWeekView && (
-        <div className="text-center mb-2 pt-8">
-          <span className="text-base font-semibold text-gray-600">
-            {['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'][date.getDay()]}
-          </span>
-        </div>
-      )}
+
 
       {/* Shift Content */}
       {shift && (
-        <div className={`${isWeekView ? 'mt-4' : 'mt-6 md:mt-10'} space-y-0.5 md:space-y-1`}>
+        <div className="mt-6 md:mt-10 space-y-0.5 md:space-y-1">
           {/* Role Name Only */}
           {shift.role && (
-            <p className={`
-              font-normal md:font-semibold text-gray-800 truncate text-center
-              ${isWeekView ? 'text-base md:text-lg' : 'text-xs md:text-base'}
-            `}>
+            <p className="font-normal md:font-semibold text-gray-800 truncate text-center text-xs md:text-base">
               {getCleanRoleName(shift.role)}
             </p>
           )}
           
           {/* Covering Person (for confirmed swaps) */}
           {shift.status === 'swap_confirmed' && shift.covering_role && (
-            <div className={`
-              bg-white/80 rounded px-2 py-1 border border-[#64B5F6]
-              ${isWeekView ? 'text-center' : ''}
-            `}>
+            <div className="bg-white/80 rounded px-2 py-1 border border-[#64B5F6]">
               <p className="text-[10px] md:text-xs text-[#64B5F6] font-semibold truncate">
                 {shift.covering_role}
               </p>
@@ -180,10 +167,7 @@ export default function ShiftCell({
 
           {/* Status Badge */}
           {shift.status !== 'regular' && (
-            <div className={`
-              mt-1 md:mt-2 flex items-center gap-1 
-              ${isWeekView ? 'justify-center' : ''}
-            `}>
+            <div className="mt-1 md:mt-2 flex items-center gap-1 justify-center">
               <StatusIcon className="w-3 h-3 text-gray-600" />
               <span className="text-[9px] md:text-xs text-gray-600 font-normal">
                 {shift.status === 'swap_requested' && (
@@ -197,32 +181,16 @@ export default function ShiftCell({
             </div>
           )}
 
-          {/* Full Swap Display with Date Range */}
-          {shift.swap_type === 'full' && shift.status === 'swap_requested' && (
-            <p className={`
-              text-[10px] md:text-xs text-gray-500 mt-1
-              ${isWeekView ? 'text-center' : ''}
-            `}>
-              24 שעות ({format(date, 'd/M')} - {format(new Date(date.getTime() + 86400000), 'd/M')})
-            </p>
-          )}
-
-          {/* Partial Time Display */}
-          {shift.swap_type === 'partial' && shift.swap_start_time && (
-            <p className={`
-              text-[10px] md:text-xs text-gray-500 mt-1
-              ${isWeekView ? 'text-center' : ''}
-            `}>
+          {/* Partial Time Display - Only for partial swaps */}
+          {shift.status === 'swap_requested' && shift.swap_type === 'partial' && shift.swap_start_time && (
+            <p className="text-[10px] md:text-xs text-gray-500 mt-1 text-center">
               {shift.swap_start_time} - {shift.swap_end_time}
             </p>
           )}
 
           {/* Gap Display for Partially Covered */}
           {shift.status === 'partially_covered' && shift.gap_hours && (
-            <div className={`
-              mt-1 bg-white/80 rounded px-2 py-1
-              ${isWeekView ? 'text-center' : ''}
-            `}>
+            <div className="mt-1 bg-white/80 rounded px-2 py-1 text-center">
               <p className="text-[10px] md:text-xs text-[#FFB74D] font-semibold">
                 פער: {shift.gap_hours}
               </p>
