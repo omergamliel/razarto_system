@@ -2,9 +2,10 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, User, ArrowRight, Clock, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover, onRequestSwap }) {
   // Fetch all shift coverages for approved shifts
@@ -191,14 +192,14 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                               ))}
                             </div>
                           ) : (
-                          <>
-                            <div className="flex items-center gap-2 mb-1">
-                              <User className="w-4 h-4 text-gray-500" />
-                              <span className="text-sm text-gray-700">{shift.assigned_person}</span>
-                            </div>
-                            <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
-                          </>
-                        )}
+                            <>
+                              <div className="flex items-center gap-2 mb-1">
+                                <User className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-700">{shift.assigned_person}</span>
+                              </div>
+                              <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
+                            </>
+                          )}
 
                         {shift.remaining_hours && (
                           <div className="flex items-center gap-2 text-xs text-orange-600 mt-2">
@@ -206,8 +207,8 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span>נותרו לכיסוי: {shift.remaining_hours}</span>
                           </div>
                         )}
-                      </div>
-                      {type === 'swap_requests' && shift.assigned_email !== currentUser?.email && (
+                        </div>
+                        {type === 'swap_requests' && shift.assigned_email !== currentUser?.email && (
                         <Button
                           onClick={() => {
                             onClose();
@@ -233,9 +234,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           <ArrowRight className="w-4 h-4 mr-1" />
                         </Button>
                       )}
-                    </div>
-                  </div>
-                ))}
+                      </div>
+                      </div>
+                      );
+                      })}
               </div>
             )}
           </div>
