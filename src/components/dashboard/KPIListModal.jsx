@@ -201,43 +201,43 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             </>
                           )}
 
-                        {shift.remaining_hours && (
-                          <div className="flex items-center gap-2 text-xs text-orange-600 mt-2">
-                            <AlertCircle className="w-3 h-3" />
-                            <span>נותרו לכיסוי: {shift.remaining_hours}</span>
+                          {shift.remaining_hours && (
+                            <div className="flex items-center gap-2 text-xs text-orange-600 mt-2">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>נותרו לכיסוי: {shift.remaining_hours}</span>
+                            </div>
+                          )}
                           </div>
-                        )}
-                        </div>
-                        {type === 'swap_requests' && shift.assigned_email !== currentUser?.email && (
-                        <Button
-                          onClick={() => {
-                            onClose();
-                            onOfferCover(shift);
-                          }}
-                          size="sm"
-                          className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white"
-                        >
-                          אני אחליף
-                          <ArrowRight className="w-4 h-4 mr-1" />
-                        </Button>
-                      )}
-                      {(type === 'my_shifts' || (shift.assigned_email === currentUser?.email && shift.status === 'regular')) && onRequestSwap && (
-                        <Button
-                          onClick={() => {
-                            onClose();
-                            onRequestSwap(shift);
-                          }}
-                          size="sm"
-                          className="bg-gradient-to-r from-[#E57373] to-[#EF5350] hover:from-[#EF5350] hover:to-[#F44336] text-white"
-                        >
-                          בקש החלפה
-                          <ArrowRight className="w-4 h-4 mr-1" />
-                        </Button>
-                      )}
-                      </div>
-                      </div>
-                      );
-                      })}
+                          {type === 'swap_requests' && shift.assigned_email !== currentUser?.email && (
+                          <Button
+                            onClick={() => {
+                              onClose();
+                              onOfferCover(shift);
+                            }}
+                            size="sm"
+                            className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white"
+                          >
+                            אני אחליף
+                            <ArrowRight className="w-4 h-4 mr-1" />
+                          </Button>
+                          )}
+                          {(type === 'my_shifts' || (shift.assigned_email === currentUser?.email && shift.status === 'regular')) && onRequestSwap && (
+                          <Button
+                            onClick={() => {
+                              onClose();
+                              onRequestSwap(shift);
+                            }}
+                            size="sm"
+                            className="bg-gradient-to-r from-[#E57373] to-[#EF5350] hover:from-[#EF5350] hover:to-[#F44336] text-white"
+                          >
+                            בקש החלפה
+                            <ArrowRight className="w-4 h-4 mr-1" />
+                          </Button>
+                          )}
+                          </div>
+                          </div>
+                          );
+                          })}
               </div>
             )}
           </div>
