@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { format } from 'date-fns';
+import React, { useState, useEffect } from 'react';
+import { format, addDays, parse } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, Clock } from 'lucide-react';
+import { X, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from 'sonner';
 
 export default function AcceptSwapModal({ 
   isOpen, 
@@ -15,22 +16,84 @@ export default function AcceptSwapModal({
   isAccepting
 }) {
   const [coverFull, setCoverFull] = useState(true);
-  const [coverDate, setCoverDate] = useState('');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+
+  // Calculate defaults based on shift and existing coverage
+  useEffect(() => {
+    if (!shift || !isOpen) return;
+    
+    const shiftStartDate = shift.date;
+    const shiftEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
+    
+    // Determine gap based on swap type or existing coverage
+    let gapStartTime = '09:00';
+    let gapEndTime = '09:00';
+    let gapStartDate = shiftStartDate;
+    let gapEndDate = shiftEndDate;
+    
+    if (shift.status === 'partially_covered' && shift.covered_end_time) {
+      // Gap starts where coverage ended
+      gapStartTime = shift.covered_end_time;
+      gapEndTime = '09:00';
+      gapStartDate = shiftStartDate;
+      gapEndDate = shiftEndDate;
+    } else if (shift.swap_type === 'partial' && shift.swap_start_time && shift.swap_end_time) {
+      // Use requested swap times
+      gapStartTime = shift.swap_start_time;
+      gapEndTime = shift.swap_end_time;
+      gapStartDate = shiftStartDate;
+      gapEndDate = shiftStartDate; // Same day for partial unless it crosses midnight
+      
+      // Check if end time crosses midnight
+      const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+      const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+      if (endHour < startHour) {
+        gapEndDate = shiftEndDate;
+      }
+    }
+    
+    setStartDate(gapStartDate);
+    setStartTime(gapStartTime);
+    setEndDate(gapEndDate);
+    setEndTime(gapEndTime);
+  }, [shift, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    if (!coverFull) {
+      // Validate date/time is within 24-hour shift window
+      const shiftStart = new Date(`${shift.date}T09:00:00`);
+      const shiftEnd = addDays(shiftStart, 1);
+      
+      const selectedStart = new Date(`${startDate}T${startTime}:00`);
+      const selectedEnd = new Date(`${endDate}T${endTime}:00`);
+      
+      if (selectedStart < shiftStart || selectedEnd > shiftEnd || selectedStart >= selectedEnd) {
+        toast.error('טעות בבחירת תאריכים', {
+          description: `הכיסוי חייב להיות בתוך חלון המשמרת: מ-${format(shiftStart, 'd/M בשעה HH:mm')} עד ${format(shiftEnd, 'd/M בשעה HH:mm')}`,
+          duration: 5000
+        });
+        return;
+      }
+    }
+    
     onAccept({
       coverFull,
-      coverDate: coverDate || shift?.date,
+      coverDate: coverFull ? shift?.date : startDate,
       startTime: coverFull ? '09:00' : startTime,
-      endTime: coverFull ? '09:00' : endTime
+      endTime: coverFull ? '09:00' : endTime,
+      endDate: coverFull ? format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd') : endDate
     });
   };
 
   if (!isOpen || !shift) return null;
+  
+  const shiftStartDate = new Date(`${shift.date}T09:00:00`);
+  const shiftEndDate = addDays(shiftStartDate, 1);
 
   return (
     <AnimatePresence>
@@ -89,7 +152,11 @@ export default function AcceptSwapModal({
               <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
                 <p className="text-sm font-semibold text-yellow-800 mb-2">כיסוי קיים:</p>
                 <div className="text-sm text-yellow-700">
-                  {shift.covering_person}: {shift.covered_start_time} - {shift.covered_end_time}
+                  {shift.covering_person}: מתאריך {format(new Date(shift.date), 'd/M')} בשעה {shift.covered_start_time} ועד לתאריך {
+                    parseInt(shift.covered_end_time.split(':')[0]) < parseInt(shift.covered_start_time.split(':')[0]) 
+                      ? format(addDays(new Date(shift.date), 1), 'd/M')
+                      : format(new Date(shift.date), 'd/M')
+                  } בשעה {shift.covered_end_time}
                 </div>
                 {shift.remaining_hours && (
                   <div className="text-sm text-yellow-700 mt-1 font-medium">
@@ -143,49 +210,80 @@ export default function AcceptSwapModal({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="space-y-3 overflow-hidden"
+                  className="space-y-4 overflow-hidden"
                 >
                   <Label className="text-gray-700 font-medium">פרטי הכיסוי שלך</Label>
                   
-                  <div>
-                    <Label className="text-xs text-gray-500 mb-1 block">תאריך (לתמיכה במשמרות לילה)</Label>
-                    <Input
-                      type="date"
-                      value={coverDate}
-                      onChange={(e) => setCoverDate(e.target.value)}
-                      min={shift?.date}
-                      className="text-center h-12 rounded-xl"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-gray-500">משעה</Label>
-                      <Input
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        className="mt-1 text-center h-12 rounded-xl"
-                        dir="ltr"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">עד שעה</Label>
-                      <Input
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        className="mt-1 text-center h-12 rounded-xl"
-                        dir="ltr"
-                      />
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-blue-700">
+                        הכיסוי חייב להיות בתוך חלון 24 השעות של המשמרת: {format(shiftStartDate, 'd/M בשעה HH:mm')} - {format(shiftEndDate, 'd/M בשעה HH:mm')}
+                      </p>
                     </div>
                   </div>
                   
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                    <p className="text-xs text-blue-800 font-medium mb-1">
+                  {/* Row 1: Start */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <Label className="text-gray-700 font-semibold">החל מ:</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">החל מתאריך</Label>
+                        <Input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          min={shift?.date}
+                          max={format(shiftEndDate, 'yyyy-MM-dd')}
+                          className="text-center h-12 rounded-xl"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">החל משעה</Label>
+                        <Input
+                          type="time"
+                          value={startTime}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          className="text-center h-12 rounded-xl"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2: End */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <Label className="text-gray-700 font-semibold">ועד ל:</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">ועד לתאריך</Label>
+                        <Input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          min={shift?.date}
+                          max={format(shiftEndDate, 'yyyy-MM-dd')}
+                          className="text-center h-12 rounded-xl"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">עד לשעה</Label>
+                        <Input
+                          type="time"
+                          value={endTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          className="text-center h-12 rounded-xl"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <p className="text-xs text-green-800 font-medium mb-1">
                       💡 כיסוי רב-משתמש
                     </p>
-                    <p className="text-xs text-blue-700">
+                    <p className="text-xs text-green-700">
                       משתמשים נוספים יכולים לכסות את השעות הנותרות
                     </p>
                   </div>
