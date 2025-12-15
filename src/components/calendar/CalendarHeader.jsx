@@ -134,7 +134,7 @@ export default function CalendarHeader({
             Razarto
           </h1>
           <p className="text-gray-600 text-sm md:text-base font-medium">
-            מערכת לניהול משמרות רז"ר תורן
+            מערכת לניהול משמרות
           </p>
           <p className="text-gray-400 text-xs md:text-sm mt-0.5">
             צפייה במשמרות | ביצוע החלפות מסודרות
