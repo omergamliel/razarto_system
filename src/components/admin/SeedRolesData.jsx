@@ -3,28 +3,27 @@ import { base44 } from '@/api/base44Client';
 
 const INITIAL_ROLES = [
   // Department 'ש'
-  { department: 'ש', role_name: 'אוה"ד' },
-  { department: 'ש', role_name: 'שליטה' },
-  { department: 'ש', role_name: 'ביטחון' },
-  { department: 'ש', role_name: 'דיגיטל' },
-  { department: 'ש', role_name: 'צבאי מערכתי' },
+  { department: 'ש', role_name: 'אוה"ד', assigned_user_name: 'ספיר לוי' },
+  { department: 'ש', role_name: 'שליטה', assigned_user_name: 'ספיר הרשקו' },
+  { department: 'ש', role_name: 'ביטחון', assigned_user_name: 'אלעד פסל' },
+  { department: 'ש', role_name: 'דיגיטל', assigned_user_name: 'חן שבתאי' },
+  { department: 'ש', role_name: 'צבאי מערכתי', assigned_user_name: 'שלומי זגה' },
   // Department 'מ'
-  { department: 'מ', role_name: 'דרום' },
-  { department: 'מ', role_name: 'מרכז' },
-  { department: 'מ', role_name: 'צפון' },
-  { department: 'מ', role_name: 'עורף' },
-  { department: 'מ', role_name: 'מבצעים' },
-  { department: 'מ', role_name: 'סייבר' },
-  { department: 'מ', role_name: 'תה"ם' },
+  { department: 'מ', role_name: 'דרום', assigned_user_name: 'איתי תורג\'מן' },
+  { department: 'מ', role_name: 'מרכז', assigned_user_name: 'שמעון עורקבי' },
+  { department: 'מ', role_name: 'צפון', assigned_user_name: 'רוני בורשטיין' },
+  { department: 'מ', role_name: 'עורף', assigned_user_name: 'שיראל כהן' },
+  { department: 'מ', role_name: 'מבצעים', assigned_user_name: 'דורון מיכאלי' },
+  { department: 'מ', role_name: 'סייבר', assigned_user_name: 'עינבל זיגר' },
+  { department: 'מ', role_name: 'תה"ם', assigned_user_name: 'מאיה סולטן' },
   // Department 'ת'
-  { department: 'ת', role_name: 'תקיפה' },
-  { department: 'ת', role_name: 'ח"ח' },
-  { department: 'ת', role_name: 'רציפות התפקוד' },
-  { department: 'ת', role_name: 'גיו"כ' },
-  { department: 'ת', role_name: 'עומק' },
-  { department: 'ת', role_name: 'מעג"ש' },
-  { department: 'ת', role_name: 'תב"ל' },
-  { department: 'ת', role_name: 'תכנון' }
+  { department: 'ת', role_name: 'תקיפה', assigned_user_name: 'ניב מלין' },
+  { department: 'ת', role_name: 'ח"ח', assigned_user_name: 'חיים פרנסיו' },
+  { department: 'ת', role_name: 'רציפות התפקוד', assigned_user_name: 'דין ויינשטיין' },
+  { department: 'ת', role_name: 'עומק', assigned_user_name: 'יאיר אלשיך' },
+  { department: 'ת', role_name: 'מעג"ש', assigned_user_name: 'יעל ליבנה' },
+  { department: 'ת', role_name: 'תב"ל', assigned_user_name: 'עודד בן צור' },
+  { department: 'ת', role_name: 'תכנון', assigned_user_name: 'יהב ברזילי' }
 ];
 
 export default function SeedRolesData() {
