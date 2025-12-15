@@ -6,15 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { DEPARTMENTS, getDepartmentList } from '../calendar/departmentData';
+import { useQuery } from '@tanstack/react-query';
 
 export default function OnboardingModal({ isOpen, onComplete }) {
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const departments = getDepartmentList();
-  const roles = department ? DEPARTMENTS[department] || [] : [];
+  // Fetch role definitions from DB
+  const { data: roleDefinitions = [] } = useQuery({
+    queryKey: ['role-definitions'],
+    queryFn: () => base44.entities.RoleDefinition.list(),
+    enabled: isOpen
+  });
+
+  const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
+  const roles = department 
+    ? roleDefinitions
+        .filter(rd => rd.department === department && rd.assigned_user_name)
+        .map(rd => rd.assigned_user_name)
+    : [];
 
   const handleDepartmentChange = (value) => {
     setDepartment(value);
@@ -38,15 +49,21 @@ export default function OnboardingModal({ isOpen, onComplete }) {
         department: department
       });
 
-      // Find and update the RoleDefinition record
-      const roleDefinitions = await base44.entities.RoleDefinition.filter({
-        department: department,
-        role_name: role
-      });
+      // Find the RoleDefinition by assigned_user_name
+      const allRoleDefs = await base44.entities.RoleDefinition.list();
+      const roleDefMatch = allRoleDefs.find(rd => 
+        rd.department === department && rd.assigned_user_name === role
+      );
 
-      if (roleDefinitions.length > 0) {
-        await base44.entities.RoleDefinition.update(roleDefinitions[0].id, {
-          assigned_user_name: user.full_name,
+      if (roleDefMatch) {
+        // Update the user with the role_name (not assigned_user_name)
+        await base44.auth.updateMe({
+          assigned_role: roleDefMatch.role_name,
+          department: department
+        });
+        
+        // Update RoleDefinition with user email
+        await base44.entities.RoleDefinition.update(roleDefMatch.id, {
           assigned_user_email: user.email
         });
       }

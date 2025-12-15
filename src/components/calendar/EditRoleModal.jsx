@@ -6,7 +6,8 @@ import { X, Calendar, Save, Users, Briefcase } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getDepartmentList, getRolesForDepartment } from './departmentData';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 export default function EditRoleModal({ 
   isOpen, 
@@ -18,6 +19,13 @@ export default function EditRoleModal({
 }) {
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState('');
+
+  // Fetch role definitions from DB
+  const { data: roleDefinitions = [] } = useQuery({
+    queryKey: ['role-definitions'],
+    queryFn: () => base44.entities.RoleDefinition.list(),
+    enabled: isOpen
+  });
 
   useEffect(() => {
     if (shift) {
@@ -43,8 +51,15 @@ export default function EditRoleModal({
 
   if (!isOpen || !shift) return null;
 
-  const departments = getDepartmentList();
-  const roles = department ? getRolesForDepartment(department) : [];
+  // Get unique departments
+  const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
+  
+  // Get roles (assigned_user_name) for selected department
+  const roles = department 
+    ? roleDefinitions
+        .filter(rd => rd.department === department && rd.assigned_user_name)
+        .map(rd => rd.assigned_user_name)
+    : [];
 
   return (
     <AnimatePresence>
@@ -94,7 +109,7 @@ export default function EditRoleModal({
               <p className="text-sm text-gray-500 mb-1">משובץ</p>
               <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
               {shift.role && (
-                <p className="text-sm text-[#E57373] mt-1">בע"ת נוכחי: {shift.role}</p>
+                <p className="text-sm text-[#E57373] mt-1">אדם נוכחי: {shift.role}</p>
               )}
             </div>
 
@@ -129,11 +144,11 @@ export default function EditRoleModal({
                 >
                   <Label className="text-gray-700 font-medium flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                    בחר בע"ת חדש
+                    בחר אדם חדש
                   </Label>
                   <Select value={role} onValueChange={setRole}>
                     <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
-                      <SelectValue placeholder="בחר בע״ת..." />
+                      <SelectValue placeholder="בחר אדם..." />
                     </SelectTrigger>
                     <SelectContent>
                       {roles.map((r) => (
