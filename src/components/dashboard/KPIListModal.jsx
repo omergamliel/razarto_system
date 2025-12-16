@@ -70,10 +70,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
       case 'partial_gaps':
         return shifts.filter(s => s.status === 'partially_covered');
       case 'approved':
-        // Sort by updated_date (most recent first)
+        // Sort by shift date (closest first)
         return shifts
           .filter(s => s.status === 'approved')
-          .sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
       case 'my_shifts':
         // All shifts with my role (regardless of current assignment status)
         return shifts.filter(s => {
@@ -180,12 +180,15 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                       <div className="text-xs text-gray-500 mt-1">{coverage.covering_person}</div>
                                     </div>
                                   </div>
-                                  <div className="mt-2 pt-2 border-t border-green-200">
+                                  <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
                                     <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
                                       <Clock className="w-3 h-3" />
                                       <span>
                                         {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
                                       </span>
+                                    </div>
+                                    <div className="text-[10px] text-gray-500 text-center">
+                                      אושר ב: {format(new Date(shift.updated_date), 'd/M/yy בשעה HH:mm')}
                                     </div>
                                   </div>
                                 </div>
