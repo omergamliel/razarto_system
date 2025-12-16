@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,10 +18,18 @@ export default function SwapRequestModal({
   isSubmitting
 }) {
   const [swapType, setSwapType] = useState('full');
-  const [startDate, setStartDate] = useState(date ? format(date, 'yyyy-MM-dd') : '');
+  const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('14:00');
-  const [endDate, setEndDate] = useState(date ? format(date, 'yyyy-MM-dd') : '');
+  const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('18:00');
+
+  // Set default dates when modal opens
+  React.useEffect(() => {
+    if (isOpen && date) {
+      setStartDate(format(date, 'yyyy-MM-dd'));
+      setEndDate(format(date, 'yyyy-MM-dd'));
+    }
+  }, [isOpen, date]);
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit({

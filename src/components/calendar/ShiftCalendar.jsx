@@ -90,21 +90,21 @@ export default function ShiftCalendar() {
   });
 
   // Swap request mutation
-  const swapRequestMutation = useMutation({
-    mutationFn: async ({ date, swapData }) => {
-      const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
-      
-      if (existingShift) {
-        return base44.entities.Shift.update(existingShift.id, {
-          status: 'swap_requested',
-          swap_request_by: currentUser?.email,
-          swap_type: swapData.swapType,
-          swap_start_time: swapData.startTime,
-          swap_end_time: swapData.endTime
-        });
-      }
-      return null;
-    },
+    const swapRequestMutation = useMutation({
+      mutationFn: async ({ date, swapData }) => {
+        const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
+
+        if (existingShift) {
+          return base44.entities.Shift.update(existingShift.id, {
+            status: swapData.swapType === 'partial' ? 'partially_covered' : 'swap_requested',
+            swap_request_by: currentUser?.email,
+            swap_type: swapData.swapType,
+            swap_start_time: swapData.startTime,
+            swap_end_time: swapData.endTime
+          });
+        }
+        return null;
+      },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setShowSwapModal(false);
