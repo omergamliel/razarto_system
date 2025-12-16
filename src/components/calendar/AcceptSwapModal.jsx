@@ -28,56 +28,72 @@ export default function AcceptSwapModal({
     const shiftStartDate = shift.date;
     const shiftEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
     
-    // Determine gap based on swap type or existing coverage
-    let gapStartTime = '09:00';
-    let gapEndTime = '09:00';
-    let gapStartDate = shiftStartDate;
-    let gapEndDate = shiftEndDate;
-    
-    if (shift.status === 'partially_covered' && shift.covered_end_time) {
+    // For partially_covered shifts - restrict to the requested swap time range
+    if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
+      setStartDate(shiftStartDate);
+      setStartTime(shift.swap_start_time);
+      setEndDate(shiftStartDate);
+      setEndTime(shift.swap_end_time);
+      setCoverFull(false); // Force partial coverage
+    } else if (shift.covered_end_time) {
       // Gap starts where coverage ended
-      gapStartTime = shift.covered_end_time;
-      gapEndTime = '09:00';
-      gapStartDate = shiftStartDate;
-      gapEndDate = shiftEndDate;
+      setStartDate(shiftStartDate);
+      setStartTime(shift.covered_end_time);
+      setEndDate(shiftEndDate);
+      setEndTime('09:00');
     } else if (shift.swap_type === 'partial' && shift.swap_start_time && shift.swap_end_time) {
       // Use requested swap times
-      gapStartTime = shift.swap_start_time;
-      gapEndTime = shift.swap_end_time;
-      gapStartDate = shiftStartDate;
-      gapEndDate = shiftStartDate; // Same day for partial unless it crosses midnight
-      
-      // Check if end time crosses midnight
+      setStartDate(shiftStartDate);
+      setStartTime(shift.swap_start_time);
       const startHour = parseInt(shift.swap_start_time.split(':')[0]);
       const endHour = parseInt(shift.swap_end_time.split(':')[0]);
-      if (endHour < startHour) {
-        gapEndDate = shiftEndDate;
-      }
+      setEndDate(endHour < startHour ? shiftEndDate : shiftStartDate);
+      setEndTime(shift.swap_end_time);
+    } else {
+      // Default to full coverage
+      setStartDate(shiftStartDate);
+      setStartTime('09:00');
+      setEndDate(shiftEndDate);
+      setEndTime('09:00');
     }
-    
-    setStartDate(gapStartDate);
-    setStartTime(gapStartTime);
-    setEndDate(gapEndDate);
-    setEndTime(gapEndTime);
   }, [shift, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
     if (!coverFull) {
-      // Validate date/time is within 24-hour shift window
-      const shiftStart = new Date(`${shift.date}T09:00:00`);
-      const shiftEnd = addDays(shiftStart, 1);
-      
       const selectedStart = new Date(`${startDate}T${startTime}:00`);
       const selectedEnd = new Date(`${endDate}T${endTime}:00`);
       
-      if (selectedStart < shiftStart || selectedEnd > shiftEnd || selectedStart >= selectedEnd) {
-        toast.error('טעות בבחירת תאריכים', {
-          description: `הכיסוי חייב להיות בתוך חלון המשמרת: מ-${format(shiftStart, 'd/M בשעה HH:mm')} עד ${format(shiftEnd, 'd/M בשעה HH:mm')}`,
-          duration: 5000
-        });
+      if (selectedStart >= selectedEnd) {
+        toast.error('שעת הסיום חייבת להיות אחרי שעת ההתחלה');
         return;
+      }
+      
+      // For partially_covered shifts - validate within requested swap range
+      if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
+        const requestedStart = new Date(`${shift.date}T${shift.swap_start_time}:00`);
+        const requestedEnd = new Date(`${shift.date}T${shift.swap_end_time}:00`);
+        
+        if (selectedStart < requestedStart || selectedEnd > requestedEnd) {
+          toast.error('טעות בבחירת שעות', {
+            description: `הכיסוי חייב להיות בטווח המבוקש: ${shift.swap_start_time} - ${shift.swap_end_time}`,
+            duration: 5000
+          });
+          return;
+        }
+      } else {
+        // Validate within 24-hour shift window
+        const shiftStart = new Date(`${shift.date}T09:00:00`);
+        const shiftEnd = addDays(shiftStart, 1);
+        
+        if (selectedStart < shiftStart || selectedEnd > shiftEnd) {
+          toast.error('טעות בבחירת תאריכים', {
+            description: `הכיסוי חייב להיות בתוך חלון המשמרת: מ-${format(shiftStart, 'd/M בשעה HH:mm')} עד ${format(shiftEnd, 'd/M בשעה HH:mm')}`,
+            duration: 5000
+          });
+          return;
+        }
       }
     }
     
@@ -166,6 +182,21 @@ export default function AcceptSwapModal({
               </div>
             )}
 
+            {/* Show requested time range for partially_covered shifts */}
+            {shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time && (
+              <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
+                <p className="text-sm font-semibold text-yellow-800 mb-2">טווח שעות מבוקש להחלפה:</p>
+                <div className="flex items-center justify-center gap-2 text-yellow-700">
+                  <Clock className="w-5 h-5" />
+                  <span className="font-bold text-lg">{shift.swap_start_time} - {shift.swap_end_time}</span>
+                </div>
+                <p className="text-xs text-yellow-700 text-center mt-2">
+                  יש לכסות בטווח שעות זה בלבד
+                </p>
+              </div>
+            )}
+
+            {shift.status !== 'partially_covered' && (
             <div className="space-y-3">
               <Label className="text-gray-700 font-medium text-lg">
                 לכסות משמרת מלאה?
@@ -203,6 +234,7 @@ export default function AcceptSwapModal({
                 </button>
               </div>
             </div>
+            )}
 
             <AnimatePresence>
               {!coverFull && (
@@ -214,6 +246,7 @@ export default function AcceptSwapModal({
                 >
                   <Label className="text-gray-700 font-medium">פרטי הכיסוי שלך</Label>
                   
+                  {shift.status !== 'partially_covered' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -222,6 +255,7 @@ export default function AcceptSwapModal({
                       </p>
                     </div>
                   </div>
+                  )}
                   
                   {/* Row 1: Start */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
