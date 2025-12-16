@@ -41,7 +41,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
     },
     {
       id: 'partial_gaps',
-      title: 'משמרות בפער חלקי',
+      title: 'בקשות להחלפה למשמרת חלקית',
       count: partialGaps,
       icon: Clock,
       color: 'from-yellow-500 to-yellow-600',
