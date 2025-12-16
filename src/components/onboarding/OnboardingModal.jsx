@@ -23,8 +23,8 @@ export default function OnboardingModal({ isOpen, onComplete }) {
   const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
   const roles = department 
     ? roleDefinitions
-        .filter(rd => rd.department === department && rd.assigned_user_name)
-        .map(rd => rd.assigned_user_name)
+        .filter(rd => rd.department === department && rd.role_name)
+        .map(rd => rd.role_name)
     : [];
 
   const handleDepartmentChange = (value) => {
@@ -43,20 +43,14 @@ export default function OnboardingModal({ isOpen, onComplete }) {
     try {
       const user = await base44.auth.me();
       
-      // Update user with role
-      await base44.auth.updateMe({
-        assigned_role: role,
-        department: department
-      });
-
-      // Find the RoleDefinition by assigned_user_name
+      // Find the RoleDefinition by role_name
       const allRoleDefs = await base44.entities.RoleDefinition.list();
       const roleDefMatch = allRoleDefs.find(rd => 
-        rd.department === department && rd.assigned_user_name === role
+        rd.department === department && rd.role_name === role
       );
 
       if (roleDefMatch) {
-        // Update the user with the role_name (not assigned_user_name)
+        // Update user with the role_name
         await base44.auth.updateMe({
           assigned_role: roleDefMatch.role_name,
           department: department
@@ -133,11 +127,11 @@ export default function OnboardingModal({ isOpen, onComplete }) {
             >
               <Label className="text-gray-700 font-medium flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                שלב 2: בחר את שמך
+                שלב 2: בחר את השם המלא שלך
               </Label>
               <Select value={role} onValueChange={setRole} disabled={roles.length === 0}>
                 <SelectTrigger className="h-12 rounded-xl border-2">
-                  <SelectValue placeholder={roles.length > 0 ? "בחר תפקיד..." : "אין תפקידים זמינים"} />
+                  <SelectValue placeholder={roles.length > 0 ? "בחר שם..." : "אין שמות זמינים"} />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (
