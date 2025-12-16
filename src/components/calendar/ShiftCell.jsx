@@ -176,7 +176,7 @@ export default function ShiftCell({
                     : 'בקשה להחלפה לכיסוי חלקי'
                 )}
                 {shift.status === 'approved' && 'הוחלף'}
-                {shift.status === 'partially_covered' && (shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'פער חלקי')}
+                {shift.status === 'partially_covered' && (shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'בקשה להחלפה למשמרת- חלקית')}
               </span>
             </div>
           )}

@@ -31,7 +31,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
   const kpis = [
     {
       id: 'swap_requests',
-      title: 'בקשות להחלפה',
+      title: 'בקשות להחלפה למשמרת מלאה',
       count: swapRequests,
       icon: AlertCircle,
       color: 'from-red-500 to-red-600',
@@ -51,7 +51,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
     },
     {
       id: 'approved',
-      title: 'החלפות שבוצעו',
+      title: 'היסטוריית החלפות שבוצעו',
       count: approved,
       icon: CheckCircle,
       color: 'from-green-500 to-green-600',
