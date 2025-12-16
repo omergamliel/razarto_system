@@ -47,11 +47,11 @@ export default function AddShiftModal({
   // Get unique departments
   const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
   
-  // Get roles (assigned_user_name) for selected department
+  // Get roles (role_name) for selected department
   const roles = department 
     ? roleDefinitions
-        .filter(rd => rd.department === department && rd.assigned_user_name)
-        .map(rd => rd.assigned_user_name)
+        .filter(rd => rd.department === department && rd.role_name)
+        .map(rd => rd.role_name)
     : [];
 
   return (
@@ -128,11 +128,11 @@ export default function AddShiftModal({
                 >
                   <Label className="text-gray-700 font-medium flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                    בחר אדם
+                    בחר שם מלא
                   </Label>
                   <Select value={role} onValueChange={setRole}>
                     <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
-                      <SelectValue placeholder="בחר אדם..." />
+                      <SelectValue placeholder="בחר שם..." />
                     </SelectTrigger>
                     <SelectContent>
                       {roles.map((r) => (
