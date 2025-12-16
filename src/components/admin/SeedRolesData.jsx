@@ -7,7 +7,7 @@ const INITIAL_ROLES = [
   { department: 'ש', role_name: 'שליטה', assigned_user_name: 'ספיר הרשקו' },
   { department: 'ש', role_name: 'ביטחון', assigned_user_name: 'אלעד פסל' },
   { department: 'ש', role_name: 'דיגיטל', assigned_user_name: 'חן שבתאי' },
-  { department: 'ש', role_name: 'צבאי מערכתי', assigned_user_name: 'שלומי זגה' },
+  { department: 'ש', role_name: 'צבאי מערכתי', assigned_user_name: 'צבאי מערכתי' },
   // Department 'מ'
   { department: 'מ', role_name: 'דרום', assigned_user_name: 'איתי תורג\'מן' },
   { department: 'מ', role_name: 'מרכז', assigned_user_name: 'שמעון עורקבי' },
