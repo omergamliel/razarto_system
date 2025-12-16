@@ -218,7 +218,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {hasGap && !isOwnShift && onOfferCover && (
+              {((shift.status === 'swap_requested' || shift.status === 'partially_covered') && !isOwnShift) && onOfferCover && (
                 <Button
                   onClick={() => {
                     onClose();
