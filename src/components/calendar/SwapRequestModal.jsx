@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Calendar, AlertCircle, Send } from 'lucide-react';
@@ -18,13 +18,17 @@ export default function SwapRequestModal({
   isSubmitting
 }) {
   const [swapType, setSwapType] = useState('full');
+  const [startDate, setStartDate] = useState(date ? format(date, 'yyyy-MM-dd') : '');
   const [startTime, setStartTime] = useState('14:00');
+  const [endDate, setEndDate] = useState(date ? format(date, 'yyyy-MM-dd') : '');
   const [endTime, setEndTime] = useState('18:00');
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit({
       swapType,
+      startDate: swapType === 'partial' ? startDate : null,
       startTime: swapType === 'partial' ? startTime : null,
+      endDate: swapType === 'partial' ? endDate : null,
       endTime: swapType === 'partial' ? endTime : null
     });
   };
@@ -127,36 +131,64 @@ export default function SwapRequestModal({
               </RadioGroup>
             </div>
 
-            {/* Time Selection (for partial) */}
+            {/* Date & Time Selection (for partial) */}
             <AnimatePresence>
               {swapType === 'partial' && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="space-y-3 overflow-hidden"
+                  className="space-y-4 overflow-hidden"
                 >
-                  <Label className="text-gray-700 font-medium">בחר שעות</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-gray-500">משעה</Label>
-                      <Input
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        className="mt-1 text-center"
-                        dir="ltr"
-                      />
+                  {/* Start Date & Time */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <Label className="text-gray-700 font-semibold">החל מ:</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">תאריך</Label>
+                        <Input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="text-center h-12 rounded-xl"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">שעה</Label>
+                        <Input
+                          type="time"
+                          value={startTime}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          className="text-center h-12 rounded-xl"
+                          dir="ltr"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">עד שעה</Label>
-                      <Input
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        className="mt-1 text-center"
-                        dir="ltr"
-                      />
+                  </div>
+
+                  {/* End Date & Time */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <Label className="text-gray-700 font-semibold">ועד ל:</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">תאריך</Label>
+                        <Input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="text-center h-12 rounded-xl"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">שעה</Label>
+                        <Input
+                          type="time"
+                          value={endTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          className="text-center h-12 rounded-xl"
+                          dir="ltr"
+                        />
+                      </div>
                     </div>
                   </div>
                 </motion.div>

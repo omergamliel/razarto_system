@@ -98,7 +98,7 @@ export default function OnboardingModal({ isOpen, onComplete }) {
           </motion.div>
           <h2 className="text-2xl font-bold mb-2">שלום וברוכים הבאים!</h2>
           <p className="text-white/90 text-sm">
-            בחר את המחלקה והתפקיד שלך כדי להתחיל לעבוד עם המערכת
+            תגידו ביי לחפירות בווצאפ, מהיום הכל מסודר במקום אחד!
           </p>
         </div>
 
@@ -133,7 +133,7 @@ export default function OnboardingModal({ isOpen, onComplete }) {
             >
               <Label className="text-gray-700 font-medium flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                שלב 2: בחר תפקיד (מתוך מחלקה {department})
+                שלב 2: בחר את שמך
               </Label>
               <Select value={role} onValueChange={setRole} disabled={roles.length === 0}>
                 <SelectTrigger className="h-12 rounded-xl border-2">
