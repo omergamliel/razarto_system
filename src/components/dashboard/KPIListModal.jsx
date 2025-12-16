@@ -222,7 +222,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             </div>
                           )}
                           </div>
-                          {type === 'swap_requests' && shift.assigned_email !== currentUser?.email && (
+                          {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
                           <Button
                             onClick={() => {
                               onClose();

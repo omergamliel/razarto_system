@@ -146,13 +146,8 @@ export default function CalendarHeader({
           {currentUser && (
             <div className="text-left">
               <p className="font-semibold text-gray-800 text-sm">
-                שלום, {currentUser.full_name || currentUser.email}
+                שלום, {currentUser.assigned_role || currentUser.full_name || currentUser.email}
               </p>
-              {currentUser.assigned_role && (
-                <p className="text-xs text-gray-500">
-                  תפקידך: {currentUser.assigned_role}
-                </p>
-              )}
             </div>
           )}
           {isAdmin && (
