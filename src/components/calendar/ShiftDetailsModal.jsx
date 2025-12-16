@@ -121,7 +121,13 @@ export default function ShiftDetailsModal({
                           <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
                             <Clock className="w-4 h-4" />
                             {shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time ? (
-                              <span>דרוש כיסוי: {shift.swap_start_time} - {shift.swap_end_time}</span>
+                              (() => {
+                                const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+                                const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+                                const startDate = format(new Date(shift.date), 'd/M');
+                                const endDate = endHour < startHour ? format(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1), 'd/M') : startDate;
+                                return <span>דרוש כיסוי: מתאריך {startDate} בשעה {shift.swap_start_time} - עד תאריך {endDate} בשעה {shift.swap_end_time}</span>;
+                              })()
                             ) : (
                               <span>09:00 - 09:00 (למחרת)</span>
                             )}
