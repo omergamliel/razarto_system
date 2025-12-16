@@ -313,7 +313,7 @@ export default function ShiftCalendar() {
     setShowKPIList(true);
   };
 
-  const handleOfferCover = (shift) => {
+  const handleOfferCover = async (shift) => {
     setSelectedShift(shift);
     setShowAcceptModal(true);
   };
@@ -434,6 +434,7 @@ export default function ShiftCalendar() {
           shift={selectedShift}
           onAccept={(acceptData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: acceptData })}
           isAccepting={offerCoverMutation.isPending}
+          existingCoverages={selectedShift ? queryClient.getQueryData(['shift-coverages', selectedShift.id]) || [] : []}
         />
 
         <ShiftActionModal

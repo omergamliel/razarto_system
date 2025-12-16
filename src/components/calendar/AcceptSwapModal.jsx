@@ -13,28 +13,71 @@ export default function AcceptSwapModal({
   onClose, 
   shift,
   onAccept,
-  isAccepting
+  isAccepting,
+  existingCoverages = []
 }) {
   const [coverFull, setCoverFull] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [remainingGap, setRemainingGap] = useState(null);
 
-  // Calculate defaults based on shift and existing coverage
+  // Calculate remaining gap based on existing coverages
   useEffect(() => {
     if (!shift || !isOpen) return;
     
     const shiftStartDate = shift.date;
     const shiftEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
     
-    // For partially_covered shifts - restrict to the requested swap time range
-    if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
+    // For partially_covered shifts - calculate the remaining gap
+    if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time && existingCoverages.length > 0) {
+      // Original requested range
+      const originalStart = new Date(`${shift.date}T${shift.swap_start_time}:00`);
+      const originalEnd = new Date(`${shift.date}T${shift.swap_end_time}:00`);
+      
+      // Sort coverages by start time
+      const sortedCoverages = [...existingCoverages].sort((a, b) => {
+        const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+        const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+        return aTime - bTime;
+      });
+      
+      // Find the first uncovered gap
+      let gapStart = originalStart;
+      let gapEnd = originalEnd;
+      
+      for (const coverage of sortedCoverages) {
+        const covStart = new Date(`${coverage.start_date}T${coverage.start_time}:00`);
+        const covEnd = new Date(`${coverage.end_date}T${coverage.end_time}:00`);
+        
+        // If coverage starts at or before gap start, move gap start to coverage end
+        if (covStart <= gapStart && covEnd > gapStart) {
+          gapStart = covEnd;
+        }
+      }
+      
+      // If there's a remaining gap
+      if (gapStart < gapEnd) {
+        const gapStartTime = format(gapStart, 'HH:mm');
+        const gapEndTime = format(gapEnd, 'HH:mm');
+        const gapStartDate = format(gapStart, 'yyyy-MM-dd');
+        const gapEndDate = format(gapEnd, 'yyyy-MM-dd');
+        
+        setRemainingGap({ startTime: gapStartTime, endTime: gapEndTime, startDate: gapStartDate, endDate: gapEndDate });
+        setStartDate(gapStartDate);
+        setStartTime(gapStartTime);
+        setEndDate(gapEndDate);
+        setEndTime(gapEndTime);
+        setCoverFull(false);
+      }
+    } else if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
+      // No existing coverages, use original range
       setStartDate(shiftStartDate);
       setStartTime(shift.swap_start_time);
       setEndDate(shiftStartDate);
       setEndTime(shift.swap_end_time);
-      setCoverFull(false); // Force partial coverage
+      setCoverFull(false);
     } else if (shift.covered_end_time) {
       // Gap starts where coverage ended
       setStartDate(shiftStartDate);
@@ -56,7 +99,7 @@ export default function AcceptSwapModal({
       setEndDate(shiftEndDate);
       setEndTime('09:00');
     }
-  }, [shift, isOpen]);
+  }, [shift, isOpen, existingCoverages]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -182,8 +225,20 @@ export default function AcceptSwapModal({
               </div>
             )}
 
-            {/* Show requested time range for partially_covered shifts */}
-            {shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time && (
+            {/* Show remaining gap range for partially_covered shifts */}
+            {shift.status === 'partially_covered' && remainingGap && (
+              <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
+                <p className="text-sm font-semibold text-yellow-800 mb-2">טווח שעות מבוקש להחלפה:</p>
+                <div className="flex items-center justify-center gap-2 text-yellow-700">
+                  <Clock className="w-5 h-5" />
+                  <span className="font-bold text-lg">{remainingGap.startTime} - {remainingGap.endTime}</span>
+                </div>
+                <p className="text-xs text-yellow-700 text-center mt-2">
+                  יש לכסות בטווח שעות זה בלבד
+                </p>
+              </div>
+            )}
+            {shift.status === 'partially_covered' && !remainingGap && shift.swap_start_time && shift.swap_end_time && (
               <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
                 <p className="text-sm font-semibold text-yellow-800 mb-2">טווח שעות מבוקש להחלפה:</p>
                 <div className="flex items-center justify-center gap-2 text-yellow-700">
