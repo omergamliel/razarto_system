@@ -113,18 +113,22 @@ export default function ShiftDetailsModal({
             <div className="p-6 space-y-4">
               {shift.status !== 'approved' && (
                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 text-center">
-                  {shift.role && (
-                    <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
-                  )}
-                  <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
-                  <div className="mt-2 pt-2 border-t border-gray-300">
-                    <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                      <Clock className="w-4 h-4" />
-                      <span>09:00 - 09:00 (למחרת)</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                        {shift.role && (
+                          <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
+                        )}
+                        <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
+                        <div className="mt-2 pt-2 border-t border-gray-300">
+                          <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                            <Clock className="w-4 h-4" />
+                            {shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time ? (
+                              <span>דרוש כיסוי: {shift.swap_start_time} - {shift.swap_end_time}</span>
+                            ) : (
+                              <span>09:00 - 09:00 (למחרת)</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
               {shift.status === 'approved' && shiftCoverages.length > 0 && (
                 <div className="space-y-3">
