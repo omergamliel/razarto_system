@@ -23,7 +23,7 @@ export default function OnboardingModal({ isOpen, onComplete }) {
   const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
   const roles = department 
     ? roleDefinitions
-        .filter(rd => rd.department === department && rd.role_name)
+        .filter(rd => rd.department === department && rd.role_name && !rd.assigned_user_email)
         .map(rd => rd.role_name)
     : [];
 
@@ -50,6 +50,16 @@ export default function OnboardingModal({ isOpen, onComplete }) {
       );
 
       if (roleDefMatch) {
+        // Check if role is already assigned to another user
+        if (roleDefMatch.assigned_user_email && roleDefMatch.assigned_user_email !== user.email) {
+          toast.error('שם זה כבר קשור למשתמש אחר', {
+            description: 'אנא בחר שם אחר מהרשימה',
+            duration: 5000
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
         // Update user with the role_name
         await base44.auth.updateMe({
           assigned_role: roleDefMatch.role_name,
