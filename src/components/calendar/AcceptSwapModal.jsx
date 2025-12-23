@@ -221,7 +221,7 @@ export default function AcceptSwapModal({
               <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
                 <p className="text-sm font-semibold text-yellow-800 mb-2">כיסוי קיים:</p>
                 <div className="text-sm text-yellow-700">
-                  {shift.covering_person}: מתאריך {format(new Date(shift.date), 'd/M')} בשעה {shift.covered_start_time} ועד לתאריך {
+                  {shift.covering_role}: מתאריך {format(new Date(shift.date), 'd/M')} בשעה {shift.covered_start_time} ועד לתאריך {
                     parseInt(shift.covered_end_time.split(':')[0]) < parseInt(shift.covered_start_time.split(':')[0]) 
                       ? format(addDays(new Date(shift.date), 1), 'd/M')
                       : format(new Date(shift.date), 'd/M')

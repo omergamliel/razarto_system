@@ -116,7 +116,6 @@ export default function ShiftDetailsModal({
                         {shift.role && (
                           <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
                         )}
-                        <p className="text-lg font-semibold text-gray-800">{shift.assigned_person}</p>
                         <div className="mt-2 pt-2 border-t border-gray-300">
                           <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
                             <Clock className="w-4 h-4" />

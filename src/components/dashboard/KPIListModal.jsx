@@ -196,10 +196,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             </div>
                           ) : (
                             <>
-                              <div className="flex items-center gap-2 mb-1">
-                                <User className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm text-gray-700">{shift.assigned_person}</span>
-                              </div>
                               <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
                               
                               {/* Display timing for swap requests and partial gaps */}
