@@ -134,8 +134,13 @@ export default function ShiftCalendar() {
 
       // Fetch all coverages for this shift
       const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
-      
-      // Calculate total covered hours
+
+      // Calculate if the requested range is fully covered
+      const requestedStart = new Date(`${shift.date}T${shift.swap_start_time}:00`);
+      const requestedEnd = new Date(`${shift.date}T${shift.swap_end_time}:00`);
+      const requestedMinutes = (requestedEnd - requestedStart) / (1000 * 60);
+
+      // Calculate total covered minutes
       let totalCoveredMinutes = 0;
       allCoverages.forEach(cov => {
         const startDateTime = new Date(`${cov.start_date}T${cov.start_time}:00`);
@@ -143,14 +148,14 @@ export default function ShiftCalendar() {
         const minutes = (endDateTime - startDateTime) / (1000 * 60);
         totalCoveredMinutes += minutes;
       });
-      
-      const totalCoveredHours = totalCoveredMinutes / 60;
-      const isFullyCovered = totalCoveredHours >= 24;
+
+      const isFullyCovered = totalCoveredMinutes >= requestedMinutes;
 
       const updateData = {
         status: isFullyCovered ? 'approved' : 'partially_covered',
         covering_person: allCoverages.map(c => c.covering_person).join(', '),
         covering_email: allCoverages.map(c => c.covering_email).join(', '),
+        covering_role: allCoverages.map(c => c.covering_role).join(', '),
         covered_start_time: allCoverages[0]?.start_time,
         covered_end_time: allCoverages[allCoverages.length - 1]?.end_time
       };
@@ -159,10 +164,10 @@ export default function ShiftCalendar() {
         // Save original assignment before replacing
         updateData.original_assigned_person = shift.assigned_person;
         updateData.original_role = shift.role;
-        // Replace with first covering person for display
+        // Replace with covering roles for display
         updateData.assigned_person = allCoverages[0]?.covering_person;
         updateData.assigned_email = allCoverages[0]?.covering_email;
-        updateData.role = allCoverages[0]?.covering_role;
+        updateData.role = allCoverages.map(c => c.covering_role).join(' + ');
       }
 
       return base44.entities.Shift.update(shift.id, updateData);

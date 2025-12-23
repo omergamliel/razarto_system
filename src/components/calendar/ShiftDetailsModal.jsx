@@ -135,15 +135,19 @@ export default function ShiftDetailsModal({
                       </div>
                     )}
 
-              {shift.status === 'approved' && shiftCoverages.length > 0 && (
+              {(shift.status === 'approved' || shift.status === 'partially_covered') && shiftCoverages.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-gray-700 flex items-center gap-2">
                       <User className="w-4 h-4" />
-                      כיסויים מלאים ({shiftCoverages.length})
+                      כיסויים ({shiftCoverages.length})
                     </h3>
-                    <div className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      מכוסה במלואו
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      shift.status === 'approved' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {shift.status === 'approved' ? 'מכוסה במלואו' : 'כיסוי חלקי'}
                     </div>
                   </div>
 
@@ -155,12 +159,13 @@ export default function ShiftDetailsModal({
                         return aTime - bTime;
                       })
                       .map((coverage) => (
-                        <div key={coverage.id} className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-300">
-                          <p className="font-bold text-gray-800 text-lg">{coverage.covering_person}</p>
-                          {coverage.covering_role && (
-                            <p className="text-sm text-green-700 font-medium">{coverage.covering_role}</p>
-                          )}
-                          <div className="mt-2 pt-2 border-t border-green-200">
+                        <div key={coverage.id} className={`bg-gradient-to-br rounded-xl p-4 border ${
+                          shift.status === 'approved'
+                            ? 'from-green-50 to-green-100 border-green-300'
+                            : 'from-blue-50 to-blue-100 border-blue-300'
+                        }`}>
+                          <p className="font-bold text-gray-800 text-lg">{coverage.covering_role}</p>
+                          <div className="mt-2 pt-2 border-t border-gray-200">
                             <div className="text-sm text-gray-700 space-y-1">
                               <div className="flex items-center gap-2">
                                 <Clock className="w-3 h-3" />
