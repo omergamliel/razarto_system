@@ -130,7 +130,6 @@ export default function PendingApprovalModal({
                           <div className="flex-1">
                             <div className="text-xs text-gray-500 mb-1">תפקיד מקורי</div>
                             <div className="font-bold text-red-600 text-lg">{request.role}</div>
-                            <div className="text-xs text-gray-600 mt-1">{request.assigned_person}</div>
                           </div>
                           
                           <div className="flex flex-col items-center">
@@ -141,7 +140,6 @@ export default function PendingApprovalModal({
                           <div className="flex-1">
                             <div className="text-xs text-gray-500 mb-1">תפקיד מחליף</div>
                             <div className="font-bold text-blue-600 text-lg">{request.covering_role}</div>
-                            <div className="text-xs text-gray-600 mt-1">{request.covering_person}</div>
                           </div>
                         </div>
                       </div>

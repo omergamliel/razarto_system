@@ -76,17 +76,9 @@ export default function ShiftActionModal({
 
           {/* Shift Info */}
           <div className="p-6 bg-gray-50 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">משובץ</p>
-                <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
-              </div>
-              {shift.role && (
-                <div className="bg-white px-3 py-1 rounded-lg border border-gray-200">
-                  <p className="text-xs text-gray-500">תפקיד</p>
-                  <p className="font-medium text-[#E57373] text-sm">{shift.role}</p>
-                </div>
-              )}
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-2">תפקיד</p>
+              <p className="font-semibold text-[#E57373] text-xl">{shift.role}</p>
             </div>
           </div>
 

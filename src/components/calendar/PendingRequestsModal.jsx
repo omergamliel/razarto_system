@@ -87,7 +87,7 @@ export default function PendingRequestsModal({
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800">
-                          {request.assigned_person}
+                          {request.role}
                         </p>
                         <p className="text-xs text-gray-500">מבקש החלפה</p>
                       </div>
