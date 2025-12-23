@@ -73,9 +73,13 @@ export default function AcceptSwapModal({
       }
     } else if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
       // No existing coverages, use original range
+      const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+      const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+      const calculatedEndDate = endHour < startHour ? shiftEndDate : shiftStartDate;
+      
       setStartDate(shiftStartDate);
       setStartTime(shift.swap_start_time);
-      setEndDate(shiftStartDate);
+      setEndDate(calculatedEndDate);
       setEndTime(shift.swap_end_time);
       setCoverFull(false);
     } else if (shift.covered_end_time) {
@@ -195,13 +199,19 @@ export default function AcceptSwapModal({
           <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
             <div className="bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2] rounded-xl p-4">
               <p className="text-sm text-gray-600 mb-1">מבקש</p>
-              <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
+              <p className="font-semibold text-gray-800">{shift.role}</p>
               <div className="mt-2 pt-2 border-t border-[#E57373]/30">
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <Clock className="w-4 h-4" />
                   {shift.swap_type === 'full' 
                     ? 'משמרת מלאה (24 שעות)'
-                    : `${shift.swap_start_time} - ${shift.swap_end_time}`
+                    : (() => {
+                        const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+                        const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+                        const startDate = format(new Date(shift.date), 'd/M');
+                        const endDate = endHour < startHour ? format(addDays(new Date(shift.date), 1), 'd/M') : startDate;
+                        return `מתאריך ${startDate} בשעה ${shift.swap_start_time} - עד תאריך ${endDate} בשעה ${shift.swap_end_time}`;
+                      })()
                   }
                 </div>
               </div>
@@ -231,7 +241,9 @@ export default function AcceptSwapModal({
                 <p className="text-sm font-semibold text-yellow-800 mb-2">טווח שעות מבוקש להחלפה:</p>
                 <div className="flex items-center justify-center gap-2 text-yellow-700">
                   <Clock className="w-5 h-5" />
-                  <span className="font-bold text-lg">{remainingGap.startTime} - {remainingGap.endTime}</span>
+                  <span className="font-bold text-lg">
+                    מתאריך {format(new Date(remainingGap.startDate), 'd/M')} בשעה {remainingGap.startTime} - עד תאריך {format(new Date(remainingGap.endDate), 'd/M')} בשעה {remainingGap.endTime}
+                  </span>
                 </div>
                 <p className="text-xs text-yellow-700 text-center mt-2">
                   יש לכסות בטווח שעות זה בלבד
@@ -243,7 +255,15 @@ export default function AcceptSwapModal({
                 <p className="text-sm font-semibold text-yellow-800 mb-2">טווח שעות מבוקש להחלפה:</p>
                 <div className="flex items-center justify-center gap-2 text-yellow-700">
                   <Clock className="w-5 h-5" />
-                  <span className="font-bold text-lg">{shift.swap_start_time} - {shift.swap_end_time}</span>
+                  <span className="font-bold text-lg">
+                    {(() => {
+                      const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+                      const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+                      const startDate = format(new Date(shift.date), 'd/M');
+                      const endDate = endHour < startHour ? format(addDays(new Date(shift.date), 1), 'd/M') : startDate;
+                      return `מתאריך ${startDate} בשעה ${shift.swap_start_time} - עד תאריך ${endDate} בשעה ${shift.swap_end_time}`;
+                    })()}
+                  </span>
                 </div>
                 <p className="text-xs text-yellow-700 text-center mt-2">
                   יש לכסות בטווח שעות זה בלבד
