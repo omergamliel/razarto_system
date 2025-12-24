@@ -66,6 +66,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     mutationFn: async ({ id, userEmail }) => {
       // Clear the role assignment from RoleDefinition
       await base44.entities.RoleDefinition.update(id, {
+        assigned_user_name: null,
         assigned_user_email: null
       });
       
