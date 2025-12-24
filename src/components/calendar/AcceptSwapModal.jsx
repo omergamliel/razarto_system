@@ -16,14 +16,56 @@ export default function AcceptSwapModal({
   isAccepting,
   existingCoverages = []
 }) {
-  const [coverFull, setCoverFull] = useState(true);
-  const [startDate, setStartDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [endTime, setEndTime] = useState('');
+  // Initialize with proper defaults based on shift data
+  const getInitialValues = () => {
+    if (!shift) return {
+      coverFull: true,
+      startDate: '',
+      startTime: '',
+      endDate: '',
+      endTime: ''
+    };
+
+    const shiftStartDate = shift.date;
+    const shiftEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
+    const originalStartTime = shift.swap_start_time || '09:00';
+    const originalEndTime = shift.swap_end_time || '09:00';
+
+    // For swap requests or partially covered shifts, initialize with request times
+    if ((shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time) {
+      const startHour = parseInt(originalStartTime.split(':')[0]);
+      const endHour = parseInt(originalEndTime.split(':')[0]);
+      const calculatedEndDate = endHour < startHour ? shiftEndDate : shiftStartDate;
+
+      return {
+        coverFull: false,
+        startDate: shiftStartDate,
+        startTime: originalStartTime,
+        endDate: calculatedEndDate,
+        endTime: originalEndTime
+      };
+    }
+
+    // Default to full coverage
+    return {
+      coverFull: true,
+      startDate: shiftStartDate,
+      startTime: '09:00',
+      endDate: shiftEndDate,
+      endTime: '09:00'
+    };
+  };
+
+  const initialValues = getInitialValues();
+  
+  const [coverFull, setCoverFull] = useState(initialValues.coverFull);
+  const [startDate, setStartDate] = useState(initialValues.startDate);
+  const [startTime, setStartTime] = useState(initialValues.startTime);
+  const [endDate, setEndDate] = useState(initialValues.endDate);
+  const [endTime, setEndTime] = useState(initialValues.endTime);
   const [remainingGap, setRemainingGap] = useState(null);
 
-  // Calculate next available time slot based on existing coverages
+  // Update values when shift or coverages change
   useEffect(() => {
     if (!shift || !isOpen) return;
     
@@ -154,20 +196,6 @@ export default function AcceptSwapModal({
           duration: 5000
         });
         return;
-      }
-      
-      if (false) {
-        // Validate within 24-hour shift window
-        const shiftStart = new Date(`${shift.date}T09:00:00`);
-        const shiftEnd = addDays(shiftStart, 1);
-        
-        if (selectedStart < shiftStart || selectedEnd > shiftEnd) {
-          toast.error('טעות בבחירת תאריכים', {
-            description: `הכיסוי חייב להיות בתוך חלון המשמרת: מ-${format(shiftStart, 'd/M בשעה HH:mm')} עד ${format(shiftEnd, 'd/M בשעה HH:mm')}`,
-            duration: 5000
-          });
-          return;
-        }
       }
     }
     
