@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { toast } from 'sonner';
 
 import BackgroundShapes from './BackgroundShapes';
@@ -135,6 +135,13 @@ export default function ShiftCalendar() {
       // Fetch all coverages for this shift
       const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
 
+      // Sort coverages by start time
+      const sortedCoverages = allCoverages.sort((a, b) => {
+        const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+        const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+        return aTime - bTime;
+      });
+
       // Calculate if the requested range is fully covered
       const requestedStart = new Date(`${shift.date}T${shift.swap_start_time}:00`);
       const requestedEnd = new Date(`${shift.date}T${shift.swap_end_time}:00`);
@@ -142,7 +149,7 @@ export default function ShiftCalendar() {
 
       // Calculate total covered minutes
       let totalCoveredMinutes = 0;
-      allCoverages.forEach(cov => {
+      sortedCoverages.forEach(cov => {
         const startDateTime = new Date(`${cov.start_date}T${cov.start_time}:00`);
         const endDateTime = new Date(`${cov.end_date}T${cov.end_time}:00`);
         const minutes = (endDateTime - startDateTime) / (1000 * 60);
@@ -151,23 +158,66 @@ export default function ShiftCalendar() {
 
       const isFullyCovered = totalCoveredMinutes >= requestedMinutes;
 
+      // Calculate remaining gap if partially covered
+      let remainingGapStart = null;
+      let remainingGapEnd = null;
+
+      if (!isFullyCovered) {
+        // Find the first uncovered gap
+        let currentPos = requestedStart;
+
+        for (const coverage of sortedCoverages) {
+          const covStart = new Date(`${coverage.start_date}T${coverage.start_time}:00`);
+          const covEnd = new Date(`${coverage.end_date}T${coverage.end_time}:00`);
+
+          // If there's a gap before this coverage
+          if (currentPos < covStart) {
+            remainingGapStart = currentPos;
+            remainingGapEnd = covStart;
+            break;
+          }
+
+          // Move position to end of coverage if it extends current position
+          if (covEnd > currentPos) {
+            currentPos = covEnd;
+          }
+        }
+
+        // If no gap found yet, check if there's a gap after all coverages
+        if (!remainingGapStart && currentPos < requestedEnd) {
+          remainingGapStart = currentPos;
+          remainingGapEnd = requestedEnd;
+        }
+      }
+
       const updateData = {
         status: isFullyCovered ? 'approved' : 'partially_covered',
-        covering_person: allCoverages.map(c => c.covering_person).join(', '),
-        covering_email: allCoverages.map(c => c.covering_email).join(', '),
-        covering_role: allCoverages.map(c => c.covering_role).join(', '),
-        covered_start_time: allCoverages[0]?.start_time,
-        covered_end_time: allCoverages[allCoverages.length - 1]?.end_time
+        covering_person: sortedCoverages.map(c => c.covering_person).join(', '),
+        covering_email: sortedCoverages.map(c => c.covering_email).join(', '),
+        covering_role: sortedCoverages.map(c => c.covering_role).join(', '),
+        covered_start_time: sortedCoverages[0]?.start_time,
+        covered_end_time: sortedCoverages[sortedCoverages.length - 1]?.end_time
       };
+
+      // Update remaining gap times for partially covered shifts
+      if (!isFullyCovered && remainingGapStart && remainingGapEnd) {
+        updateData.swap_start_time = format(remainingGapStart, 'HH:mm');
+        updateData.swap_end_time = format(remainingGapEnd, 'HH:mm');
+
+        const remainingMinutes = (remainingGapEnd - remainingGapStart) / (1000 * 60);
+        const remainingHours = Math.floor(remainingMinutes / 60);
+        const remainingMins = remainingMinutes % 60;
+        updateData.remaining_hours = remainingMins > 0 ? `${remainingHours}:${remainingMins.toString().padStart(2, '0')} שעות` : `${remainingHours} שעות`;
+      }
 
       if (isFullyCovered) {
         // Save original assignment before replacing
         updateData.original_assigned_person = shift.assigned_person;
         updateData.original_role = shift.role;
         // Replace with covering roles for display
-        updateData.assigned_person = allCoverages[0]?.covering_person;
-        updateData.assigned_email = allCoverages[0]?.covering_email;
-        updateData.role = allCoverages.map(c => c.covering_role).join(' + ');
+        updateData.assigned_person = sortedCoverages[0]?.covering_person;
+        updateData.assigned_email = sortedCoverages[0]?.covering_email;
+        updateData.role = sortedCoverages.map(c => c.covering_role).join(' + ');
       }
 
       return base44.entities.Shift.update(shift.id, updateData);

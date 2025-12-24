@@ -202,10 +202,14 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                               {(type === 'swap_requests' || type === 'partial_gaps') && (
                                 <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 bg-white/50 rounded-lg px-2 py-1">
                                   <Clock className="w-3 h-3" />
-                                  {shift.swap_type === 'partial' && shift.swap_start_time && shift.swap_end_time ? (
-                                    <span>{format(new Date(shift.date), 'd/M')} {shift.swap_start_time} - {format(new Date(shift.date), 'd/M')} {shift.swap_end_time}</span>
-                                  ) : shift.covered_start_time && shift.covered_end_time ? (
-                                    <span>פער: {format(new Date(shift.date), 'd/M')} {shift.covered_end_time} - {format(new Date(shift.date), 'd/M')} 09:00</span>
+                                  {shift.swap_start_time && shift.swap_end_time ? (
+                                    (() => {
+                                      const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+                                      const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+                                      const startDate = format(new Date(shift.date), 'd/M');
+                                      const endDate = endHour < startHour ? format(new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)), 'd/M') : startDate;
+                                      return <span>פער: {startDate} {shift.swap_start_time} - {endDate} {shift.swap_end_time}</span>;
+                                    })()
                                   ) : (
                                     <span>{format(new Date(shift.date), 'd/M')} 09:00 - {format(new Date(shift.date), 'd/M')} 09:00 (למחרת)</span>
                                   )}
