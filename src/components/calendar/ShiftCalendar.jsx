@@ -115,7 +115,7 @@ export default function ShiftCalendar() {
     }
   });
 
-  // Offer to cover mutation (multi-user partial support)
+  // Offer to cover mutation (multi-user partial support with "Green Light" check)
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
       // Create a coverage record
@@ -142,9 +142,11 @@ export default function ShiftCalendar() {
         return aTime - bTime;
       });
 
-      // Calculate if the requested range is fully covered
-      const requestedStart = new Date(`${shift.date}T${shift.swap_start_time}:00`);
-      const requestedEnd = new Date(`${shift.date}T${shift.swap_end_time}:00`);
+      // Calculate if the requested range is fully covered ("Green Light" Check)
+      const originalStartTime = shift.swap_start_time || '09:00';
+      const originalEndTime = shift.swap_end_time || '09:00';
+      const requestedStart = new Date(`${shift.date}T${originalStartTime}:00`);
+      const requestedEnd = new Date(`${shift.date}T${originalEndTime}:00`);
       const requestedMinutes = (requestedEnd - requestedStart) / (1000 * 60);
 
       // Calculate total covered minutes
@@ -191,7 +193,6 @@ export default function ShiftCalendar() {
       }
 
       const updateData = {
-        status: isFullyCovered ? 'approved' : 'partially_covered',
         covering_person: sortedCoverages.map(c => c.covering_person).join(', '),
         covering_email: sortedCoverages.map(c => c.covering_email).join(', '),
         covering_role: sortedCoverages.map(c => c.covering_role).join(', '),
@@ -199,8 +200,9 @@ export default function ShiftCalendar() {
         covered_end_time: sortedCoverages[sortedCoverages.length - 1]?.end_time
       };
 
-      // Update remaining gap times for partially covered shifts
+      // Case 1: Balance > 0 (Still missing hours) - Keep Partial Coverage
       if (!isFullyCovered && remainingGapStart && remainingGapEnd) {
+        updateData.status = 'partially_covered';
         updateData.swap_start_time = format(remainingGapStart, 'HH:mm');
         updateData.swap_end_time = format(remainingGapEnd, 'HH:mm');
 
@@ -210,7 +212,10 @@ export default function ShiftCalendar() {
         updateData.remaining_hours = remainingMins > 0 ? `${remainingHours}:${remainingMins.toString().padStart(2, '0')} שעות` : `${remainingHours} שעות`;
       }
 
+      // Case 2: Balance == 0 (Fully Covered) - Change to Green & Close
       if (isFullyCovered) {
+        updateData.status = 'approved';
+        updateData.remaining_hours = null;
         // Save original assignment before replacing
         updateData.original_assigned_person = shift.assigned_person;
         updateData.original_role = shift.role;

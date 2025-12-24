@@ -366,8 +366,8 @@ export default function AcceptSwapModal({
                   {/* Row 1: Start */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                     <Label className="text-gray-700 font-semibold">החל מ:</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1 min-w-0">
                         <Label className="text-xs text-gray-500 mb-1 block">החל מתאריך</Label>
                         <Input
                           type="date"
@@ -375,16 +375,16 @@ export default function AcceptSwapModal({
                           onChange={(e) => setStartDate(e.target.value)}
                           min={shift?.date}
                           max={format(shiftEndDate, 'yyyy-MM-dd')}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                         />
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <Label className="text-xs text-gray-500 mb-1 block">החל משעה</Label>
                         <Input
                           type="time"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                           dir="ltr"
                         />
                       </div>
@@ -394,8 +394,8 @@ export default function AcceptSwapModal({
                   {/* Row 2: End */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                     <Label className="text-gray-700 font-semibold">ועד ל:</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1 min-w-0">
                         <Label className="text-xs text-gray-500 mb-1 block">ועד לתאריך</Label>
                         <Input
                           type="date"
@@ -403,16 +403,16 @@ export default function AcceptSwapModal({
                           onChange={(e) => setEndDate(e.target.value)}
                           min={shift?.date}
                           max={format(shiftEndDate, 'yyyy-MM-dd')}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                         />
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <Label className="text-xs text-gray-500 mb-1 block">עד לשעה</Label>
                         <Input
                           type="time"
                           value={endTime}
                           onChange={(e) => setEndTime(e.target.value)}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                           dir="ltr"
                         />
                       </div>
@@ -433,21 +433,21 @@ export default function AcceptSwapModal({
 
             <Button
               type="submit"
-              disabled={isAccepting}
-              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
+              disabled={isAccepting || (!coverFull && (!startTime || !endTime))}
+              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAccepting ? (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1 }}
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
                   >
                     ⏳
                   </motion.div>
-                  מאשר...
+                  מעבד...
                 </span>
               ) : (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   <CheckCircle className="w-5 h-5" />
                   אשר כיסוי
                 </span>
