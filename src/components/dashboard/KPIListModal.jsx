@@ -206,9 +206,11 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     (() => {
                                       const startHour = parseInt(shift.swap_start_time.split(':')[0]);
                                       const endHour = parseInt(shift.swap_end_time.split(':')[0]);
-                                      const startDate = format(new Date(shift.date), 'd/M');
-                                      const endDate = endHour < startHour ? format(new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)), 'd/M') : startDate;
-                                      return <span>פער: {startDate} {shift.swap_start_time} - {endDate} {shift.swap_end_time}</span>;
+                                      const startDateObj = new Date(shift.date);
+                                      const endDateObj = endHour < startHour ? new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)) : startDateObj;
+                                      const startDate = format(startDateObj, 'd/M');
+                                      const endDate = format(endDateObj, 'd/M');
+                                      return <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {startDate} {shift.swap_start_time} - {endDate} {shift.swap_end_time}</span>;
                                     })()
                                   ) : (
                                     <span>{format(new Date(shift.date), 'd/M')} 09:00 - {format(new Date(shift.date), 'd/M')} 09:00 (למחרת)</span>

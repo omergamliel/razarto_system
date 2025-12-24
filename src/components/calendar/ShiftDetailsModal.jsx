@@ -123,9 +123,11 @@ export default function ShiftDetailsModal({
                               (() => {
                                 const startHour = parseInt(shift.swap_start_time.split(':')[0]);
                                 const endHour = parseInt(shift.swap_end_time.split(':')[0]);
-                                const startDate = format(new Date(shift.date), 'd/M');
-                                const endDate = endHour < startHour ? format(new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)), 'd/M') : startDate;
-                                return <span>דרוש כיסוי: מתאריך {startDate} בשעה {shift.swap_start_time} - עד תאריך {endDate} בשעה {shift.swap_end_time}</span>;
+                                const startDateObj = new Date(shift.date);
+                                const endDateObj = endHour < startHour ? new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)) : startDateObj;
+                                const startDate = format(startDateObj, 'd/M');
+                                const endDate = format(endDateObj, 'd/M');
+                                return <span>{shift.status === 'partially_covered' ? 'נשאר לכסות' : 'דרוש כיסוי'}: {startDate} {shift.swap_start_time} - {endDate} {shift.swap_end_time}</span>;
                               })()
                             ) : (
                               <span>09:00 - 09:00 (למחרת)</span>
