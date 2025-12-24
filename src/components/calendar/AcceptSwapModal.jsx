@@ -30,72 +30,23 @@ export default function AcceptSwapModal({
     const shiftStartDate = shift.date;
     const shiftEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
     
-    // For partially_covered shifts - calculate the remaining gap
-    if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time && existingCoverages.length > 0) {
-      // Original requested range
-      const originalStart = new Date(`${shift.date}T${shift.swap_start_time}:00`);
-      const originalEnd = new Date(`${shift.date}T${shift.swap_end_time}:00`);
-      
-      // Sort coverages by start time
-      const sortedCoverages = [...existingCoverages].sort((a, b) => {
-        const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
-        const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
-        return aTime - bTime;
-      });
-      
-      // Find the first uncovered gap
-      let gapStart = originalStart;
-      let gapEnd = originalEnd;
-      
-      for (const coverage of sortedCoverages) {
-        const covStart = new Date(`${coverage.start_date}T${coverage.start_time}:00`);
-        const covEnd = new Date(`${coverage.end_date}T${coverage.end_time}:00`);
-        
-        // If coverage starts at or before gap start, move gap start to coverage end
-        if (covStart <= gapStart && covEnd > gapStart) {
-          gapStart = covEnd;
-        }
-      }
-      
-      // If there's a remaining gap
-      if (gapStart < gapEnd) {
-        const gapStartTime = format(gapStart, 'HH:mm');
-        const gapEndTime = format(gapEnd, 'HH:mm');
-        const gapStartDate = format(gapStart, 'yyyy-MM-dd');
-        const gapEndDate = format(gapEnd, 'yyyy-MM-dd');
-        
-        setRemainingGap({ startTime: gapStartTime, endTime: gapEndTime, startDate: gapStartDate, endDate: gapEndDate });
-        setStartDate(gapStartDate);
-        setStartTime(gapStartTime);
-        setEndDate(gapEndDate);
-        setEndTime(gapEndTime);
-        setCoverFull(false);
-      }
-    } else if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
-      // No existing coverages, use original range
+    // Use the remaining gap from shift data (calculated by backend)
+    if ((shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time) {
       const startHour = parseInt(shift.swap_start_time.split(':')[0]);
       const endHour = parseInt(shift.swap_end_time.split(':')[0]);
       const calculatedEndDate = endHour < startHour ? shiftEndDate : shiftStartDate;
       
+      setRemainingGap({ 
+        startTime: shift.swap_start_time, 
+        endTime: shift.swap_end_time, 
+        startDate: shiftStartDate, 
+        endDate: calculatedEndDate 
+      });
       setStartDate(shiftStartDate);
       setStartTime(shift.swap_start_time);
       setEndDate(calculatedEndDate);
       setEndTime(shift.swap_end_time);
       setCoverFull(false);
-    } else if (shift.covered_end_time) {
-      // Gap starts where coverage ended
-      setStartDate(shiftStartDate);
-      setStartTime(shift.covered_end_time);
-      setEndDate(shiftEndDate);
-      setEndTime('09:00');
-    } else if (shift.swap_type === 'partial' && shift.swap_start_time && shift.swap_end_time) {
-      // Use requested swap times
-      setStartDate(shiftStartDate);
-      setStartTime(shift.swap_start_time);
-      const startHour = parseInt(shift.swap_start_time.split(':')[0]);
-      const endHour = parseInt(shift.swap_end_time.split(':')[0]);
-      setEndDate(endHour < startHour ? shiftEndDate : shiftStartDate);
-      setEndTime(shift.swap_end_time);
     } else {
       // Default to full coverage
       setStartDate(shiftStartDate);
@@ -103,7 +54,7 @@ export default function AcceptSwapModal({
       setEndDate(shiftEndDate);
       setEndTime('09:00');
     }
-  }, [shift, isOpen, existingCoverages]);
+  }, [shift, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

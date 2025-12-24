@@ -62,8 +62,8 @@ export default function ShiftCell({
       };
     }
     
-    // Priority 2: Yellow for partial coverage
-    if (shift.status === 'partially_covered') {
+    // Priority 2: Yellow for partial coverage (still has remaining time)
+    if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
       return {
         bg: 'bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4]',
         border: 'border-[#FDD835]',
@@ -72,8 +72,8 @@ export default function ShiftCell({
       };
     }
     
-    // Priority 3: Green for approved swaps
-    if (shift.status === 'approved') {
+    // Priority 3: Green for approved swaps (fully covered - no remaining time)
+    if (shift.status === 'approved' || (shift.status === 'partially_covered' && !shift.swap_start_time)) {
       return {
         bg: 'bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9]',
         border: 'border-[#66BB6A]',
