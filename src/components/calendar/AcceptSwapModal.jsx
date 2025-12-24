@@ -16,56 +16,14 @@ export default function AcceptSwapModal({
   isAccepting,
   existingCoverages = []
 }) {
-  // Initialize with proper defaults based on shift data
-  const getInitialValues = () => {
-    if (!shift) return {
-      coverFull: true,
-      startDate: '',
-      startTime: '',
-      endDate: '',
-      endTime: ''
-    };
-
-    const shiftStartDate = shift.date;
-    const shiftEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
-    const originalStartTime = shift.swap_start_time || '09:00';
-    const originalEndTime = shift.swap_end_time || '09:00';
-
-    // For swap requests or partially covered shifts, initialize with request times
-    if ((shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time) {
-      const startHour = parseInt(originalStartTime.split(':')[0]);
-      const endHour = parseInt(originalEndTime.split(':')[0]);
-      const calculatedEndDate = endHour < startHour ? shiftEndDate : shiftStartDate;
-
-      return {
-        coverFull: false,
-        startDate: shiftStartDate,
-        startTime: originalStartTime,
-        endDate: calculatedEndDate,
-        endTime: originalEndTime
-      };
-    }
-
-    // Default to full coverage
-    return {
-      coverFull: true,
-      startDate: shiftStartDate,
-      startTime: '09:00',
-      endDate: shiftEndDate,
-      endTime: '09:00'
-    };
-  };
-
-  const initialValues = getInitialValues();
-  
-  const [coverFull, setCoverFull] = useState(initialValues.coverFull);
-  const [startDate, setStartDate] = useState(initialValues.startDate);
-  const [startTime, setStartTime] = useState(initialValues.startTime);
-  const [endDate, setEndDate] = useState(initialValues.endDate);
-  const [endTime, setEndTime] = useState(initialValues.endTime);
+  const [coverFull, setCoverFull] = useState(true);
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [remainingGap, setRemainingGap] = useState(null);
 
-  // Update values when shift or coverages change
+  // Initialize and update values when modal opens or shift changes
   useEffect(() => {
     if (!shift || !isOpen) return;
     
@@ -78,23 +36,19 @@ export default function AcceptSwapModal({
     
     // Calculate next gap based on existing coverages
     if (existingCoverages && existingCoverages.length > 0) {
-      // Filter valid coverages (not from requester)
       const validCoverages = existingCoverages.filter(c => c.covering_email !== shift.swap_request_by);
       
       if (validCoverages.length > 0) {
-        // Sort by start time
         const sorted = [...validCoverages].sort((a, b) => {
           const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
           const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
           return aTime - bTime;
         });
         
-        // Find the latest end time
         const latestCoverage = sorted[sorted.length - 1];
         const nextStartTime = latestCoverage.end_time;
         const nextStartDate = latestCoverage.end_date;
         
-        // Calculate end date based on original end time
         const originalEndHour = parseInt(originalEndTime.split(':')[0]);
         const nextStartHour = parseInt(nextStartTime.split(':')[0]);
         const calculatedEndDate = originalEndHour < nextStartHour ? shiftEndDate : nextStartDate;
@@ -115,7 +69,7 @@ export default function AcceptSwapModal({
       }
     }
     
-    // No existing coverages - use original request times
+    // No existing coverages - check if it's a swap request
     if ((shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time) {
       const startHour = parseInt(originalStartTime.split(':')[0]);
       const endHour = parseInt(originalEndTime.split(':')[0]);
@@ -138,73 +92,92 @@ export default function AcceptSwapModal({
       setStartTime('09:00');
       setEndDate(shiftEndDate);
       setEndTime('09:00');
+      setCoverFull(true);
     }
   }, [shift, isOpen, existingCoverages]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    if (!coverFull) {
-      // Validate that all required fields are filled
-      if (!startDate || !startTime || !endDate || !endTime) {
-        toast.error('נא למלא את כל השדות');
-        return;
-      }
-      
-      const selectedStart = new Date(`${startDate}T${startTime}:00`);
-      const selectedEnd = new Date(`${endDate}T${endTime}:00`);
-      
-      if (selectedStart >= selectedEnd) {
-        toast.error('שעת הסיום חייבת להיות אחרי שעת ההתחלה');
-        return;
-      }
-      
-      // Validate against original request range
-      const originalStartTime = shift.swap_start_time || '09:00';
-      const originalEndTime = shift.swap_end_time || '09:00';
-      
-      // Calculate the "next available start time" based on existing coverages
-      let calculatedMinStart = new Date(`${shift.date}T${originalStartTime}:00`);
-      if (existingCoverages && existingCoverages.length > 0) {
-        const validCoverages = existingCoverages.filter(c => c.covering_email !== shift.swap_request_by);
-        if (validCoverages.length > 0) {
-          const sorted = [...validCoverages].sort((a, b) => {
-            const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
-            const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
-            return aTime - bTime;
-          });
-          const latestCoverage = sorted[sorted.length - 1];
-          calculatedMinStart = new Date(`${latestCoverage.end_date}T${latestCoverage.end_time}:00`);
-        }
-      }
-      
-      const originalEndDateTime = new Date(`${shift.date}T${originalEndTime}:00`);
-      
-      // Ensure new coverage starts at or after calculated start time
-      if (selectedStart < calculatedMinStart) {
-        toast.error('טעות בבחירת שעה', {
-          description: `הכיסוי חייב להתחיל מ-${format(calculatedMinStart, 'HH:mm')} ואילך`,
-          duration: 5000
+    // If covering full shift, no validation needed
+    if (coverFull) {
+      onAccept({
+        coverFull: true,
+        coverDate: shift?.date,
+        startTime: '09:00',
+        endTime: '09:00',
+        endDate: format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd')
+      });
+      return;
+    }
+    
+    // Partial coverage - validate fields are filled
+    if (!startDate || !startTime || !endDate || !endTime) {
+      toast.error('נא למלא את כל השדות');
+      return;
+    }
+    
+    const selectedStart = new Date(`${startDate}T${startTime}:00`);
+    const selectedEnd = new Date(`${endDate}T${endTime}:00`);
+    
+    // Validate end is after start
+    if (selectedStart >= selectedEnd) {
+      toast.error('שעת הסיום חייבת להיות אחרי שעת ההתחלה');
+      return;
+    }
+    
+    // Get the valid range for this shift
+    const originalStartTime = shift.swap_start_time || '09:00';
+    const originalEndTime = shift.swap_end_time || '09:00';
+    
+    // Calculate the minimum start time (original or after latest coverage)
+    let validRangeStart = new Date(`${shift.date}T${originalStartTime}:00`);
+    if (existingCoverages && existingCoverages.length > 0) {
+      const validCoverages = existingCoverages.filter(c => c.covering_email !== shift.swap_request_by);
+      if (validCoverages.length > 0) {
+        const sorted = [...validCoverages].sort((a, b) => {
+          const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+          const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+          return aTime - bTime;
         });
-        return;
-      }
-      
-      // Ensure new coverage doesn't exceed original request end time
-      if (selectedEnd > originalEndDateTime) {
-        toast.error('טעות בבחירת שעה', {
-          description: `הכיסוי לא יכול לחרוג מזמן הבקשה המקורי: ${originalEndTime}`,
-          duration: 5000
-        });
-        return;
+        const latestCoverage = sorted[sorted.length - 1];
+        validRangeStart = new Date(`${latestCoverage.end_date}T${latestCoverage.end_time}:00`);
       }
     }
     
+    // Calculate the maximum end time (original request end time)
+    const originalEndHour = parseInt(originalEndTime.split(':')[0]);
+    const originalStartHour = parseInt(originalStartTime.split(':')[0]);
+    let validRangeEndDate = shift.date;
+    if (originalEndHour < originalStartHour) {
+      validRangeEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
+    }
+    const validRangeEnd = new Date(`${validRangeEndDate}T${originalEndTime}:00`);
+    
+    // Validate coverage is within the valid range
+    if (selectedStart < validRangeStart) {
+      toast.error('טעות בבחירת שעה', {
+        description: `הכיסוי חייב להתחיל מ-${format(validRangeStart, 'd/M בשעה HH:mm')} ואילך`,
+        duration: 5000
+      });
+      return;
+    }
+    
+    if (selectedEnd > validRangeEnd) {
+      toast.error('טעות בבחירת שעה', {
+        description: `הכיסוי לא יכול לחרוג מ-${format(validRangeEnd, 'd/M בשעה HH:mm')}`,
+        duration: 5000
+      });
+      return;
+    }
+    
+    // All validations passed - submit
     onAccept({
-      coverFull,
-      coverDate: coverFull ? shift?.date : startDate,
-      startTime: coverFull ? '09:00' : startTime,
-      endTime: coverFull ? '09:00' : endTime,
-      endDate: coverFull ? format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd') : endDate
+      coverFull: false,
+      coverDate: startDate,
+      startTime: startTime,
+      endTime: endTime,
+      endDate: endDate
     });
   };
 
@@ -300,7 +273,6 @@ export default function AcceptSwapModal({
               </div>
             )}
 
-            {/* Show remaining gap range for partially_covered shifts */}
             {shift.status === 'partially_covered' && remainingGap && (
               <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
                 <p className="text-sm font-semibold text-yellow-800 mb-2">טווח שעות מבוקש להחלפה:</p>
@@ -397,7 +369,6 @@ export default function AcceptSwapModal({
                   </div>
                   )}
                   
-                  {/* Row 1: Start */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                     <Label className="text-gray-700 font-semibold">החל מ:</Label>
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -425,7 +396,6 @@ export default function AcceptSwapModal({
                     </div>
                   </div>
 
-                  {/* Row 2: End */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                     <Label className="text-gray-700 font-semibold">ועד ל:</Label>
                     <div className="flex flex-col sm:flex-row gap-3">
