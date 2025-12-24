@@ -23,29 +23,72 @@ export default function AcceptSwapModal({
   const [endTime, setEndTime] = useState('');
   const [remainingGap, setRemainingGap] = useState(null);
 
-  // Calculate remaining gap based on existing coverages
+  // Calculate next available time slot based on existing coverages
   useEffect(() => {
     if (!shift || !isOpen) return;
     
     const shiftStartDate = shift.date;
     const shiftEndDate = format(addDays(new Date(shift.date), 1), 'yyyy-MM-dd');
     
-    // Use the remaining gap from shift data (calculated by backend)
+    // Get original request times
+    const originalStartTime = shift.swap_start_time || '09:00';
+    const originalEndTime = shift.swap_end_time || '09:00';
+    
+    // Calculate next gap based on existing coverages
+    if (existingCoverages && existingCoverages.length > 0) {
+      // Filter valid coverages (not from requester)
+      const validCoverages = existingCoverages.filter(c => c.covering_email !== shift.swap_request_by);
+      
+      if (validCoverages.length > 0) {
+        // Sort by start time
+        const sorted = [...validCoverages].sort((a, b) => {
+          const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+          const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+          return aTime - bTime;
+        });
+        
+        // Find the latest end time
+        const latestCoverage = sorted[sorted.length - 1];
+        const nextStartTime = latestCoverage.end_time;
+        const nextStartDate = latestCoverage.end_date;
+        
+        // Calculate end date based on original end time
+        const originalEndHour = parseInt(originalEndTime.split(':')[0]);
+        const nextStartHour = parseInt(nextStartTime.split(':')[0]);
+        const calculatedEndDate = originalEndHour < nextStartHour ? shiftEndDate : nextStartDate;
+        
+        setStartDate(nextStartDate);
+        setStartTime(nextStartTime);
+        setEndDate(calculatedEndDate);
+        setEndTime(originalEndTime);
+        setCoverFull(false);
+        
+        setRemainingGap({ 
+          startTime: nextStartTime, 
+          endTime: originalEndTime, 
+          startDate: nextStartDate, 
+          endDate: calculatedEndDate 
+        });
+        return;
+      }
+    }
+    
+    // No existing coverages - use original request times
     if ((shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time) {
-      const startHour = parseInt(shift.swap_start_time.split(':')[0]);
-      const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+      const startHour = parseInt(originalStartTime.split(':')[0]);
+      const endHour = parseInt(originalEndTime.split(':')[0]);
       const calculatedEndDate = endHour < startHour ? shiftEndDate : shiftStartDate;
       
       setRemainingGap({ 
-        startTime: shift.swap_start_time, 
-        endTime: shift.swap_end_time, 
+        startTime: originalStartTime, 
+        endTime: originalEndTime, 
         startDate: shiftStartDate, 
         endDate: calculatedEndDate 
       });
       setStartDate(shiftStartDate);
-      setStartTime(shift.swap_start_time);
+      setStartTime(originalStartTime);
       setEndDate(calculatedEndDate);
-      setEndTime(shift.swap_end_time);
+      setEndTime(originalEndTime);
       setCoverFull(false);
     } else {
       // Default to full coverage
@@ -54,7 +97,7 @@ export default function AcceptSwapModal({
       setEndDate(shiftEndDate);
       setEndTime('09:00');
     }
-  }, [shift, isOpen]);
+  }, [shift, isOpen, existingCoverages]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -68,19 +111,46 @@ export default function AcceptSwapModal({
         return;
       }
       
-      // For partially_covered shifts - validate within requested swap range
-      if (shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time) {
-        const requestedStart = new Date(`${shift.date}T${shift.swap_start_time}:00`);
-        const requestedEnd = new Date(`${shift.date}T${shift.swap_end_time}:00`);
-        
-        if (selectedStart < requestedStart || selectedEnd > requestedEnd) {
-          toast.error('טעות בבחירת שעות', {
-            description: `הכיסוי חייב להיות בטווח המבוקש: ${shift.swap_start_time} - ${shift.swap_end_time}`,
-            duration: 5000
+      // Validate against original request range
+      const originalStartTime = shift.swap_start_time || '09:00';
+      const originalEndTime = shift.swap_end_time || '09:00';
+      
+      // Calculate the "next available start time" based on existing coverages
+      let calculatedMinStart = new Date(`${shift.date}T${originalStartTime}:00`);
+      if (existingCoverages && existingCoverages.length > 0) {
+        const validCoverages = existingCoverages.filter(c => c.covering_email !== shift.swap_request_by);
+        if (validCoverages.length > 0) {
+          const sorted = [...validCoverages].sort((a, b) => {
+            const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+            const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+            return aTime - bTime;
           });
-          return;
+          const latestCoverage = sorted[sorted.length - 1];
+          calculatedMinStart = new Date(`${latestCoverage.end_date}T${latestCoverage.end_time}:00`);
         }
-      } else {
+      }
+      
+      const originalEndDateTime = new Date(`${shift.date}T${originalEndTime}:00`);
+      
+      // Ensure new coverage starts at or after calculated start time
+      if (selectedStart < calculatedMinStart) {
+        toast.error('טעות בבחירת שעה', {
+          description: `הכיסוי חייב להתחיל מ-${format(calculatedMinStart, 'HH:mm')} ואילך`,
+          duration: 5000
+        });
+        return;
+      }
+      
+      // Ensure new coverage doesn't exceed original request end time
+      if (selectedEnd > originalEndDateTime) {
+        toast.error('טעות בבחירת שעה', {
+          description: `הכיסוי לא יכול לחרוג מזמן הבקשה המקורי: ${originalEndTime}`,
+          duration: 5000
+        });
+        return;
+      }
+      
+      if (false) {
         // Validate within 24-hour shift window
         const shiftStart = new Date(`${shift.date}T09:00:00`);
         const shiftEnd = addDays(shiftStart, 1);
@@ -168,18 +238,28 @@ export default function AcceptSwapModal({
               </div>
             </div>
 
-            {shift.status === 'partially_covered' && shift.covered_start_time && (
+            {existingCoverages && existingCoverages.filter(c => c.covering_email !== shift.swap_request_by).length > 0 && (
               <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-                <p className="text-sm font-semibold text-yellow-800 mb-2">כיסוי קיים:</p>
-                <div className="text-sm text-yellow-700">
-                  {shift.covering_role}: מתאריך {format(new Date(shift.date), 'd/M')} בשעה {shift.covered_start_time} ועד לתאריך {
-                    parseInt(shift.covered_end_time.split(':')[0]) < parseInt(shift.covered_start_time.split(':')[0]) 
-                      ? format(addDays(new Date(shift.date), 1), 'd/M')
-                      : format(new Date(shift.date), 'd/M')
-                  } בשעה {shift.covered_end_time}
+                <p className="text-sm font-semibold text-yellow-800 mb-3">כיסויים קיימים:</p>
+                <div className="space-y-2">
+                  {existingCoverages
+                    .filter(c => c.covering_email !== shift.swap_request_by)
+                    .sort((a, b) => {
+                      const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+                      const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+                      return aTime - bTime;
+                    })
+                    .map((coverage, idx) => (
+                      <div key={coverage.id} className="text-sm text-yellow-700 bg-white/50 rounded-lg p-2">
+                        <div className="font-semibold">{coverage.covering_role || coverage.covering_person}</div>
+                        <div className="text-xs mt-1">
+                          {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
+                        </div>
+                      </div>
+                    ))}
                 </div>
                 {shift.remaining_hours && (
-                  <div className="text-sm text-yellow-700 mt-1 font-medium">
+                  <div className="text-sm text-yellow-800 mt-3 pt-3 border-t border-yellow-200 font-medium">
                     נותר לכיסוי: {shift.remaining_hours}
                   </div>
                 )}
