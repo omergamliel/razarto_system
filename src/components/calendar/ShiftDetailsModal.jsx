@@ -135,55 +135,85 @@ export default function ShiftDetailsModal({
                       </div>
                     )}
 
-              {(shift.status === 'approved' || shift.status === 'partially_covered') && shiftCoverages.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-700 flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      כיסויים ({shiftCoverages.length})
-                    </h3>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      shift.status === 'approved' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {shift.status === 'approved' ? 'מכוסה במלואו' : 'כיסוי חלקי'}
-                    </div>
-                  </div>
+              {(shift.status === 'approved' || shift.status === 'partially_covered') && shiftCoverages.length > 0 && (() => {
+                // Filter out coverages from the original person who requested the swap
+                const validCoverages = shiftCoverages.filter(c => c.covering_email !== shift.swap_request_by);
 
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                    {shiftCoverages
-                      .sort((a, b) => {
-                        const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
-                        const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
-                        return aTime - bTime;
-                      })
-                      .map((coverage) => (
-                        <div key={coverage.id} className={`bg-gradient-to-br rounded-xl p-4 border ${
-                          shift.status === 'approved'
-                            ? 'from-green-50 to-green-100 border-green-300'
-                            : 'from-blue-50 to-blue-100 border-blue-300'
-                        }`}>
-                          <p className="font-bold text-gray-800 text-lg">{coverage.covering_role}</p>
-                          <div className="mt-2 pt-2 border-t border-gray-200">
-                            <div className="text-sm text-gray-700 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-3 h-3" />
-                                <span className="font-medium">מתאריך:</span>
-                                <span>{format(new Date(coverage.start_date), 'd/M')} בשעה {coverage.start_time}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-3 h-3" />
-                                <span className="font-medium">עד תאריך:</span>
-                                <span>{format(new Date(coverage.end_date), 'd/M')} בשעה {coverage.end_time}</span>
+                if (validCoverages.length === 0) return null;
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        כיסויים ({validCoverages.length})
+                      </h3>
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        shift.status === 'approved' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {shift.status === 'approved' ? 'מכוסה במלואו' : 'כיסוי חלקי'}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                      {validCoverages
+                        .sort((a, b) => {
+                          const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
+                          const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
+                          return aTime - bTime;
+                        })
+                        .map((coverage) => (
+                          <div key={coverage.id} className={`bg-gradient-to-br rounded-xl p-4 border ${
+                            shift.status === 'approved'
+                              ? 'from-green-50 to-green-100 border-green-300'
+                              : 'from-blue-50 to-blue-100 border-blue-300'
+                          }`}>
+                            <p className="font-bold text-gray-800 text-lg">{coverage.covering_role}</p>
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <div className="text-sm text-gray-700 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-3 h-3" />
+                                  <span className="font-medium">מתאריך:</span>
+                                  <span>{format(new Date(coverage.start_date), 'd/M')} בשעה {coverage.start_time}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-3 h-3" />
+                                  <span className="font-medium">עד תאריך:</span>
+                                  <span>{format(new Date(coverage.end_date), 'd/M')} בשעה {coverage.end_time}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
+                        ))}
+                    </div>
+
+                    {shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time && (
+                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4 border-2 border-yellow-300">
+                        <p className="text-sm font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          נשאר לכסות:
+                        </p>
+                        <div className="text-sm text-yellow-700 font-medium">
+                          {(() => {
+                            const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+                            const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+                            const startDate = format(new Date(shift.date), 'd/M');
+                            const endDate = endHour < startHour ? format(new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)), 'd/M') : startDate;
+                            return `מתאריך ${startDate} בשעה ${shift.swap_start_time} - עד תאריך ${endDate} בשעה ${shift.swap_end_time}`;
+                          })()}
                         </div>
-                      ))}
+                        {shift.remaining_hours && (
+                          <div className="text-xs text-yellow-700 mt-2">
+                            ({shift.remaining_hours})
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
 
 
