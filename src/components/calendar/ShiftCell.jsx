@@ -146,21 +146,33 @@ export default function ShiftCell({
       {/* Shift Content */}
       {shift && (
         <div className="mt-6 md:mt-10 space-y-0.5 md:space-y-1">
-          {/* Role Name Only */}
-          {shift.role && (
+          {/* Original Requester Name for swap requests and partial coverage */}
+          {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.role && (
             <p className="font-normal md:font-semibold text-gray-800 truncate text-center text-xs md:text-base">
               {getCleanRoleName(shift.role)}
             </p>
           )}
-          
-          {/* Covering Person (for confirmed swaps) */}
-          {shift.status === 'swap_confirmed' && shift.covering_role && (
-            <div className="bg-white/80 rounded px-2 py-1 border border-[#64B5F6]">
-              <p className="text-[10px] md:text-xs text-[#64B5F6] font-semibold truncate">
-                {shift.covering_role}
-              </p>
-              <p className="text-[9px] md:text-[10px] text-gray-600 truncate">
-                {shift.confirmed_by}
+
+          {/* Approved Swap - Show covering role */}
+          {shift.status === 'approved' && shift.role && (
+            <p className="font-normal md:font-semibold text-gray-800 truncate text-center text-xs md:text-base">
+              {getCleanRoleName(shift.role)}
+            </p>
+          )}
+
+          {/* Regular shift - show role */}
+          {shift.status === 'regular' && shift.role && (
+            <p className="font-normal md:font-semibold text-gray-800 truncate text-center text-xs md:text-base">
+              {getCleanRoleName(shift.role)}
+            </p>
+          )}
+
+          {/* Partial Coverage Indicator */}
+          {shift.status === 'partially_covered' && shift.covering_person && (
+            <div className="mt-1 bg-blue-50/90 rounded px-2 py-1 border border-blue-300">
+              <p className="text-[9px] md:text-[10px] text-blue-700 font-medium truncate text-center">
+                כיסוי חלקי: {shift.covering_person.split(',')[0]}
+                {shift.covering_person.split(',').length > 1 && ` +${shift.covering_person.split(',').length - 1}`}
               </p>
             </div>
           )}
@@ -172,34 +184,20 @@ export default function ShiftCell({
               <span className="text-[9px] md:text-xs text-gray-600 font-normal">
                 {shift.status === 'swap_requested' && (
                   shift.swap_type === 'full' 
-                    ? 'בקשה להחלפה למשמרת מלאה' 
-                    : 'בקשה להחלפה לכיסוי חלקי'
+                    ? 'דרוש כיסוי מלא' 
+                    : 'דרוש כיסוי חלקי'
                 )}
                 {shift.status === 'approved' && 'הוחלף'}
-                {shift.status === 'partially_covered' && (shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'בקשה להחלפה למשמרת- חלקית')}
+                {shift.status === 'partially_covered' && (shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'דרוש כיסוי נוסף')}
               </span>
             </div>
           )}
 
-          {/* Partial Time Display - Only for partial swaps */}
-          {shift.status === 'swap_requested' && shift.swap_type === 'partial' && shift.swap_start_time && (
+          {/* Time Range Display */}
+          {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time && (
             <p className="text-[10px] md:text-xs text-gray-500 mt-1 text-center">
               {shift.swap_start_time} - {shift.swap_end_time}
             </p>
-          )}
-
-          {/* Gap Display for Partially Covered */}
-          {shift.status === 'partially_covered' && shift.gap_hours && (
-            <div className="mt-1 bg-white/80 rounded px-2 py-1 text-center">
-              <p className="text-[10px] md:text-xs text-[#FFB74D] font-semibold">
-                פער: {shift.gap_hours}
-              </p>
-              {shift.covered_start_time && (
-                <p className="text-[9px] md:text-[10px] text-gray-500">
-                  מכוסה: {shift.covered_start_time}-{shift.covered_end_time}
-                </p>
-              )}
-            </div>
           )}
         </div>
       )}
