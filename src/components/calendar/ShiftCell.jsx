@@ -168,11 +168,11 @@ export default function ShiftCell({
           )}
 
           {/* Partial Coverage Indicator */}
-          {shift.status === 'partially_covered' && shift.covering_person && (
+          {shift.status === 'partially_covered' && shift.covering_role && (
             <div className="mt-1 bg-blue-50/90 rounded px-2 py-1 border border-blue-300">
               <p className="text-[9px] md:text-[10px] text-blue-700 font-medium truncate text-center">
-                כיסוי חלקי: {shift.covering_person.split(',')[0]}
-                {shift.covering_person.split(',').length > 1 && ` +${shift.covering_person.split(',').length - 1}`}
+                כיסוי חלקי: {shift.covering_role.split(',')[0]}
+                {shift.covering_role.split(',').length > 1 && ` +${shift.covering_role.split(',').length - 1}`}
               </p>
             </div>
           )}
