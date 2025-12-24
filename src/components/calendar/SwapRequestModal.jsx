@@ -151,23 +151,23 @@ export default function SwapRequestModal({
                   {/* Start Date & Time */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                     <Label className="text-gray-700 font-semibold">החל מ:</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">תאריך</Label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-gray-500 mb-1 block">החל מתאריך</Label>
                         <Input
                           type="date"
                           value={startDate}
                           onChange={(e) => setStartDate(e.target.value)}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">שעה</Label>
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-gray-500 mb-1 block">החל משעה</Label>
                         <Input
                           type="time"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                           dir="ltr"
                         />
                       </div>
@@ -177,23 +177,23 @@ export default function SwapRequestModal({
                   {/* End Date & Time */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                     <Label className="text-gray-700 font-semibold">ועד ל:</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">תאריך</Label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-gray-500 mb-1 block">ועד לתאריך</Label>
                         <Input
                           type="date"
                           value={endDate}
                           onChange={(e) => setEndDate(e.target.value)}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">שעה</Label>
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-gray-500 mb-1 block">עד לשעה</Label>
                         <Input
                           type="time"
                           value={endTime}
                           onChange={(e) => setEndTime(e.target.value)}
-                          className="text-center h-12 rounded-xl"
+                          className="text-center h-12 rounded-xl w-full"
                           dir="ltr"
                         />
                       </div>
