@@ -103,6 +103,12 @@ export default function AcceptSwapModal({
     e.preventDefault();
     
     if (!coverFull) {
+      // Validate that all required fields are filled
+      if (!startDate || !startTime || !endDate || !endTime) {
+        toast.error('נא למלא את כל השדות');
+        return;
+      }
+      
       const selectedStart = new Date(`${startDate}T${startTime}:00`);
       const selectedEnd = new Date(`${endDate}T${endTime}:00`);
       
@@ -433,7 +439,7 @@ export default function AcceptSwapModal({
 
             <Button
               type="submit"
-              disabled={isAccepting || (!coverFull && (!startTime || !endTime))}
+              disabled={isAccepting}
               className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAccepting ? (
