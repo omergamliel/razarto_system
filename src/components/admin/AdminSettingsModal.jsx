@@ -63,14 +63,26 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   });
 
   const removeUserMutation = useMutation({
-    mutationFn: ({ id }) => 
-      base44.entities.RoleDefinition.update(id, {
-        assigned_user_name: '',
-        assigned_user_email: ''
-      }),
+    mutationFn: async ({ id, userEmail }) => {
+      // Clear the role assignment from RoleDefinition
+      await base44.entities.RoleDefinition.update(id, {
+        assigned_user_email: null
+      });
+      
+      // Clear the user's assigned role and department
+      if (userEmail) {
+        const users = await base44.entities.User.filter({ email: userEmail });
+        if (users.length > 0) {
+          await base44.entities.User.update(users[0].id, {
+            assigned_role: null,
+            department: null
+          });
+        }
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
-      toast.success('המשתמש הוסר מהתפקיד');
+      toast.success('המשתמש הוסר מהתפקיד ויופיע שוב בתהליך הרישום');
       setDeleteConfirm(null);
     }
   });
@@ -89,7 +101,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     if (item.type === 'role') {
       deleteRoleMutation.mutate(item.id);
     } else if (item.type === 'user') {
-      removeUserMutation.mutate({ id: item.id });
+      removeUserMutation.mutate({ id: item.id, userEmail: item.email });
     }
   };
 
@@ -215,7 +227,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => setDeleteConfirm({ type: 'user', id: role.id, name: role.assigned_user_name })}
+                                  onClick={() => setDeleteConfirm({ type: 'user', id: role.id, name: role.assigned_user_name, email: role.assigned_user_email })}
                                   className="text-orange-500 hover:text-orange-700 hover:bg-orange-50"
                                 >
                                   הסר משתמש
