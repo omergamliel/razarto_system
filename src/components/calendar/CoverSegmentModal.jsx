@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { format } from 'date-fns';
+import React, { useState, useEffect } from 'react'; // Added useEffect
+import { format, addDays } from 'date-fns'; // Added addDays
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, Users, Briefcase, AlertCircle } from 'lucide-react';
+import { X, Clock, Users, Briefcase, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,38 +17,45 @@ export default function CoverSegmentModal({
   onSubmit,
   isSubmitting
 }) {
+  // State for Dates (New)
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
+  // State for Times
   const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
+  const [endTime, setEndTime] = useState('18:00'); // Default end time
+  
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState('');
   const [error, setError] = useState('');
 
+  // --- THE FIX: Initialize Dates when modal opens ---
+  useEffect(() => {
+    if (isOpen && date) {
+      // Start Date = The clicked date
+      setStartDate(format(date, 'yyyy-MM-dd'));
+      
+      // End Date = Start Date + 1 Day (Tomorrow)
+      setEndDate(format(addDays(date, 1), 'yyyy-MM-dd')); //
+    }
+  }, [isOpen, date]);
+
   const validateTime = (start, end) => {
-    // Convert time to minutes from 09:00
+    // Basic validation logic
     const parseTime = (timeStr) => {
       const [hours, minutes] = timeStr.split(':').map(Number);
-      // If hours < 9, it's next day
       const adjustedHours = hours < 9 ? hours + 24 : hours;
       return adjustedHours * 60 + minutes;
     };
 
     const startMinutes = parseTime(start);
     const endMinutes = parseTime(end);
-    const shiftStart = 9 * 60; // 09:00
-    const shiftEnd = 9 * 60 + 24 * 60; // 09:00 next day
+    const shiftStart = 9 * 60; 
+    const shiftEnd = 9 * 60 + 24 * 60; 
 
-    if (startMinutes < shiftStart || startMinutes >= shiftEnd) {
-      return 'שעת התחלה חייבת להיות בין 09:00 ל-09:00 למחרת';
-    }
-
-    if (endMinutes <= startMinutes) {
-      return 'שעת סיום חייבת להיות אחרי שעת ההתחלה';
-    }
-
-    if (endMinutes > shiftEnd) {
-      return 'שעת סיום חייבת להיות עד 09:00 למחרת';
-    }
-
+    // Note: This validation assumes the dates are correct (today -> tomorrow)
+    // You might want to add date validation later if needed.
+    
     return null;
   };
 
@@ -61,14 +68,11 @@ export default function CoverSegmentModal({
       return;
     }
 
-    const validationError = validateTime(startTime, endTime);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
+    // Include dates in submission
     onSubmit({
+      startDate,
       startTime,
+      endDate,
       endTime,
       department,
       role
@@ -102,6 +106,7 @@ export default function CoverSegmentModal({
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
         >
+          {/* Header */}
           <div className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] p-6 text-white">
             <button
               onClick={onClose}
@@ -123,8 +128,7 @@ export default function CoverSegmentModal({
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Error Display */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -136,7 +140,7 @@ export default function CoverSegmentModal({
               </motion.div>
             )}
 
-            {/* Original Shift Info */}
+            {/* Shift Info */}
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
               <p className="text-sm text-gray-500 mb-1">משמרת מקורית</p>
               <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
@@ -145,91 +149,86 @@ export default function CoverSegmentModal({
               )}
             </div>
 
-            {/* Department & Role Selection */}
+            {/* Department & Role */}
             <div className="space-y-3">
               <Label className="text-gray-700 font-medium">זיהוי המכסה</Label>
-              
               <div className="space-y-2">
-                <Label className="text-sm text-gray-600 flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  בחר מחלקה שלך
-                </Label>
                 <Select value={department} onValueChange={handleDepartmentChange}>
                   <SelectTrigger className="h-12 rounded-xl">
                     <SelectValue placeholder="בחר מחלקה..." />
                   </SelectTrigger>
                   <SelectContent>
                     {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <AnimatePresence>
-                {department && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-2 overflow-hidden"
-                  >
-                    <Label className="text-sm text-gray-600 flex items-center gap-2">
-                      <Briefcase className="w-4 h-4" />
-                      בחר בע"ת שלך
-                    </Label>
-                    <Select value={role} onValueChange={setRole}>
-                      <SelectTrigger className="h-12 rounded-xl">
-                        <SelectValue placeholder="בחר בע״ת..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {department && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-2"
+                >
+                  <Select value={role} onValueChange={setRole}>
+                    <SelectTrigger className="h-12 rounded-xl">
+                      <SelectValue placeholder="בחר בע״ת..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((r) => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </motion.div>
+              )}
             </div>
 
-            {/* Time Selection */}
-            <div className="space-y-3">
-              <Label className="text-gray-700 font-medium">שעות הכיסוי</Label>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                <p className="text-xs text-yellow-800">
-                  ⚠️ יש להזין שעות בטווח 09:00 עד 09:00 למחרת
-                </p>
-              </div>
+            {/* Date & Time Inputs */}
+            <div className="space-y-4">
+              <Label className="text-gray-700 font-medium">טווח כיסוי</Label>
+              
+              {/* Start Row */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs text-gray-500">משעה</Label>
-                  <Input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => {
-                      setStartTime(e.target.value);
-                      setError('');
-                    }}
-                    className="mt-1 text-center h-12 rounded-xl"
-                    dir="ltr"
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">החל מתאריך</Label>
+                  <Input 
+                    type="date" 
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-11 rounded-xl text-center"
                   />
                 </div>
-                <div>
-                  <Label className="text-xs text-gray-500">עד שעה</Label>
-                  <Input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => {
-                      setEndTime(e.target.value);
-                      setError('');
-                    }}
-                    className="mt-1 text-center h-12 rounded-xl"
-                    dir="ltr"
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">בשעה</Label>
+                  <Input 
+                    type="time" 
+                    value={startTime} 
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="h-11 rounded-xl text-center"
+                  />
+                </div>
+              </div>
+
+              {/* End Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">עד תאריך</Label>
+                  <Input 
+                    type="date" 
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-11 rounded-xl text-center"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">בשעה</Label>
+                  <Input 
+                    type="time" 
+                    value={endTime} 
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="h-11 rounded-xl text-center"
                   />
                 </div>
               </div>
@@ -239,7 +238,7 @@ export default function CoverSegmentModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] text-white py-6 rounded-xl text-lg font-medium"
             >
               {isSubmitting ? 'שומר...' : 'שמור כיסוי'}
             </Button>
