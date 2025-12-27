@@ -157,7 +157,7 @@ export default function AcceptSwapModal({
     // Validate coverage is within the valid range
     if (selectedStart < validRangeStart) {
       toast.error('טעות בבחירת שעה', {
-        description: `הכיסוי חייב להתחיל מ-${format(validRangeStart, 'd/M בשעה HH:mm')} ואילך`,
+        description: `הכיסוי חייב להתחיל מ-${format(validRangeStart, 'HH:mm d/M')} ואילך`,
         duration: 5000
       });
       return;
@@ -165,7 +165,7 @@ export default function AcceptSwapModal({
     
     if (selectedEnd > validRangeEnd) {
       toast.error('טעות בבחירת שעה', {
-        description: `הכיסוי לא יכול לחרוג מ-${format(validRangeEnd, 'd/M בשעה HH:mm')}`,
+        description: `הכיסוי לא יכול לחרוג מ-${format(validRangeEnd, 'HH:mm d/M')}`,
         duration: 5000
       });
       return;
@@ -238,7 +238,7 @@ export default function AcceptSwapModal({
                         const endHour = parseInt(shift.swap_end_time.split(':')[0]);
                         const startDate = format(new Date(shift.date), 'd/M');
                         const endDate = endHour < startHour ? format(addDays(new Date(shift.date), 1), 'd/M') : startDate;
-                        return `מתאריך ${startDate} בשעה ${shift.swap_start_time} - עד תאריך ${endDate} בשעה ${shift.swap_end_time}`;
+                        return `${shift.swap_start_time} ${startDate} - ${shift.swap_end_time} ${endDate}`;
                       })()
                   }
                 </div>
@@ -260,7 +260,7 @@ export default function AcceptSwapModal({
                       <div key={coverage.id} className="text-sm text-yellow-700 bg-white/50 rounded-lg p-2">
                         <div className="font-semibold">{coverage.covering_role || coverage.covering_person}</div>
                         <div className="text-xs mt-1">
-                          {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
+                          {coverage.start_time} {format(new Date(coverage.start_date), 'd/M')} - {coverage.end_time} {format(new Date(coverage.end_date), 'd/M')}
                         </div>
                       </div>
                     ))}
@@ -279,7 +279,7 @@ export default function AcceptSwapModal({
                 <div className="flex items-center justify-center gap-2 text-yellow-700">
                   <Clock className="w-5 h-5" />
                   <span className="font-bold text-lg">
-                    מתאריך {format(new Date(remainingGap.startDate), 'd/M')} בשעה {remainingGap.startTime} - עד תאריך {format(new Date(remainingGap.endDate), 'd/M')} בשעה {remainingGap.endTime}
+                    {remainingGap.startTime} {format(new Date(remainingGap.startDate), 'd/M')} - {remainingGap.endTime} {format(new Date(remainingGap.endDate), 'd/M')}
                   </span>
                 </div>
                 <p className="text-xs text-yellow-700 text-center mt-2">
@@ -298,7 +298,7 @@ export default function AcceptSwapModal({
                       const endHour = parseInt(shift.swap_end_time.split(':')[0]);
                       const startDate = format(new Date(shift.date), 'd/M');
                       const endDate = endHour < startHour ? format(addDays(new Date(shift.date), 1), 'd/M') : startDate;
-                      return `מתאריך ${startDate} בשעה ${shift.swap_start_time} - עד תאריך ${endDate} בשעה ${shift.swap_end_time}`;
+                      return `${shift.swap_start_time} ${startDate} - ${shift.swap_end_time} ${endDate}`;
                     })()}
                   </span>
                 </div>
@@ -363,7 +363,7 @@ export default function AcceptSwapModal({
                     <div className="flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-blue-700">
-                        הכיסוי חייב להיות בתוך חלון 24 השעות של המשמרת: {format(shiftStartDate, 'd/M בשעה HH:mm')} - {format(shiftEndDate, 'd/M בשעה HH:mm')}
+                        הכיסוי חייב להיות בתוך חלון 24 השעות של המשמרת: {format(shiftStartDate, 'HH:mm d/M')} - {format(shiftEndDate, 'HH:mm d/M')}
                       </p>
                     </div>
                   </div>

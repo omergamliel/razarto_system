@@ -127,7 +127,7 @@ export default function ShiftDetailsModal({
                                 const endDateObj = endHour < startHour ? new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)) : startDateObj;
                                 const startDate = format(startDateObj, 'd/M');
                                 const endDate = format(endDateObj, 'd/M');
-                                return <span>{shift.status === 'partially_covered' ? 'נשאר לכסות' : 'דרוש כיסוי'}: {startDate} {shift.swap_start_time} - {endDate} {shift.swap_end_time}</span>;
+                                return <span>{shift.status === 'partially_covered' ? 'נשאר לכסות' : 'דרוש כיסוי'}: {shift.swap_start_time} {startDate} - {shift.swap_end_time} {endDate}</span>;
                               })()
                             ) : (
                               <span>09:00 - 09:00 (למחרת)</span>
@@ -178,12 +178,12 @@ export default function ShiftDetailsModal({
                                   <div className="flex items-center gap-2">
                                     <Clock className="w-3 h-3" />
                                     <span className="font-medium">מתאריך:</span>
-                                    <span>{format(new Date(coverage.start_date), 'd/M')} בשעה {coverage.start_time}</span>
+                                    <span>{coverage.start_time} {format(new Date(coverage.start_date), 'd/M')}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Clock className="w-3 h-3" />
                                     <span className="font-medium">עד תאריך:</span>
-                                    <span>{format(new Date(coverage.end_date), 'd/M')} בשעה {coverage.end_time}</span>
+                                    <span>{coverage.end_time} {format(new Date(coverage.end_date), 'd/M')}</span>
                                   </div>
                                 </div>
                               </div>
@@ -203,7 +203,7 @@ export default function ShiftDetailsModal({
                             const endHour = parseInt(shift.swap_end_time.split(':')[0]);
                             const startDate = format(new Date(shift.date), 'd/M');
                             const endDate = endHour < startHour ? format(new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)), 'd/M') : startDate;
-                            return `מתאריך ${startDate} בשעה ${shift.swap_start_time} - עד תאריך ${endDate} בשעה ${shift.swap_end_time}`;
+                            return `${shift.swap_start_time} ${startDate} - ${shift.swap_end_time} ${endDate}`;
                           })()}
                         </div>
                         {shift.remaining_hours && (

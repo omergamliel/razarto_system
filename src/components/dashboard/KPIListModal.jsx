@@ -182,11 +182,15 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
                                       <Clock className="w-3 h-3" />
                                       <span>
-                                        {coverage.start_time} {format(new Date(coverage.start_date), 'd/M')} - {coverage.end_time} {format(new Date(coverage.end_date), 'd/M')}
+                                        {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
                                       </span>
                                     </div>
                                     <div className="text-[10px] text-gray-500 text-center">
-                                      אושר ב: {format(new Date(shift.updated_date).toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }), 'd/M/yy בשעה HH:mm')}
+                                      אושר ב: {(() => {
+                                        const date = new Date(shift.updated_date);
+                                        const israelTime = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+                                        return format(israelTime, 'd/M/yy בשעה HH:mm');
+                                      })()}
                                     </div>
                                   </div>
                                 </div>
@@ -208,10 +212,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                       const endDateObj = endHour < startHour ? new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)) : startDateObj;
                                       const startDate = format(startDateObj, 'd/M');
                                       const endDate = format(endDateObj, 'd/M');
-                                      return <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {startDate} {shift.swap_start_time} - {endDate} {shift.swap_end_time}</span>;
+                                      return <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {shift.swap_start_time} {startDate} - {shift.swap_end_time} {endDate}</span>;
                                     })()
                                   ) : (
-                                    <span>{format(new Date(shift.date), 'd/M')} 09:00 - {format(new Date(shift.date), 'd/M')} 09:00 (למחרת)</span>
+                                    <span>09:00 {format(new Date(shift.date), 'd/M')} - 09:00 {format(new Date(shift.date), 'd/M')} (למחרת)</span>
                                   )}
                                 </div>
                               )}
