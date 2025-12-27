@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'; // Added useEffect
-import { format, addDays } from 'date-fns'; // Added addDays
+import React, { useState, useEffect } from 'react';
+import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Users, Briefcase, AlertCircle } from 'lucide-react';
@@ -17,45 +17,48 @@ export default function CoverSegmentModal({
   onSubmit,
   isSubmitting
 }) {
-  // State for Dates (New)
+  // State for Dates
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
-  // State for Times
+  // State for Times - Default to 09:00 - 09:00 (24h cycle)
   const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00'); // Default end time
+  const [endTime, setEndTime] = useState('09:00');
   
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState('');
   const [error, setError] = useState('');
 
-  // --- THE FIX: Initialize Dates when modal opens ---
+  // --- THE FIX: Robust Date Initialization ---
   useEffect(() => {
     if (isOpen && date) {
-      // Start Date = The clicked date
-      setStartDate(format(date, 'yyyy-MM-dd'));
-      
-      // End Date = Start Date + 1 Day (Tomorrow)
-      setEndDate(format(addDays(date, 1), 'yyyy-MM-dd')); //
+      try {
+        // 1. Force conversion to a Date object (handles strings properly)
+        const dateObj = new Date(date);
+        
+        // 2. Set Start Date (Current day)
+        setStartDate(format(dateObj, 'yyyy-MM-dd'));
+        
+        // 3. Set End Date (Current day + 1)
+        // Using dateObj ensures addDays works correctly
+        const nextDay = addDays(dateObj, 1);
+        setEndDate(format(nextDay, 'yyyy-MM-dd'));
+
+        // 4. Reset times to standard shift times
+        setStartTime('09:00');
+        setEndTime('09:00');
+        
+      } catch (e) {
+        console.error("Error calculating dates:", e);
+        // Fallback to basic string if calculation fails
+        setStartDate(format(new Date(), 'yyyy-MM-dd'));
+        setEndDate(format(new Date(), 'yyyy-MM-dd'));
+      }
     }
   }, [isOpen, date]);
 
   const validateTime = (start, end) => {
-    // Basic validation logic
-    const parseTime = (timeStr) => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      const adjustedHours = hours < 9 ? hours + 24 : hours;
-      return adjustedHours * 60 + minutes;
-    };
-
-    const startMinutes = parseTime(start);
-    const endMinutes = parseTime(end);
-    const shiftStart = 9 * 60; 
-    const shiftEnd = 9 * 60 + 24 * 60; 
-
-    // Note: This validation assumes the dates are correct (today -> tomorrow)
-    // You might want to add date validation later if needed.
-    
+    // Basic validation logic placeholder
     return null;
   };
 
@@ -122,7 +125,7 @@ export default function CoverSegmentModal({
               <div>
                 <h2 className="text-xl font-bold">כיסוי מקטע משמרת</h2>
                 <p className="text-white/80 text-sm">
-                  {date && format(date, 'EEEE, d בMMMM', { locale: he })}
+                  {date && format(new Date(date), 'EEEE, d בMMMM', { locale: he })}
                 </p>
               </div>
             </div>
