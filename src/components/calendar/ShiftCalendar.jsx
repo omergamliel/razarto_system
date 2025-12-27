@@ -19,7 +19,6 @@ import OnboardingModal from '../onboarding/OnboardingModal';
 import KPIHeader from '../dashboard/KPIHeader';
 import KPIListModal from '../dashboard/KPIListModal';
 import AdminSettingsModal from '../admin/AdminSettingsModal';
-import PendingApprovalModal from './PendingApprovalModal';
 import SeedRolesData from '../admin/SeedRolesData';
 
 export default function ShiftCalendar() {
@@ -27,10 +26,12 @@ export default function ShiftCalendar() {
   const [viewMode, setViewMode] = useState('month');
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
+  
+  // Modals state
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [showAcceptModal, setShowAcceptModal] = useState(false); // We might not need this anymore for the main flow
   const [showActionModal, setShowActionModal] = useState(false);
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -90,21 +91,21 @@ export default function ShiftCalendar() {
   });
 
   // Swap request mutation
-    const swapRequestMutation = useMutation({
-      mutationFn: async ({ date, swapData }) => {
-        const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
+  const swapRequestMutation = useMutation({
+    mutationFn: async ({ date, swapData }) => {
+      const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
 
-        if (existingShift) {
-          return base44.entities.Shift.update(existingShift.id, {
-            status: 'swap_requested',
-            swap_request_by: currentUser?.email,
-            swap_type: swapData.swapType,
-            swap_start_time: swapData.swapType === 'partial' ? swapData.startTime : '09:00',
-            swap_end_time: swapData.swapType === 'partial' ? swapData.endTime : '09:00'
-          });
-        }
-        return null;
-      },
+      if (existingShift) {
+        return base44.entities.Shift.update(existingShift.id, {
+          status: swapData.status || 'swap_requested', // Use the specific status (Full/Partial)
+          swap_request_by: currentUser?.email,
+          swap_type: swapData.swapType,
+          swap_start_time: swapData.swapType === 'partial' ? swapData.startTime : '09:00',
+          swap_end_time: swapData.swapType === 'partial' ? swapData.endTime : '09:00'
+        });
+      }
+      return null;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setShowSwapModal(false);
@@ -115,88 +116,64 @@ export default function ShiftCalendar() {
     }
   });
 
-  // Offer to cover mutation (multi-user partial support with "Green Light" check)
+  // --- THE BRAIN: Logic for calculating Partial vs Full Coverage ---
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
-      // Create a coverage record
+      // 1. Create a coverage record
       await base44.entities.ShiftCoverage.create({
         shift_id: shift.id,
         covering_person: currentUser?.full_name || currentUser?.email,
         covering_email: currentUser?.email,
-        covering_role: currentUser?.assigned_role,
-        covering_department: currentUser?.department,
-        start_date: coverData.startDate || coverData.coverDate || shift.date,
+        covering_role: coverData.role || currentUser?.assigned_role, // Ensure role comes from modal
+        covering_department: coverData.department || currentUser?.department,
+        start_date: coverData.startDate,
         start_time: coverData.startTime,
-        end_date: coverData.endDate || coverData.coverDate || shift.date,
+        end_date: coverData.endDate,
         end_time: coverData.endTime,
         status: 'approved'
       });
 
-      // Fetch all coverages for this shift
+      // 2. Fetch all coverages for this shift to recalculate status
       const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
 
-      // Sort coverages by start time
+      // 3. Sort coverages by start time
       const sortedCoverages = allCoverages.sort((a, b) => {
         const aTime = new Date(`${a.start_date}T${a.start_time}:00`);
         const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
         return aTime - bTime;
       });
 
-      // Calculate if the requested range is fully covered ("Green Light" Check)
+      // 4. Calculate Total Needed Minutes
       const originalStartTime = shift.swap_start_time || '09:00';
       const originalEndTime = shift.swap_end_time || '09:00';
       const requestedStart = new Date(`${shift.date}T${originalStartTime}:00`);
       let requestedEnd = new Date(`${shift.date}T${originalEndTime}:00`);
       
-      // Handle next-day scenarios
+      // Handle next-day logic for the requested slot
       if (requestedEnd <= requestedStart) {
-        requestedEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
+        requestedEnd = addDays(requestedEnd, 1);
       }
       
       const requestedMinutes = (requestedEnd - requestedStart) / (1000 * 60);
 
-      // Calculate total covered minutes
+      // 5. Calculate Total Covered Minutes
       let totalCoveredMinutes = 0;
       sortedCoverages.forEach(cov => {
         const startDateTime = new Date(`${cov.start_date}T${cov.start_time}:00`);
-        const endDateTime = new Date(`${cov.end_date}T${cov.end_time}:00`);
+        let endDateTime = new Date(`${cov.end_date}T${cov.end_time}:00`);
+        
+        // Safety check for next day in coverage
+        if (endDateTime <= startDateTime) {
+             endDateTime = addDays(endDateTime, 1);
+        }
+
         const minutes = (endDateTime - startDateTime) / (1000 * 60);
         totalCoveredMinutes += minutes;
       });
 
-      const isFullyCovered = totalCoveredMinutes >= requestedMinutes;
-
-      // Calculate remaining gap if partially covered
-      let remainingGapStart = null;
-      let remainingGapEnd = null;
-
-      if (!isFullyCovered) {
-        // Find the first uncovered gap
-        let currentPos = requestedStart;
-
-        for (const coverage of sortedCoverages) {
-          const covStart = new Date(`${coverage.start_date}T${coverage.start_time}:00`);
-          const covEnd = new Date(`${coverage.end_date}T${coverage.end_time}:00`);
-
-          // If there's a gap before this coverage
-          if (currentPos < covStart) {
-            remainingGapStart = currentPos;
-            remainingGapEnd = covStart;
-            break;
-          }
-
-          // Move position to end of coverage if it extends current position
-          if (covEnd > currentPos) {
-            currentPos = covEnd;
-          }
-        }
-
-        // If no gap found yet, check if there's a gap after all coverages
-        if (!remainingGapStart && currentPos < requestedEnd) {
-          remainingGapStart = currentPos;
-          remainingGapEnd = requestedEnd;
-        }
-      }
+      // 6. Determine Status
+      // Allow a small buffer (e.g., 5 mins) for calculation errors
+      const isFullyCovered = totalCoveredMinutes >= (requestedMinutes - 5);
 
       const updateData = {
         covering_person: sortedCoverages.map(c => c.covering_person).join(', '),
@@ -206,26 +183,25 @@ export default function ShiftCalendar() {
         covered_end_time: sortedCoverages[sortedCoverages.length - 1]?.end_time
       };
 
-      // Case 1: Balance > 0 (Still missing hours) - Keep Partial Coverage
-      if (!isFullyCovered && remainingGapStart && remainingGapEnd) {
-        updateData.status = 'partially_covered';
-        updateData.swap_start_time = format(remainingGapStart, 'HH:mm');
-        updateData.swap_end_time = format(remainingGapEnd, 'HH:mm');
-
-        const remainingMinutes = (remainingGapEnd - remainingGapStart) / (1000 * 60);
+      // Case A: Partial Coverage (Yellow)
+      if (!isFullyCovered) {
+        updateData.status = 'REQUIRES_PARTIAL_COVERAGE'; // Use our new status
+        
+        const remainingMinutes = Math.max(0, requestedMinutes - totalCoveredMinutes);
         const remainingHours = Math.floor(remainingMinutes / 60);
-        const remainingMins = remainingMinutes % 60;
-        updateData.remaining_hours = remainingMins > 0 ? `${remainingHours}:${remainingMins.toString().padStart(2, '0')} שעות` : `${remainingHours} שעות`;
+        const remainingMins = Math.round(remainingMinutes % 60);
+        
+        updateData.remaining_hours = remainingMins > 0 
+            ? `${remainingHours}:${remainingMins.toString().padStart(2, '0')} שעות` 
+            : `${remainingHours} שעות`;
       }
 
-      // Case 2: Balance == 0 (Fully Covered) - Change to Green & Close
+      // Case B: Fully Covered (Green)
       if (isFullyCovered) {
         updateData.status = 'approved';
         updateData.remaining_hours = null;
-        // Save original assignment before replacing
         updateData.original_assigned_person = shift.assigned_person;
         updateData.original_role = shift.role;
-        // Replace with covering roles for display
         updateData.assigned_person = sortedCoverages[0]?.covering_person;
         updateData.assigned_email = sortedCoverages[0]?.covering_email;
         updateData.role = sortedCoverages.map(c => c.covering_role).join(' + ');
@@ -236,11 +212,16 @@ export default function ShiftCalendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-coverages'] });
+      
+      // Close all relevant modals
       setShowAcceptModal(false);
-      toast.success('הכיסוי נוסף בהצלחה!');
+      setShowCoverSegmentModal(false);
+      
+      toast.success('הכיסוי נקלט בהצלחה!');
     },
-    onError: () => {
-      toast.error('שגיאה בהוספת הכיסוי');
+    onError: (e) => {
+      console.error(e);
+      toast.error('שגיאה בשמירת הכיסוי');
     }
   });
 
@@ -255,10 +236,8 @@ export default function ShiftCalendar() {
         status: 'approved',
         approved_by: currentUser?.full_name || currentUser?.email,
         approved_by_email: currentUser?.email,
-        // Save original assignment before replacing
         original_assigned_person: shift.assigned_person,
         original_role: shift.role,
-        // Replace original assignment with covering person
         assigned_person: shift.covering_person,
         assigned_email: shift.covering_email,
         role: shift.covering_role,
@@ -294,31 +273,6 @@ export default function ShiftCalendar() {
     }
   });
 
-  // Cover segment mutation
-  const coverSegmentMutation = useMutation({
-    mutationFn: async ({ shift, segmentData }) => {
-      return base44.entities.ShiftSegment.create({
-        shift_id: shift.id,
-        date: shift.date,
-        start_time: segmentData.startTime,
-        end_time: segmentData.endTime,
-        assigned_person: currentUser?.full_name || currentUser?.email,
-        assigned_email: currentUser?.email,
-        department: segmentData.department,
-        role: segmentData.role
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      queryClient.invalidateQueries({ queryKey: ['shift-segments'] });
-      setShowCoverSegmentModal(false);
-      toast.success('המקטע נוסף בהצלחה');
-    },
-    onError: () => {
-      toast.error('שגיאה בכיסוי המקטע');
-    }
-  });
-
   // Edit role mutation
   const editRoleMutation = useMutation({
     mutationFn: async ({ shift, roleData }) => {
@@ -338,7 +292,9 @@ export default function ShiftCalendar() {
   });
 
   const handleCellClick = (date, shift) => {
-    setSelectedDate(date);
+    // Ensure date is a Date object
+    const validDate = new Date(date);
+    setSelectedDate(validDate);
     setSelectedShift(shift);
     
     // Empty slot - only admin can add
@@ -363,13 +319,12 @@ export default function ShiftCalendar() {
     const isMyShift = shift.role && currentUser?.assigned_role && 
                       typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role);
 
-    // Allow clicking on: my shifts, swap requests, or partial coverage
-    const isSwapRequested = shift.status === 'swap_requested';
-    const isPartiallyCovered = shift.status === 'partially_covered';
+    // Check if swap is requested or active
+    const isSwapActive = ['swap_requested', 'partially_covered', 'REQUIRES_FULL_COVERAGE', 'REQUIRES_PARTIAL_COVERAGE'].includes(shift.status);
 
     if (isMyShift) {
       setShowActionModal(true);
-    } else if (isSwapRequested || isPartiallyCovered) {
+    } else if (isSwapActive) {
       setShowDetailsModal(true);
     }
   };
@@ -379,14 +334,23 @@ export default function ShiftCalendar() {
     setShowKPIList(true);
   };
 
+  // --- FIX: Redirect "Offer Cover" to CoverSegmentModal ---
   const handleOfferCover = async (shift) => {
     setSelectedShift(shift);
-    setShowAcceptModal(true);
+    
+    // Ensure the date is passed correctly
+    if (shift.date) {
+        setSelectedDate(new Date(shift.date));
+    }
+    
+    // !!! THIS WAS THE BUG !!!
+    // Old: setShowAcceptModal(true);
+    // New: Open the detailed coverage modal
+    setShowCoverSegmentModal(true); 
   };
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
-    // Refresh user
     base44.auth.me().then(user => setCurrentUser(user));
   };
 
@@ -440,6 +404,7 @@ export default function ShiftCalendar() {
           isAdmin={isAdmin}
         />
 
+        {/* Modals */}
         <OnboardingModal
           isOpen={showOnboarding}
           onComplete={handleOnboardingComplete}
@@ -464,8 +429,6 @@ export default function ShiftCalendar() {
           isOpen={showAdminSettings}
           onClose={() => setShowAdminSettings(false)}
         />
-
-
 
         <SwapRequestModal
           isOpen={showSwapModal}
@@ -500,7 +463,6 @@ export default function ShiftCalendar() {
           shift={selectedShift}
           onAccept={(acceptData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: acceptData })}
           isAccepting={offerCoverMutation.isPending}
-          existingCoverages={selectedShift ? queryClient.getQueryData(['shift-coverages', selectedShift.id]) || [] : []}
         />
 
         <ShiftActionModal
@@ -535,31 +497,26 @@ export default function ShiftCalendar() {
           shift={selectedShift}
           date={selectedDate}
           onCoverSegment={(shift) => {
-            setSelectedShift(shift);
-            setShowCoverSegmentModal(true);
+            handleOfferCover(shift);
           }}
-          onOfferCover={(shift) => {
-            setSelectedShift(shift);
-            setShowDetailsModal(false);
-            setShowAcceptModal(true);
-          }}
+          onOfferCover={handleOfferCover} // Calls our fixed handler
           onDelete={deleteShiftMutation.mutate}
           onApprove={() => approveSwapMutation.mutate(selectedShift)}
           currentUserEmail={currentUser?.email}
           isAdmin={isAdmin}
         />
 
+        {/* This modal now uses the SMART logic from offerCoverMutation */}
         <CoverSegmentModal
           isOpen={showCoverSegmentModal}
           onClose={() => setShowCoverSegmentModal(false)}
           shift={selectedShift}
           date={selectedDate}
-          onSubmit={(segmentData) => coverSegmentMutation.mutate({ shift: selectedShift, segmentData })}
-          isSubmitting={coverSegmentMutation.isPending}
+          onSubmit={(segmentData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: segmentData })}
+          isSubmitting={offerCoverMutation.isPending}
         />
       </div>
 
-      {/* Google Font Import */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
       `}</style>
