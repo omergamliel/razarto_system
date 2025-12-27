@@ -238,7 +238,7 @@ export default function CoverSegmentModal({
             {/* Submit */}
             <Button
               type="submit"
-              disabled={isSubmitting || !department || !role}
+              disabled={isSubmitting}
               className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
             >
               {isSubmitting ? 'שומר...' : 'שמור כיסוי'}
