@@ -96,11 +96,11 @@ export default function ShiftCalendar() {
 
         if (existingShift) {
           return base44.entities.Shift.update(existingShift.id, {
-            status: swapData.swapType === 'partial' ? 'partially_covered' : 'swap_requested',
+            status: 'swap_requested',
             swap_request_by: currentUser?.email,
             swap_type: swapData.swapType,
-            swap_start_time: swapData.startTime,
-            swap_end_time: swapData.endTime
+            swap_start_time: swapData.swapType === 'partial' ? swapData.startTime : '09:00',
+            swap_end_time: swapData.swapType === 'partial' ? swapData.endTime : '09:00'
           });
         }
         return null;
@@ -146,7 +146,13 @@ export default function ShiftCalendar() {
       const originalStartTime = shift.swap_start_time || '09:00';
       const originalEndTime = shift.swap_end_time || '09:00';
       const requestedStart = new Date(`${shift.date}T${originalStartTime}:00`);
-      const requestedEnd = new Date(`${shift.date}T${originalEndTime}:00`);
+      let requestedEnd = new Date(`${shift.date}T${originalEndTime}:00`);
+      
+      // Handle next-day scenarios
+      if (requestedEnd <= requestedStart) {
+        requestedEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
+      }
+      
       const requestedMinutes = (requestedEnd - requestedStart) / (1000 * 60);
 
       // Calculate total covered minutes
