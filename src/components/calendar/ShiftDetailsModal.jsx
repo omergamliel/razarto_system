@@ -22,7 +22,7 @@ export default function ShiftDetailsModal({
   shift,
   date,
   onCoverSegment,
-  onOfferCover,
+  onOfferCover, // This is the function triggered when "I'll Replace" is clicked
   onDelete,
   onApprove,
   currentUserEmail,
@@ -46,20 +46,30 @@ export default function ShiftDetailsModal({
 
   if (!isOpen || !shift) return null;
 
-  // Calculate coverage and gaps
+  // --- Improved Coverage Calculation ---
   const shiftDuration = 24;
   let totalCoveredHours = 0;
   
   shiftCoverages.forEach(cov => {
     const start = parseInt(cov.start_time.split(':')[0]);
     const end = parseInt(cov.end_time.split(':')[0]);
+    // Handle overnight calculation
     const hours = end > start ? end - start : (24 - start) + end;
     totalCoveredHours += hours;
   });
 
+  // Determine if there is a gap
   const hasGap = shiftCoverages.length === 0 ? (shift.status === 'swap_requested') : (totalCoveredHours < shiftDuration);
   const remainingHours = Math.max(0, shiftDuration - totalCoveredHours);
+  
+  // Check if the current user is the owner of the shift
   const isOwnShift = shift.assigned_email === currentUserEmail;
+
+  // Helper to check if the shift requires coverage (Full or Partial)
+  const needsCoverage = shift.status === 'swap_requested' || 
+                        shift.status === 'partially_covered' || 
+                        shift.status === 'REQUIRES_FULL_COVERAGE' || 
+                        shift.status === 'REQUIRES_PARTIAL_COVERAGE';
 
   return (
     <AnimatePresence>
@@ -78,6 +88,7 @@ export default function ShiftDetailsModal({
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
         >
+          {/* Header */}
           <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-6 text-white flex-shrink-0">
             <div className="absolute top-4 left-4 flex gap-2">
               {isAdmin && (
@@ -103,7 +114,7 @@ export default function ShiftDetailsModal({
               <div>
                 <h2 className="text-xl font-bold">פרטי משמרת</h2>
                 <p className="text-white/80 text-sm">
-                  {date && format(date, 'EEEE, d בMMMM yyyy', { locale: he })}
+                  {date && format(new Date(date), 'EEEE, d בMMMM yyyy', { locale: he })}
                 </p>
               </div>
             </div>
@@ -111,8 +122,14 @@ export default function ShiftDetailsModal({
 
           <div className="flex-1 overflow-y-auto" style={{ maxHeight: '60vh' }}>
             <div className="p-6 space-y-4">
+              
+              {/* Shift Status / Role Card */}
               {shift.status !== 'approved' && (
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 text-center">
+                <div className={`bg-gradient-to-br rounded-xl p-6 border text-center ${
+                    shift.status === 'partially_covered' || shift.status === 'REQUIRES_PARTIAL_COVERAGE'
+                    ? 'from-yellow-50 to-yellow-100 border-yellow-200'
+                    : 'from-gray-50 to-gray-100 border-gray-200'
+                }`}>
                         {shift.role && (
                           <h2 className="text-3xl font-bold text-[#E57373] mb-3">{shift.role}</h2>
                         )}
@@ -125,9 +142,22 @@ export default function ShiftDetailsModal({
                                 const endHour = parseInt(shift.swap_end_time.split(':')[0]);
                                 const startDateObj = new Date(shift.date);
                                 const endDateObj = endHour < startHour ? new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)) : startDateObj;
-                                const startDate = format(startDateObj, 'd/M');
-                                const endDate = format(endDateObj, 'd/M');
-                                return <span>{shift.status === 'partially_covered' ? 'נשאר לכסות' : 'דרוש כיסוי'}: {shift.swap_start_time} {startDate} - {shift.swap_end_time} {endDate}</span>;
+                                const startDateStr = format(startDateObj, 'd/M');
+                                const endDateStr = format(endDateObj, 'd/M');
+                                
+                                const isPartial = shift.status === 'partially_covered' || shift.status === 'REQUIRES_PARTIAL_COVERAGE';
+                                
+                                return (
+                                    <div className="flex flex-col items-center">
+                                        <span>{isPartial ? 'נשאר לכסות' : 'דרוש כיסוי'}:</span>
+                                        <span className="font-bold">
+                                            {shift.swap_start_time} ({startDateStr}) - {shift.swap_end_time} ({endDateStr})
+                                        </span>
+                                        {remainingHours > 0 && isPartial && (
+                                            <span className="text-xs text-yellow-700 mt-1">({remainingHours} שעות נותרו)</span>
+                                        )}
+                                    </div>
+                                );
                               })()
                             ) : (
                               <span>09:00 - 09:00 (למחרת)</span>
@@ -137,8 +167,8 @@ export default function ShiftDetailsModal({
                       </div>
                     )}
 
-              {(shift.status === 'approved' || shift.status === 'partially_covered') && shiftCoverages.length > 0 && (() => {
-                // Filter out coverages from the original person who requested the swap
+              {/* Coverage List */}
+              {(shift.status === 'approved' || shift.status === 'partially_covered' || shift.status === 'REQUIRES_PARTIAL_COVERAGE') && shiftCoverages.length > 0 && (() => {
                 const validCoverages = shiftCoverages.filter(c => c.covering_email !== shift.swap_request_by);
 
                 if (validCoverages.length === 0) return null;
@@ -190,46 +220,20 @@ export default function ShiftDetailsModal({
                             </div>
                           ))}
                     </div>
-
-                    {shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time && (
-                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4 border-2 border-yellow-300">
-                        <p className="text-sm font-semibold text-yellow-800 mb-2 flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
-                          נשאר לכסות:
-                        </p>
-                        <div className="text-sm text-yellow-700 font-medium">
-                          {(() => {
-                            const startHour = parseInt(shift.swap_start_time.split(':')[0]);
-                            const endHour = parseInt(shift.swap_end_time.split(':')[0]);
-                            const startDate = format(new Date(shift.date), 'd/M');
-                            const endDate = endHour < startHour ? format(new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)), 'd/M') : startDate;
-                            return `${shift.swap_start_time} ${startDate} - ${shift.swap_end_time} ${endDate}`;
-                          })()}
-                        </div>
-                        {shift.remaining_hours && (
-                          <div className="text-xs text-yellow-700 mt-2">
-                            ({shift.remaining_hours})
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 );
               })()}
 
+              {/* ACTION BUTTONS */}
 
-
-
-
-              {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && isOwnShift && (
+              {/* 1. Cancel Request (For Owner) */}
+              {(needsCoverage && isOwnShift) && (
                 <Button
                   onClick={async () => {
                     try {
-                      // Delete all coverages for this shift
                       const coverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
                       await Promise.all(coverages.map(c => base44.entities.ShiftCoverage.delete(c.id)));
 
-                      // Reset shift to regular status
                       await base44.entities.Shift.update(shift.id, {
                         status: 'regular',
                         swap_request_by: null,
@@ -260,11 +264,13 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {((shift.status === 'swap_requested' || shift.status === 'partially_covered') && !isOwnShift) && onOfferCover && (
+              {/* 2. "I'll Replace" (For Others) */}
+              {(needsCoverage && !isOwnShift && onOfferCover) && (
                 <Button
                   onClick={() => {
+                    console.log("Offer Cover Clicked for Shift:", shift); // Debug log
                     onClose();
-                    onOfferCover(shift);
+                    onOfferCover(shift); // Trigger the parent action
                   }}
                   className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium shadow-md"
                 >
@@ -275,6 +281,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
+              {/* 3. Admin Approve */}
               {isAdmin && shift.status === 'pending_approval' && (
                 <Button
                   onClick={() => {
@@ -293,6 +300,7 @@ export default function ShiftDetailsModal({
           </div>
         </motion.div>
 
+        {/* Delete Confirmation Dialog */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <DialogContent>
             <DialogHeader>
