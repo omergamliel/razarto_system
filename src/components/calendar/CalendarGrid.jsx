@@ -68,7 +68,7 @@ export default function CalendarGrid({
 
       {/* Calendar Grid */}
       <div className={`
-        grid grid-cols-7 gap-2 md:gap-3
+        grid grid-cols-7 gap-[2px] md:gap-3 px-0
         ${viewMode === 'week' ? 'auto-rows-fr min-h-[400px]' : ''}
       `}>
         {days.map((day, index) => (
@@ -95,6 +95,10 @@ export default function CalendarGrid({
       {/* Legend */}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-4 md:gap-6 text-sm">
         <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-gradient-to-br from-[#E3F2FD] to-[#BBDEFB] border border-[#64B5F6]" />
+          <span className="text-gray-600">משמרות שלי</span>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-white border border-gray-200" />
           <span className="text-gray-600">משמרת רגילה</span>
         </div>
@@ -107,7 +111,7 @@ export default function CalendarGrid({
           <span className="text-gray-600">החלפה אושרה</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2] border border-[#FFB74D]" />
+          <div className="w-4 h-4 rounded bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4] border border-[#FDD835]" />
           <span className="text-gray-600">כיסוי חלקי - פער</span>
         </div>
       </div>

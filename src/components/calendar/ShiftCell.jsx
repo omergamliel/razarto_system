@@ -122,8 +122,8 @@ export default function ShiftCell({
       whileTap={{ scale: 0.98 }}
       onClick={handleClick}
       className={`
-        relative cursor-pointer rounded-xl transition-all duration-200
-        min-h-[70px] md:min-h-[110px] p-1.5 md:p-3
+        relative cursor-pointer rounded-lg md:rounded-xl transition-all duration-200
+        min-h-[85px] md:min-h-[110px] p-1 md:p-3
         ${statusStyles.bg}
         ${statusStyles.border ? `border-2 ${statusStyles.border}` : 'border border-gray-100'}
         ${!isCurrentMonth ? 'opacity-40' : ''}
@@ -148,29 +148,29 @@ export default function ShiftCell({
         <div className="mt-6 md:mt-10 space-y-0.5 md:space-y-1">
           {/* Original Requester Name for swap requests and partial coverage */}
           {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.role && (
-            <p className="font-normal md:font-semibold text-gray-800 truncate text-center text-xs md:text-base">
+            <p className="font-normal md:font-semibold text-gray-800 text-center text-[10px] leading-tight md:text-base break-words px-0.5">
               {getCleanRoleName(shift.role)}
             </p>
           )}
 
           {/* Approved Swap - Show covering role */}
           {shift.status === 'approved' && shift.role && (
-            <p className="font-normal md:font-semibold text-gray-800 truncate text-center text-xs md:text-base">
+            <p className="font-normal md:font-semibold text-gray-800 text-center text-[10px] leading-tight md:text-base break-words px-0.5">
               {getCleanRoleName(shift.role)}
             </p>
           )}
 
           {/* Regular shift - show role */}
           {shift.status === 'regular' && shift.role && (
-            <p className="font-normal md:font-semibold text-gray-800 truncate text-center text-xs md:text-base">
+            <p className="font-normal md:font-semibold text-gray-800 text-center text-[10px] leading-tight md:text-base break-words px-0.5">
               {getCleanRoleName(shift.role)}
             </p>
           )}
 
           {/* Partial Coverage Indicator */}
           {shift.status === 'partially_covered' && shift.covering_role && (
-            <div className="mt-1 bg-blue-50/90 rounded px-2 py-1 border border-blue-300">
-              <p className="text-[9px] md:text-[10px] text-blue-700 font-medium truncate text-center">
+            <div className="mt-0.5 bg-blue-50/90 rounded px-1 py-0.5 border border-blue-300">
+              <p className="text-[8px] md:text-[10px] text-blue-700 font-medium text-center leading-tight break-words">
                 כיסוי חלקי: {shift.covering_role.split(',')[0]}
                 {shift.covering_role.split(',').length > 1 && ` +${shift.covering_role.split(',').length - 1}`}
               </p>
@@ -179,9 +179,9 @@ export default function ShiftCell({
 
           {/* Status Badge */}
           {shift.status !== 'regular' && (
-            <div className="mt-1 md:mt-2 flex items-center gap-1 justify-center">
-              <StatusIcon className="w-3 h-3 text-gray-600" />
-              <span className="text-[9px] md:text-xs text-gray-600 font-normal">
+            <div className="mt-0.5 md:mt-2 flex items-center gap-0.5 justify-center">
+              <StatusIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-gray-600 flex-shrink-0" />
+              <span className="text-[8px] md:text-xs text-gray-600 font-normal leading-tight">
                 {shift.status === 'swap_requested' && (
                   shift.swap_type === 'full' 
                     ? 'דרוש כיסוי מלא' 
@@ -195,7 +195,7 @@ export default function ShiftCell({
 
           {/* Time Range Display */}
           {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time && (
-            <p className="text-[10px] md:text-xs text-gray-500 mt-1 text-center">
+            <p className="text-[8px] md:text-xs text-gray-500 mt-0.5 text-center leading-tight">
               {shift.swap_start_time} - {shift.swap_end_time}
             </p>
           )}
