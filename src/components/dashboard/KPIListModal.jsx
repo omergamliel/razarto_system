@@ -182,11 +182,11 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
                                       <Clock className="w-3 h-3" />
                                       <span>
-                                        {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
+                                        {coverage.start_time} {format(new Date(coverage.start_date), 'd/M')} - {coverage.end_time} {format(new Date(coverage.end_date), 'd/M')}
                                       </span>
                                     </div>
                                     <div className="text-[10px] text-gray-500 text-center">
-                                      אושר ב: {format(new Date(shift.updated_date), 'd/M/yy בשעה HH:mm')}
+                                      אושר ב: {format(new Date(shift.updated_date).toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }), 'd/M/yy בשעה HH:mm')}
                                     </div>
                                   </div>
                                 </div>
