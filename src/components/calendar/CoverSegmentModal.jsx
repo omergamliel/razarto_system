@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { format, addDays, parseISO, isValid } from 'date-fns'; // הוספנו parseISO
+import { format, addDays, parseISO, isValid } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, AlertCircle } from 'lucide-react'; // ניקיתי אייקונים לא בשימוש
+import { X, Clock, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getDepartmentList, getRolesForDepartment } from './departmentData';
 
 export default function CoverSegmentModal({ 
   isOpen, 
@@ -22,82 +20,77 @@ export default function CoverSegmentModal({
   const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('09:00');
+  const [coverageType, setCoverageType] = useState('full'); // 'full' or 'partial'
   
-  const [department, setDepartment] = useState('');
-  const [role, setRole] = useState('');
   const [error, setError] = useState('');
 
-  // --- THE FIX: Aggressive Date Calculation ---
+  // --- Date Initialization Logic (The fixed one) ---
   useEffect(() => {
     if (isOpen && date) {
       try {
-        // 1. נסה לפרסר את התאריך בכל דרך אפשרית
         let dateObj = new Date(date);
-        if (!isValid(dateObj)) {
-            dateObj = parseISO(date); // ניסיון נוסף אם זה סטרינג ISO
-        }
+        if (!isValid(dateObj)) dateObj = parseISO(date);
 
         if (isValid(dateObj)) {
-            // תאריך התחלה = התאריך שנבחר
+            // Start: Selected Date
             const startStr = format(dateObj, 'yyyy-MM-dd');
             setStartDate(startStr);
 
-            // תאריך סיום = תאריך שנבחר + יום אחד בדיוק
+            // End: Selected Date + 1 Day
             const nextDay = addDays(dateObj, 1);
             const endStr = format(nextDay, 'yyyy-MM-dd');
             setEndDate(endStr);
-            
-            console.log("Setting Dates:", { start: startStr, end: endStr }); // לוג לבדיקה בקונסול
         } else {
-            // Fallback: אם התאריך לא תקין, קח את היום
+            // Fallback
             const today = new Date();
             setStartDate(format(today, 'yyyy-MM-dd'));
             setEndDate(format(addDays(today, 1), 'yyyy-MM-dd'));
         }
 
-        // איפוס שעות
+        // Default Times
         setStartTime('09:00');
         setEndTime('09:00');
+        setCoverageType('full'); // Reset to full on open
         setError('');
         
       } catch (e) {
-        console.error("Critical Date Error:", e);
+        console.error("Date init error:", e);
       }
     }
   }, [isOpen, date]);
+
+  // Handle Full/Partial Toggle
+  const handleTypeChange = (type) => {
+    setCoverageType(type);
+    if (type === 'full') {
+        // Reset to full shift defaults if "Yes" is clicked
+        setStartTime('09:00');
+        setEndTime('09:00');
+        
+        let dateObj = new Date(date);
+        if (isValid(dateObj)) {
+            setStartDate(format(dateObj, 'yyyy-MM-dd'));
+            setEndDate(format(addDays(dateObj, 1), 'yyyy-MM-dd'));
+        }
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
 
-    // בדיקה: האם נבחר תפקיד?
-    if (!department || !role) {
-      setError('חובה לבחור מחלקה ותפקיד לפני השמירה');
-      return;
-    }
-
-    // שליחת הנתונים
-    console.log("Submitting Coverage:", { startDate, startTime, endDate, endTime, role });
-    
+    // Submit only times (User info is handled by backend/parent)
     onSubmit({
       startDate,
       startTime,
       endDate,
       endTime,
-      department,
-      role
+      role: '', // Parent will fill from currentUser
+      department: '' // Parent will fill from currentUser
     });
   };
 
-  const handleDepartmentChange = (value) => {
-    setDepartment(value);
-    setRole('');
-  };
-
   if (!isOpen || !shift) return null;
-
-  const departments = getDepartmentList();
-  const roles = department ? getRolesForDepartment(department) : [];
 
   return (
     <AnimatePresence>
@@ -114,92 +107,141 @@ export default function CoverSegmentModal({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] p-6 text-white">
+          <div className="bg-[#42A5F5] p-6 text-white text-center relative">
             <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20">
               <X className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/20 rounded-xl"><Clock className="w-6 h-6" /></div>
-              <div>
-                <h2 className="text-xl font-bold">כיסוי מקטע משמרת</h2>
-                <p className="text-white/80 text-sm">הזנת פרטי מחליף</p>
-              </div>
+            <div className="flex flex-col items-center gap-1">
+                <div className="bg-white/20 p-2 rounded-xl mb-1">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-xl font-bold">כיסוי משמרת</h2>
+                <p className="text-white/90 text-sm">
+                  {date && format(new Date(date), 'EEEE, d בMMMM', { locale: he })}
+                </p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
-            {/* Error Message Area */}
+            
+            {/* Requester Info Box (Pink) */}
+            <div className="bg-red-50 rounded-xl p-4 border border-red-100 text-center">
+                <p className="text-xs text-gray-500 mb-1">מבקש</p>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{shift.assigned_person}</h3>
+                <div className="flex items-center justify-center gap-2 text-xs text-gray-600 bg-red-100/50 py-1.5 px-3 rounded-full mx-auto w-fit">
+                    <Clock className="w-3 h-3" />
+                    <span>משמרת מלאה (24 שעות)</span>
+                </div>
+            </div>
+
+            {/* Coverage Type Toggle */}
+            <div className="space-y-2">
+                <Label className="text-center block text-gray-700 font-medium">לכסות משמרת מלאה?</Label>
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        type="button"
+                        onClick={() => handleTypeChange('partial')}
+                        className={`p-4 rounded-xl border-2 transition-all text-center ${
+                            coverageType === 'partial' 
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' 
+                            : 'border-gray-200 text-gray-600 hover:border-blue-200'
+                        }`}
+                    >
+                        <span className="block text-lg">לא</span>
+                        <span className="text-xs opacity-70">כיסוי חלקי</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleTypeChange('full')}
+                        className={`p-4 rounded-xl border-2 transition-all text-center ${
+                            coverageType === 'full' 
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' 
+                            : 'border-gray-200 text-gray-600 hover:border-blue-200'
+                        }`}
+                    >
+                        <span className="block text-lg">כן</span>
+                        <span className="text-xs opacity-70">24 שעות</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Info Alert */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-700 leading-tight">
+                    הכיסוי חייב להיות בתוך חלון 24 השעות של המשמרת: <br/>
+                    <span dir="ltr">{endDate} 09:00 - {startDate} 09:00</span>
+                </p>
+            </div>
+
+            {/* Vertical Time Inputs */}
+            <div className="space-y-4">
+                {/* Start */}
+                <div className="space-y-2">
+                    <Label className="text-gray-700 font-bold text-sm">החל מ:</Label>
+                    <div className="space-y-2">
+                        <div className="relative">
+                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">החל מתאריך</Label>
+                            <Input 
+                                type="date" 
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">החל משעה</Label>
+                            <Input 
+                                type="time" 
+                                value={startTime} 
+                                onChange={(e) => setStartTime(e.target.value)}
+                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors text-lg"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* End */}
+                <div className="space-y-2">
+                    <Label className="text-gray-700 font-bold text-sm">ועד ל:</Label>
+                    <div className="space-y-2">
+                        <div className="relative">
+                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">ועד לתאריך</Label>
+                            <Input 
+                                type="date" 
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">עד לשעה</Label>
+                            <Input 
+                                type="time" 
+                                value={endTime} 
+                                onChange={(e) => setEndTime(e.target.value)}
+                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors text-lg"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-700 font-medium">
-                <AlertCircle className="w-5 h-5" />
+              <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">
                 {error}
               </div>
             )}
 
-            {/* Read Only: Shift Info */}
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-              <p className="text-xs text-gray-500">מבקש ההחלפה</p>
-              <p className="font-bold text-gray-800 text-lg">{shift.assigned_person}</p>
-              <p className="text-sm text-gray-500">
-                 {shift.role} | {shift.startTime || '09:00'} - {shift.endTime || '09:00'}
-              </p>
-            </div>
-
-            {/* Department & Role Selectors */}
-            <div className="space-y-3">
-              <Label className="text-gray-700 font-medium">מי המחליף?</Label>
-              <div className="grid grid-cols-1 gap-3">
-                <Select value={department} onValueChange={handleDepartmentChange}>
-                  <SelectTrigger className="h-12 rounded-xl bg-white border-gray-200">
-                    <SelectValue placeholder="בחר מחלקה" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-
-                {department && (
-                  <Select value={role} onValueChange={setRole}>
-                    <SelectTrigger className="h-12 rounded-xl bg-white border-gray-200">
-                      <SelectValue placeholder="בחר תפקיד (חובה)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </div>
-
-            {/* Date & Time Inputs */}
-            <div className="bg-blue-50/50 p-4 rounded-xl space-y-4 border border-blue-100">
-              <Label className="text-blue-900 font-medium">זמני הכיסוי שלך</Label>
-              
-              <div className="grid grid-cols-2 gap-4">
-                {/* Start */}
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">התחלה</Label>
-                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-white" />
-                  <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="bg-white" />
-                </div>
-
-                {/* End */}
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">סיום (יום למחרת)</Label>
-                  <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-white" />
-                  <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="bg-white" />
-                </div>
-              </div>
-            </div>
-
-            {/* Submit Button - ALWAYS ENABLED (Unless loading) */}
+            {/* Submit Button */}
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full h-14 text-lg bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/20"
+              className="w-full h-14 text-lg bg-[#42A5F5] hover:bg-[#2196F3] text-white rounded-xl shadow-lg shadow-blue-500/20"
             >
               {isSubmitting ? 'מעבד נתונים...' : 'אשר כיסוי'}
             </Button>
