@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format, addDays, parseISO, isValid } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
+import { X, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,7 @@ export default function CoverSegmentModal({
   
   const [error, setError] = useState('');
 
-  // --- Date Initialization Logic (The fixed one) ---
+  // --- Date Initialization Logic ---
   useEffect(() => {
     if (isOpen && date) {
       try {
@@ -63,7 +63,7 @@ export default function CoverSegmentModal({
   const handleTypeChange = (type) => {
     setCoverageType(type);
     if (type === 'full') {
-        // Reset to full shift defaults if "Yes" is clicked
+        // Reset to full shift defaults immediately if "Yes" is clicked
         setStartTime('09:00');
         setEndTime('09:00');
         
@@ -79,7 +79,8 @@ export default function CoverSegmentModal({
     e.preventDefault();
     setError('');
 
-    // Submit only times (User info is handled by backend/parent)
+    // Submit the data
+    // Even if inputs are hidden, the state contains the correct 'full' values due to handleTypeChange
     onSubmit({
       startDate,
       startTime,
@@ -127,11 +128,12 @@ export default function CoverSegmentModal({
 
           <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
             
-            {/* Requester Info Box (Pink) */}
-            <div className="bg-red-50 rounded-xl p-4 border border-red-100 text-center">
+            {/* Requester Info Box (Darker Pastel Red) */}
+            <div className="bg-red-100 rounded-xl p-4 border border-red-200 text-center shadow-sm">
                 <p className="text-xs text-gray-500 mb-1">מבקש</p>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">{shift.assigned_person}</h3>
-                <div className="flex items-center justify-center gap-2 text-xs text-gray-600 bg-red-100/50 py-1.5 px-3 rounded-full mx-auto w-fit">
+                {/* Changed from assigned_person to role as requested */}
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{shift.role}</h3>
+                <div className="flex items-center justify-center gap-2 text-xs text-gray-600 bg-white/60 py-1.5 px-3 rounded-full mx-auto w-fit border border-red-100">
                     <Clock className="w-3 h-3" />
                     <span>משמרת מלאה (24 שעות)</span>
                 </div>
@@ -146,7 +148,7 @@ export default function CoverSegmentModal({
                         onClick={() => handleTypeChange('partial')}
                         className={`p-4 rounded-xl border-2 transition-all text-center ${
                             coverageType === 'partial' 
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' 
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold shadow-sm' 
                             : 'border-gray-200 text-gray-600 hover:border-blue-200'
                         }`}
                     >
@@ -158,7 +160,7 @@ export default function CoverSegmentModal({
                         onClick={() => handleTypeChange('full')}
                         className={`p-4 rounded-xl border-2 transition-all text-center ${
                             coverageType === 'full' 
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' 
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold shadow-sm' 
                             : 'border-gray-200 text-gray-600 hover:border-blue-200'
                         }`}
                     >
@@ -168,67 +170,79 @@ export default function CoverSegmentModal({
                 </div>
             </div>
 
-            {/* Info Alert */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-blue-700 leading-tight">
-                    הכיסוי חייב להיות בתוך חלון 24 השעות של המשמרת: <br/>
-                    <span dir="ltr">{endDate} 09:00 - {startDate} 09:00</span>
-                </p>
-            </div>
+            {/* CONDITIONAL RENDERING: Only show inputs if Partial is selected */}
+            <AnimatePresence>
+                {coverageType === 'partial' && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4 overflow-hidden"
+                    >
+                        {/* Info Alert */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-2">
+                            <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-blue-700 leading-tight">
+                                הכיסוי חייב להיות בתוך חלון 24 השעות של המשמרת: <br/>
+                                <span dir="ltr">{endDate} 09:00 - {startDate} 09:00</span>
+                            </p>
+                        </div>
 
-            {/* Vertical Time Inputs */}
-            <div className="space-y-4">
-                {/* Start */}
-                <div className="space-y-2">
-                    <Label className="text-gray-700 font-bold text-sm">החל מ:</Label>
-                    <div className="space-y-2">
-                        <div className="relative">
-                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">החל מתאריך</Label>
-                            <Input 
-                                type="date" 
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                            />
-                        </div>
-                        <div className="relative">
-                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">החל משעה</Label>
-                            <Input 
-                                type="time" 
-                                value={startTime} 
-                                onChange={(e) => setStartTime(e.target.value)}
-                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors text-lg"
-                            />
-                        </div>
-                    </div>
-                </div>
+                        {/* Vertical Time Inputs */}
+                        <div className="space-y-4">
+                            {/* Start */}
+                            <div className="space-y-2">
+                                <Label className="text-gray-700 font-bold text-sm">החל מ:</Label>
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">החל מתאריך</Label>
+                                        <Input 
+                                            type="date" 
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">החל משעה</Label>
+                                        <Input 
+                                            type="time" 
+                                            value={startTime} 
+                                            onChange={(e) => setStartTime(e.target.value)}
+                                            className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors text-lg"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
-                {/* End */}
-                <div className="space-y-2">
-                    <Label className="text-gray-700 font-bold text-sm">ועד ל:</Label>
-                    <div className="space-y-2">
-                        <div className="relative">
-                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">ועד לתאריך</Label>
-                            <Input 
-                                type="date" 
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                            />
+                            {/* End */}
+                            <div className="space-y-2">
+                                <Label className="text-gray-700 font-bold text-sm">ועד ל:</Label>
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">ועד לתאריך</Label>
+                                        <Input 
+                                            type="date" 
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                            className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">עד לשעה</Label>
+                                        <Input 
+                                            type="time" 
+                                            value={endTime} 
+                                            onChange={(e) => setEndTime(e.target.value)}
+                                            className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors text-lg"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="relative">
-                            <Label className="text-xs text-gray-400 absolute -top-2 right-2 bg-white px-1">עד לשעה</Label>
-                            <Input 
-                                type="time" 
-                                value={endTime} 
-                                onChange={(e) => setEndTime(e.target.value)}
-                                className="h-12 rounded-xl text-center bg-gray-50 border-gray-200 focus:bg-white transition-colors text-lg"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Error Message */}
             {error && (
