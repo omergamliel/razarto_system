@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isValid } from 'date-fns'; // Added isValid check
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Users, Briefcase, AlertCircle } from 'lucide-react';
@@ -17,11 +17,9 @@ export default function CoverSegmentModal({
   onSubmit,
   isSubmitting
 }) {
-  // State for Dates
+  // --- State ---
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  
-  // State for Times - Default to 09:00 - 09:00 (24h cycle)
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('09:00');
   
@@ -29,49 +27,48 @@ export default function CoverSegmentModal({
   const [role, setRole] = useState('');
   const [error, setError] = useState('');
 
-  // --- THE FIX: Robust Date Initialization ---
+  // --- FIX 1: Aggressive Date Initialization ---
   useEffect(() => {
     if (isOpen && date) {
       try {
-        // 1. Force conversion to a Date object (handles strings properly)
+        // 1. Force conversion to Date object (handles string or object)
         const dateObj = new Date(date);
-        
-        // 2. Set Start Date (Current day)
-        setStartDate(format(dateObj, 'yyyy-MM-dd'));
-        
-        // 3. Set End Date (Current day + 1)
-        // Using dateObj ensures addDays works correctly
-        const nextDay = addDays(dateObj, 1);
-        setEndDate(format(nextDay, 'yyyy-MM-dd'));
 
-        // 4. Reset times to standard shift times
+        // 2. Validate if date is valid
+        if (isValid(dateObj)) {
+          // Set Start Date (Current day)
+          setStartDate(format(dateObj, 'yyyy-MM-dd'));
+          
+          // Set End Date (Date + 1 Day)
+          const nextDay = addDays(dateObj, 1);
+          setEndDate(format(nextDay, 'yyyy-MM-dd'));
+        } else {
+          // Fallback if date is invalid
+          console.error("Invalid date received:", date);
+        }
+
+        // 3. Reset times to standard shift times
         setStartTime('09:00');
         setEndTime('09:00');
+        setError(''); // Clear previous errors
         
       } catch (e) {
-        console.error("Error calculating dates:", e);
-        // Fallback to basic string if calculation fails
-        setStartDate(format(new Date(), 'yyyy-MM-dd'));
-        setEndDate(format(new Date(), 'yyyy-MM-dd'));
+        console.error("Error setting dates:", e);
       }
     }
   }, [isOpen, date]);
-
-  const validateTime = (start, end) => {
-    // Basic validation logic placeholder
-    return null;
-  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
 
+    // Validation
     if (!department || !role) {
-      setError('יש לבחור מחלקה ותפקיד');
+      setError('נא לבחור מחלקה ותפקיד (חובה)');
       return;
     }
 
-    // Include dates in submission
+    // Include all data
     onSubmit({
       startDate,
       startTime,
@@ -91,6 +88,15 @@ export default function CoverSegmentModal({
 
   const departments = getDepartmentList();
   const roles = department ? getRolesForDepartment(department) : [];
+
+  // Helper to safely format header date
+  const getHeaderDate = () => {
+    try {
+      return date ? format(new Date(date), 'EEEE, d בMMMM', { locale: he }) : '';
+    } catch (e) {
+      return '';
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -125,7 +131,7 @@ export default function CoverSegmentModal({
               <div>
                 <h2 className="text-xl font-bold">כיסוי מקטע משמרת</h2>
                 <p className="text-white/80 text-sm">
-                  {date && format(new Date(date), 'EEEE, d בMMMM', { locale: he })}
+                  {getHeaderDate()}
                 </p>
               </div>
             </div>
@@ -237,13 +243,13 @@ export default function CoverSegmentModal({
               </div>
             </div>
 
-            {/* Submit */}
+            {/* Submit Button - FIX 2: Unconditionally Enabled (except loading) */}
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] text-white py-6 rounded-xl text-lg font-medium"
+              disabled={isSubmitting} 
+              className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
             >
-              {isSubmitting ? 'שומר...' : 'שמור כיסוי'}
+              {isSubmitting ? 'שומר...' : 'אשר כיסוי'}
             </Button>
           </form>
         </motion.div>
