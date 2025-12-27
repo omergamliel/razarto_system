@@ -4,11 +4,28 @@ import { AlertCircle, Clock, CheckCircle, Calendar } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 
 export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, onKPIClick }) {
-  // Calculate KPIs
-  const swapRequests = shifts.filter(s => s.status === 'swap_requested').length;
-  const partialGaps = shifts.filter(s => s.status === 'partially_covered').length;
+  
+  // --- תיקון הלוגיקה כאן ---
+  
+  // 1. חישוב בקשות למשמרת מלאה (אדום)
+  // סופר רק אם הסטטוס הוא מפורש "מלא" או אם זה בקשה ישנה מסוג "מלא"
+  const swapRequests = shifts.filter(s => 
+    s.status === 'REQUIRES_FULL_COVERAGE' || 
+    (s.status === 'swap_requested' && (s.swapType === 'full' || s.swap_type === 'full'))
+  ).length;
+
+  // 2. חישוב בקשות להחלפה חלקית (צהוב)
+  // סופר סטטוסים של "דרוש כיסוי חלקי", "מכוסה חלקית", או בקשה ישנה מסוג "חלקי"
+  const partialGaps = shifts.filter(s => 
+    s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
+    s.status === 'partially_covered' || 
+    (s.status === 'swap_requested' && (s.swapType === 'partial' || s.swap_type === 'partial'))
+  ).length;
+
+  // 3. החלפות שאושרו
   const approved = shifts.filter(s => s.status === 'approved').length;
-  // My shifts count - all shifts with my role, regardless of status or assignment
+
+  // 4. המשמרות שלי
   const myShifts = shifts.filter(s => {
     // Compare dates without time
     const today = new Date();
@@ -19,7 +36,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, o
     
     if (!isFutureShift) return false;
     
-    // Check if shift role contains user role (regardless of who is currently assigned)
+    // Check if shift role contains user role
     if (currentUserRole && s.role && typeof s.role === 'string' && 
         s.role.includes(currentUserRole)) {
       return true;
