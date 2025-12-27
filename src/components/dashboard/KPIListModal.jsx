@@ -188,7 +188,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     <div className="text-[10px] text-gray-500 text-center">
                                       אושר ב: {(() => {
                                         const date = new Date(shift.updated_date);
-                                        const israelTime = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+                                        const israelTime = new Date(date.getTime() + (2 * 60 * 60 * 1000));
                                         return format(israelTime, 'd/M/yy בשעה HH:mm');
                                       })()}
                                     </div>
