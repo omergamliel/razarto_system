@@ -170,14 +170,12 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                       <div className="text-sm font-bold text-gray-800">
                                         {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
                                       </div>
-                                      <div className="text-xs text-gray-500 mt-1">{shift.original_assigned_person}</div>
                                     </div>
                                     <ArrowRight className="w-4 h-4 text-green-600 flex-shrink-0" />
                                     <div className="text-center flex-1">
                                       <div className="text-sm font-bold text-green-700">
                                         {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
                                       </div>
-                                      <div className="text-xs text-gray-500 mt-1">{coverage.covering_person}</div>
                                     </div>
                                   </div>
                                   <div className="mt-2 pt-2 border-t border-green-200 space-y-1">

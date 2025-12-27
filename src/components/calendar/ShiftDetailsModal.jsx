@@ -167,28 +167,28 @@ export default function ShiftDetailsModal({
                           return aTime - bTime;
                         })
                         .map((coverage) => (
-                          <div key={coverage.id} className={`bg-gradient-to-br rounded-xl p-4 border ${
-                            shift.status === 'approved'
-                              ? 'from-green-50 to-green-100 border-green-300'
-                              : 'from-blue-50 to-blue-100 border-blue-300'
-                          }`}>
-                            <p className="font-bold text-gray-800 text-lg">{coverage.covering_role}</p>
-                            <div className="mt-2 pt-2 border-t border-gray-200">
-                              <div className="text-sm text-gray-700 space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-3 h-3" />
-                                  <span className="font-medium">מתאריך:</span>
-                                  <span>{format(new Date(coverage.start_date), 'd/M')} בשעה {coverage.start_time}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-3 h-3" />
-                                  <span className="font-medium">עד תאריך:</span>
-                                  <span>{format(new Date(coverage.end_date), 'd/M')} בשעה {coverage.end_time}</span>
+                            <div key={coverage.id} className={`bg-gradient-to-br rounded-xl p-4 border ${
+                              shift.status === 'approved'
+                                ? 'from-green-50 to-green-100 border-green-300'
+                                : 'from-blue-50 to-blue-100 border-blue-300'
+                            }`}>
+                              <p className="font-bold text-gray-800 text-lg">{coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim()}</p>
+                              <div className="mt-2 pt-2 border-t border-gray-200">
+                                <div className="text-sm text-gray-700 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-3 h-3" />
+                                    <span className="font-medium">מתאריך:</span>
+                                    <span>{format(new Date(coverage.start_date), 'd/M')} בשעה {coverage.start_time}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-3 h-3" />
+                                    <span className="font-medium">עד תאריך:</span>
+                                    <span>{format(new Date(coverage.end_date), 'd/M')} בשעה {coverage.end_time}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
                     </div>
 
                     {shift.status === 'partially_covered' && shift.swap_start_time && shift.swap_end_time && (
