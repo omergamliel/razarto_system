@@ -24,46 +24,74 @@ export default function CoverSegmentModal({
   
   const [error, setError] = useState('');
 
-  // --- Date Initialization Logic ---
+  // --- Date & Logic Initialization (The Brain) ---
   useEffect(() => {
-    if (isOpen && date) {
+    if (isOpen && date && shift) {
       try {
-        let dateObj = new Date(date);
-        if (!isValid(dateObj)) dateObj = parseISO(date);
+        let baseDate = new Date(date);
+        if (!isValid(baseDate)) baseDate = parseISO(date);
 
-        if (isValid(dateObj)) {
-            // Start: Selected Date
-            const startStr = format(dateObj, 'yyyy-MM-dd');
-            setStartDate(startStr);
+        // 1. הגדרות ברירת מחדל (משמרת מלאה רגילה)
+        let newStartDate = format(baseDate, 'yyyy-MM-dd');
+        let newStartTime = '09:00';
+        let newEndDate = format(addDays(baseDate, 1), 'yyyy-MM-dd');
+        let newEndTime = '09:00';
+        let type = 'full';
 
-            // End: Selected Date + 1 Day
-            const nextDay = addDays(dateObj, 1);
-            const endStr = format(nextDay, 'yyyy-MM-dd');
-            setEndDate(endStr);
-        } else {
-            // Fallback
-            const today = new Date();
-            setStartDate(format(today, 'yyyy-MM-dd'));
-            setEndDate(format(addDays(today, 1), 'yyyy-MM-dd'));
+        // 2. בדיקה: האם זו משמרת שכבר כוסתה חלקית? (סטטוס צהוב)
+        const isPartial = shift.status === 'partially_covered' || shift.status === 'REQUIRES_PARTIAL_COVERAGE';
+
+        // אם זו משמרת חלקית ויש לנו מידע על השעות שנותרו
+        if (isPartial && shift.swap_start_time && shift.swap_end_time) {
+            type = 'partial'; // מעביר אוטומטית למצב "כיסוי חלקי"
+            
+            // לוקחים את השעות מהיתרה שנשמרה במשמרת
+            newStartTime = shift.swap_start_time;
+            newEndTime = shift.swap_end_time;
+
+            const startH = parseInt(newStartTime.split(':')[0]);
+            const endH = parseInt(newEndTime.split(':')[0]);
+
+            // --- לוגיקת תאריכים חכמה ---
+            
+            // חישוב תאריך התחלה:
+            // הנחת עבודה: המשמרת המקורית התחילה ב-09:00.
+            // אם שעת ההתחלה של היתרה קטנה מ-9 (למשל 02:00), זה בהכרח יום למחרת.
+            let startBaseObj = baseDate;
+            if (startH < 9) {
+                startBaseObj = addDays(baseDate, 1);
+            }
+            newStartDate = format(startBaseObj, 'yyyy-MM-dd');
+
+            // חישוב תאריך סיום:
+            // אם שעת הסיום קטנה או שווה לשעת ההתחלה, זה אומר שזה גולש ליום הבא ביחס לתאריך ההתחלה החדש
+            let endBaseObj = startBaseObj;
+            if (endH <= startH) {
+                endBaseObj = addDays(startBaseObj, 1);
+            }
+            newEndDate = format(endBaseObj, 'yyyy-MM-dd');
         }
 
-        // Default Times
-        setStartTime('09:00');
-        setEndTime('09:00');
-        setCoverageType('full'); // Reset to full on open
+        // 3. עדכון ה-State
+        setStartDate(newStartDate);
+        setStartTime(newStartTime);
+        setEndDate(newEndDate);
+        setEndTime(newEndTime);
+        setCoverageType(type);
         setError('');
         
       } catch (e) {
         console.error("Date init error:", e);
       }
     }
-  }, [isOpen, date]);
+  }, [isOpen, date, shift]);
 
   // Handle Full/Partial Toggle
   const handleTypeChange = (type) => {
     setCoverageType(type);
+    
+    // אם המשתמש לוחץ ידנית על "כן" (מלא), נאפס לברירת המחדל של 24 שעות
     if (type === 'full') {
-        // Reset to full shift defaults immediately if "Yes" is clicked
         setStartTime('09:00');
         setEndTime('09:00');
         
@@ -80,7 +108,6 @@ export default function CoverSegmentModal({
     setError('');
 
     // Submit the data
-    // Even if inputs are hidden, the state contains the correct 'full' values due to handleTypeChange
     onSubmit({
       startDate,
       startTime,
@@ -128,10 +155,9 @@ export default function CoverSegmentModal({
 
           <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
             
-            {/* Requester Info Box (Darker Pastel Red) */}
+            {/* Requester Info Box */}
             <div className="bg-red-100 rounded-xl p-4 border border-red-200 text-center shadow-sm">
                 <p className="text-xs text-gray-500 mb-1">מבקש</p>
-                {/* Changed from assigned_person to role as requested */}
                 <h3 className="text-xl font-bold text-gray-800 mb-2">{shift.role}</h3>
                 <div className="flex items-center justify-center gap-2 text-xs text-gray-600 bg-white/60 py-1.5 px-3 rounded-full mx-auto w-fit border border-red-100">
                     <Clock className="w-3 h-3" />
@@ -179,12 +205,11 @@ export default function CoverSegmentModal({
                         exit={{ opacity: 0, height: 0 }}
                         className="space-y-4 overflow-hidden"
                     >
-                        {/* Info Alert */}
+                        {/* Info Alert - מראה שהמערכת טענה את היתרה */}
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-2">
                             <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                             <p className="text-xs text-blue-700 leading-tight">
-                                הכיסוי חייב להיות בתוך חלון 24 השעות של המשמרת: <br/>
-                                <span dir="ltr">{endDate} 09:00 - {startDate} 09:00</span>
+                                המערכת חישבה את היתרה שנותרה לכיסוי. ניתן לשנות את השעות במידת הצורך.
                             </p>
                         </div>
 
