@@ -32,15 +32,24 @@ export default function SwapRequestModal({
   }, [isOpen, date]);
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // לוגיקה חדשה: קביעת הסטטוס לפי סוג ההחלפה
+    // אם נבחרה משמרת מלאה -> סטטוס מלא (אדום)
+    // אחרת -> סטטוס חלקי (צהוב)
+    const status = swapType === 'full' 
+      ? 'REQUIRES_FULL_COVERAGE' 
+      : 'REQUIRES_PARTIAL_COVERAGE';
+
     onSubmit({
       swapType,
+      status, // <--- הוספנו את השדה הזה
       startDate: swapType === 'partial' ? startDate : null,
       startTime: swapType === 'partial' ? startTime : null,
       endDate: swapType === 'partial' ? endDate : null,
       endTime: swapType === 'partial' ? endTime : null
     });
   };
-
+  
   if (!isOpen) return null;
 
   return (
