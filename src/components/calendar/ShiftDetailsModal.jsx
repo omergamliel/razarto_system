@@ -54,7 +54,6 @@ export default function ShiftDetailsModal({
       const endHour = parseInt(endStr.split(':')[0]);
       
       const shiftDate = new Date(baseDate);
-      // אם שעת הסיום קטנה או שווה לשעת ההתחלה - זה אומר שעברנו ליום הבא
       const isNextDay = endHour <= startHour; 
       
       const endDate = isNextDay ? addDays(shiftDate, 1) : shiftDate;
@@ -75,7 +74,6 @@ export default function ShiftDetailsModal({
           {/* Header */}
           <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-6 text-white flex-shrink-0 relative">
             <div className="absolute top-4 left-4 flex gap-2">
-                {/* כפתור מחיקה למנהל */}
                 {isAdmin && (
                     <button onClick={() => setShowDeleteConfirm(true)} className="p-2 rounded-full hover:bg-white/20 transition-colors">
                         <Trash2 className="w-5 h-5 text-red-400" />
@@ -153,9 +151,12 @@ export default function ShiftDetailsModal({
                     <h3 className="text-sm font-bold text-gray-500 px-1">מי כבר מכסה?</h3>
                     {shiftCoverages.map((cov) => (
                         <div key={cov.id} className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center text-sm">
-                            <span className="font-medium text-gray-700">{cov.covering_person}</span>
-                            <span className="text-gray-500 dir-ltr">
-                                {cov.start_time} - {cov.end_time}
+                            {/* שינוי 1: הצגת תפקיד (covering_role) במקום שם */}
+                            <span className="font-medium text-gray-700">{cov.covering_role}</span>
+                            
+                            {/* שינוי 2: הצגת טווח תאריכים מלא */}
+                            <span className="text-gray-500 dir-ltr text-xs">
+                                {format(new Date(cov.start_date), 'd/M')} {cov.start_time} - {format(new Date(cov.end_date), 'd/M')} {cov.end_time}
                             </span>
                         </div>
                     ))}
@@ -180,9 +181,8 @@ export default function ShiftDetailsModal({
                 {/* כפתור ביטול בקשה (לבעל המשמרת) */}
                 {needsCoverage && isOwnShift && (
                     <Button 
-                        variant="destructive" // זה נותן צבע אדום
+                        variant="destructive"
                         className="w-full h-14 text-lg rounded-xl shadow-lg bg-red-500 hover:bg-red-600"
-                        // כאן צריך להוסיף את פונקציית הביטול אם תרצי, כרגע זה רק UI
                     >
                         בטל בקשה
                     </Button>
