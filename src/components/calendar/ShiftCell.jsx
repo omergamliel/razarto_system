@@ -32,7 +32,11 @@ export default function ShiftCell({
     }
 
     // Swap requested or partial - everyone can click
-    if (shift.status === 'swap_requested' || shift.status === 'partially_covered') {
+    // UPDATED: Added new statuses here
+    if (shift.status === 'swap_requested' || 
+        shift.status === 'partially_covered' || 
+        shift.status === 'REQUIRES_FULL_COVERAGE' || 
+        shift.status === 'REQUIRES_PARTIAL_COVERAGE') {
       onClick(date, shift);
       return;
     }
@@ -46,14 +50,16 @@ export default function ShiftCell({
     // Default - allow click
     onClick(date, shift);
   };
+
   const isCurrentMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
   
   const getStatusStyles = () => {
     if (!shift) return {};
     
-    // Priority 1: Red for swap requests (even if it's my shift)
-    if (shift.status === 'swap_requested') {
+    // Priority 1: Red for FULL coverage requests
+    // UPDATED: Check specifically for REQUIRES_FULL_COVERAGE
+    if (shift.status === 'REQUIRES_FULL_COVERAGE' || shift.status === 'swap_requested') {
       return {
         bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2]',
         border: 'border-[#E57373]',
@@ -62,8 +68,9 @@ export default function ShiftCell({
       };
     }
     
-    // Priority 2: Yellow for partial coverage (still has remaining time)
-    if (shift.status === 'partially_covered') {
+    // Priority 2: Yellow for PARTIAL coverage requests
+    // UPDATED: Check specifically for REQUIRES_PARTIAL_COVERAGE
+    if (shift.status === 'REQUIRES_PARTIAL_COVERAGE' || shift.status === 'partially_covered') {
       return {
         bg: 'bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4]',
         border: 'border-[#FDD835]',
@@ -107,7 +114,6 @@ export default function ShiftCell({
   // Extract clean role name (remove prefix like רז"ר, רע"ן)
   const getCleanRoleName = (role) => {
     if (!role || typeof role !== 'string') return '';
-    // Remove common prefixes
     return role
       .replace(/^רז"ר\s+/, '')
       .replace(/^רע"ן\s+/, '')
@@ -115,6 +121,9 @@ export default function ShiftCell({
       .replace(/^רע״ן\s+/, '')
       .trim();
   };
+
+  // Helper to check if any swap logic applies
+  const isSwapRelated = ['swap_requested', 'partially_covered', 'REQUIRES_FULL_COVERAGE', 'REQUIRES_PARTIAL_COVERAGE'].includes(shift?.status);
 
   return (
     <motion.div
@@ -141,13 +150,11 @@ export default function ShiftCell({
         {format(date, 'd')}
       </div>
 
-
-
       {/* Shift Content */}
       {shift && (
         <div className="mt-6 md:mt-10 space-y-0.5 md:space-y-1">
           {/* Original Requester Name for swap requests and partial coverage */}
-          {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.role && (
+          {isSwapRelated && shift.role && (
             <p className="font-normal md:font-semibold text-gray-800 text-center text-[10px] leading-tight md:text-base break-words px-0.5">
               {getCleanRoleName(shift.role)}
             </p>
@@ -167,8 +174,8 @@ export default function ShiftCell({
             </p>
           )}
 
-          {/* Partial Coverage Indicator */}
-          {shift.status === 'partially_covered' && shift.covering_role && (
+          {/* Partial Coverage Indicator (Visual for who is covering) */}
+          {(shift.status === 'REQUIRES_PARTIAL_COVERAGE' || shift.status === 'partially_covered') && shift.covering_role && (
             <div className="mt-0.5 bg-blue-50/90 rounded px-1 py-0.5 border border-blue-300">
               <p className="text-[8px] md:text-[10px] text-blue-700 font-medium text-center leading-tight break-words">
                 כיסוי חלקי: {shift.covering_role.split(',')[0]}
@@ -182,19 +189,20 @@ export default function ShiftCell({
             <div className="mt-0.5 md:mt-2 flex items-center gap-0.5 justify-center">
               <StatusIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-gray-600 flex-shrink-0" />
               <span className="text-[8px] md:text-xs text-gray-600 font-normal leading-tight">
-                {shift.status === 'swap_requested' && (
-                  shift.swap_type === 'full' 
-                    ? 'דרוש כיסוי מלא' 
-                    : 'דרוש כיסוי חלקי'
-                )}
+                
+                {/* Logic for FULL Coverage Text */}
+                {(shift.status === 'REQUIRES_FULL_COVERAGE' || shift.status === 'swap_requested') && 'דרוש כיסוי מלא'}
+                
+                {/* Logic for PARTIAL Coverage Text */}
+                {(shift.status === 'REQUIRES_PARTIAL_COVERAGE' || shift.status === 'partially_covered') && 'דרוש כיסוי חלקי'}
+                
                 {shift.status === 'approved' && 'הוחלף'}
-                {shift.status === 'partially_covered' && (shift.remaining_hours ? `נותר: ${shift.remaining_hours}` : 'דרוש כיסוי נוסף')}
               </span>
             </div>
           )}
 
           {/* Time Range Display */}
-          {(shift.status === 'swap_requested' || shift.status === 'partially_covered') && shift.swap_start_time && shift.swap_end_time && (
+          {isSwapRelated && shift.swap_start_time && shift.swap_end_time && (
             <p className="text-[8px] md:text-xs text-gray-500 mt-0.5 text-center leading-tight">
               {shift.swap_start_time} - {shift.swap_end_time}
             </p>
