@@ -25,6 +25,7 @@ export default function CoverSegmentModal({
   const [error, setError] = useState('');
 
   // --- Date & Logic Initialization (The Brain) ---
+  // זה החלק החכם מהקוד שלך שטוען יתרות אם יש
   useEffect(() => {
     if (isOpen && date && shift) {
       try {
@@ -55,8 +56,6 @@ export default function CoverSegmentModal({
             // --- לוגיקת תאריכים חכמה ---
             
             // חישוב תאריך התחלה:
-            // הנחת עבודה: המשמרת המקורית התחילה ב-09:00.
-            // אם שעת ההתחלה של היתרה קטנה מ-9 (למשל 02:00), זה בהכרח יום למחרת.
             let startBaseObj = baseDate;
             if (startH < 9) {
                 startBaseObj = addDays(baseDate, 1);
@@ -64,7 +63,6 @@ export default function CoverSegmentModal({
             newStartDate = format(startBaseObj, 'yyyy-MM-dd');
 
             // חישוב תאריך סיום:
-            // אם שעת הסיום קטנה או שווה לשעת ההתחלה, זה אומר שזה גולש ליום הבא ביחס לתאריך ההתחלה החדש
             let endBaseObj = startBaseObj;
             if (endH <= startH) {
                 endBaseObj = addDays(startBaseObj, 1);
@@ -89,6 +87,7 @@ export default function CoverSegmentModal({
   // Handle Full/Partial Toggle
   const handleTypeChange = (type) => {
     setCoverageType(type);
+    setError(''); // Clear errors when switching
     
     // אם המשתמש לוחץ ידנית על "כן" (מלא), נאפס לברירת המחדל של 24 שעות
     if (type === 'full') {
@@ -103,9 +102,25 @@ export default function CoverSegmentModal({
     }
   };
 
+  // --- Validation & Submit Logic ---
+  // הוספתי כאן את הבדיקות כדי למנוע באגים
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+
+    // בדיקת תקינות זמנים
+    const startDateTime = new Date(`${startDate}T${startTime}`);
+    const endDateTime = new Date(`${endDate}T${endTime}`);
+
+    if (!isValid(startDateTime) || !isValid(endDateTime)) {
+        setError('נא להזין תאריכים ושעות תקינים');
+        return;
+    }
+
+    if (endDateTime <= startDateTime) {
+        setError('שגיאה: שעת הסיום חייבת להיות אחרי שעת ההתחלה');
+        return;
+    }
 
     // Submit the data
     onSubmit({
@@ -209,7 +224,8 @@ export default function CoverSegmentModal({
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-2">
                             <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                             <p className="text-xs text-blue-700 leading-tight">
-                                המערכת חישבה את היתרה שנותרה לכיסוי. ניתן לשנות את השעות במידת הצורך.
+                                המערכת חישבה את היתרה שנותרה לכיסוי. ניתן לשנות את השעות במידת הצורך. <br/>
+                                <span dir="ltr" className="font-bold">{endDate} {endTime} - {startDate} {startTime}</span>
                             </p>
                         </div>
 
@@ -271,7 +287,7 @@ export default function CoverSegmentModal({
 
             {/* Error Message */}
             {error && (
-              <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">
+              <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg border border-red-100 font-medium">
                 {error}
               </div>
             )}
