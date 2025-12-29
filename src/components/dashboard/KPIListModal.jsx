@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, Send, MessageCircle } from 'lucide-react'; // אייקונים מעודכנים
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -157,6 +157,18 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                   const myPartialCoverages = type === 'my_shifts' ? shiftCoverages.filter(c => c.covering_email === currentUser?.email) : [];
                   const isMySwapRequest = shift.assigned_email === currentUser?.email && shift.status !== 'regular' && shift.status !== 'approved';
 
+                  // --- לוגיקה לקביעת פעולת כפתור הוואטסאפ ---
+                  // אם אני כבר בבקשה -> שתף. אם אני רגיל -> פתח בקשה.
+                  const handleWhatsAppClick = () => {
+                      if (isMySwapRequest) {
+                          handleWhatsAppShare(shift);
+                      } else {
+                          // סוגר את המודל הנוכחי ופותח את מודל הבקשה
+                          onClose();
+                          if (onRequestSwap) onRequestSwap(shift);
+                      }
+                  };
+
                   return (
                     <div key={shift.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all">
                       <div className="flex items-start justify-between">
@@ -166,7 +178,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {/* תוכן פרטי המשמרת - נשאר אותו דבר... */}
+                          {/* תוכן פרטי המשמרת */}
                           {myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email ? (
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                                 <div className="flex justify-between items-start mb-2"><p className="text-sm text-gray-600">משמרת ראשית של: <b>{shift.role}</b></p></div>
@@ -212,47 +224,47 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <div className="flex items-center gap-2 text-xs text-orange-600 mt-2"><AlertCircle className="w-3 h-3" /><span>נותרו לכיסוי: {shift.remaining_hours}</span></div>
                           )}
                           
-                          {/* --- אזור הכפתורים החדש והמסודר --- */}
-                          <div className="mt-3 flex flex-wrap gap-2">
-                              {/* 1. אני אחליף (עבור אחרים שרוצים לקחת משמרת) */}
+                          {/* --- אזור הכפתורים החדש - רק אייקונים --- */}
+                          <div className="mt-4 flex flex-row-reverse justify-end gap-3">
+                              
+                              {/* כפתור אני אחליף (עבור אחרים) - נשאר עם טקסט כי הוא פעולה ראשית */}
                               {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
-                                    <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white w-full hover:bg-blue-600 flex-1">
+                                    <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white w-full hover:bg-blue-600">
                                         אני אחליף <ArrowRight className="w-4 h-4 mr-1" />
                                     </Button>
                               )}
                               
-                              {/* 2. מצב רגיל (משמרת שלי) -> כפתור בקש החלפה + כפתור יומן */}
-                              {type === 'my_shifts' && shift.assigned_email === currentUser?.email && shift.status === 'regular' && onRequestSwap && (
-                                <div className="flex w-full gap-2">
-                                    <Button onClick={() => { onClose(); onRequestSwap(shift); }} size="sm" className="bg-red-100 text-red-600 hover:bg-red-200 border-none flex-[2]">
-                                        בקש החלפה <ArrowRight className="w-4 h-4 mr-1" />
+                              {/* --- אייקונים למשמרות שלי --- */}
+                              {type === 'my_shifts' && (shift.assigned_email === currentUser?.email || myPartialCoverages.length > 0) && (
+                                <>
+                                    {/* 1. כפתור יומן (תמיד מופיע) */}
+                                    <Button 
+                                        onClick={() => handleAddToCalendar(shift)} 
+                                        size="icon" 
+                                        variant="outline" 
+                                        className="rounded-full w-10 h-10 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors shadow-sm"
+                                        title="הוסף ליומן גוגל"
+                                    >
+                                        <CalendarPlus className="w-5 h-5" />
                                     </Button>
-                                    {/* כפתור יומן אפור/כחול */}
-                                    <Button onClick={() => handleAddToCalendar(shift)} size="sm" variant="outline" className="text-gray-600 border-gray-200 hover:bg-gray-50 flex-1" title="הוסף ליומן גוגל">
-                                        <CalendarPlus className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                              )}
 
-                              {/* 3. מצב החלפה פעילה (כבר ביקשתי) -> כפתור ווצאפ ירוק + כפתור יומן */}
-                              {type === 'my_shifts' && isMySwapRequest && (
-                                <div className="flex w-full gap-2">
-                                    <Button onClick={() => handleWhatsAppShare(shift)} size="sm" className="bg-[#25D366] hover:bg-[#128C7E] text-white flex-[2] flex items-center justify-center gap-2">
-                                        <MessageCircle className="w-4 h-4" />
-                                        שלח לקבוצה
-                                    </Button>
-                                    {/* כפתור יומן אפור/כחול (שיהיה זמין תמיד) */}
-                                    <Button onClick={() => handleAddToCalendar(shift)} size="sm" variant="outline" className="text-gray-600 border-gray-200 hover:bg-gray-50 flex-1" title="הוסף ליומן גוגל">
-                                        <CalendarPlus className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                              )}
-
-                              {/* 4. כיסוי חלקי שלי -> כפתור יומן רחב */}
-                              {type === 'my_shifts' && myPartialCoverages.length > 0 && (
-                                  <Button onClick={() => handleAddToCalendar(shift)} size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50 w-full" title="הוסף ליומן גוגל">
-                                      <CalendarPlus className="w-4 h-4 mr-2" /> הוסף ליומן
-                                  </Button>
+                                    {/* 2. כפתור וואטסאפ (חכם) */}
+                                    {/* מופיע רק אם זו משמרת ראשית שלי (לא כיסוי חלקי) */}
+                                    {shift.assigned_email === currentUser?.email && (
+                                        <Button 
+                                            onClick={handleWhatsAppClick}
+                                            size="icon"
+                                            className={`rounded-full w-10 h-10 transition-all shadow-sm ${
+                                                isMySwapRequest 
+                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // ירוק מלא אם כבר ביקשתי
+                                                : "bg-white border border-green-200 text-green-600 hover:bg-green-50" // מסגרת ירוקה אם טרם ביקשתי
+                                            }`}
+                                            title={isMySwapRequest ? "שתף בווצאפ" : "בקש החלפה"}
+                                        >
+                                            <MessageCircle className="w-5 h-5" />
+                                        </Button>
+                                    )}
+                                </>
                               )}
                           </div>
 
