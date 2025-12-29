@@ -25,25 +25,24 @@ export default function CoverSegmentModal({
   const [error, setError] = useState('');
 
   // --- Date & Logic Initialization (The Brain) ---
-  // זה החלק החכם מהקוד שלך שטוען יתרות אם יש
   useEffect(() => {
     if (isOpen && date && shift) {
       try {
         let baseDate = new Date(date);
         if (!isValid(baseDate)) baseDate = parseISO(date);
 
-        // 1. הגדרות ברירת מחדל (משמרת מלאה רגילה)
+        // 1. הגדרות ברירת מחדל (משמרת מלאה רגילה - יום עד יום למחרת)
         let newStartDate = format(baseDate, 'yyyy-MM-dd');
         let newStartTime = '09:00';
         let newEndDate = format(addDays(baseDate, 1), 'yyyy-MM-dd');
         let newEndTime = '09:00';
         let type = 'full';
 
-        // 2. בדיקה: האם זו משמרת שכבר כוסתה חלקית? (סטטוס צהוב)
-        const isPartial = shift.status === 'partially_covered' || shift.status === 'REQUIRES_PARTIAL_COVERAGE';
+        // בדיקה: האם זו בעצם משמרת מלאה בתחפושת? (09:00 עד 09:00)
+        const isFull24Hours = shift.swap_start_time === '09:00' && shift.swap_end_time === '09:00';
 
-        // אם זו משמרת חלקית ויש לנו מידע על השעות שנותרו
-        if (isPartial && shift.swap_start_time && shift.swap_end_time) {
+        // 2. בדיקה: האם יש שעות ספציפיות להחלפה שהן *לא* יום שלם?
+        if (shift.swap_start_time && shift.swap_end_time && !isFull24Hours) {
             type = 'partial'; // מעביר אוטומטית למצב "כיסוי חלקי"
             
             // לוקחים את השעות מהיתרה שנשמרה במשמרת
@@ -56,6 +55,7 @@ export default function CoverSegmentModal({
             // --- לוגיקת תאריכים חכמה ---
             
             // חישוב תאריך התחלה:
+            // אם שעת ההתחלה קטנה מ-9 (למשל 06:00), זה בהכרח היום למחרת
             let startBaseObj = baseDate;
             if (startH < 9) {
                 startBaseObj = addDays(baseDate, 1);
@@ -64,9 +64,13 @@ export default function CoverSegmentModal({
 
             // חישוב תאריך סיום:
             let endBaseObj = startBaseObj;
+            
+            // אם שעת הסיום קטנה או שווה לשעת ההתחלה, עברנו יום
+            // (למשל: התחיל ב-23:00 ונגמר ב-02:00, או התחיל ב-14:00 ונגמר ב-14:00 למחרת)
             if (endH <= startH) {
                 endBaseObj = addDays(startBaseObj, 1);
-            }
+            } 
+            
             newEndDate = format(endBaseObj, 'yyyy-MM-dd');
         }
 
@@ -102,8 +106,6 @@ export default function CoverSegmentModal({
     }
   };
 
-  // --- Validation & Submit Logic ---
-  // הוספתי כאן את הבדיקות כדי למנוע באגים
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
@@ -174,6 +176,15 @@ export default function CoverSegmentModal({
             <div className="bg-red-100 rounded-xl p-4 border border-red-200 text-center shadow-sm">
                 <p className="text-xs text-gray-500 mb-1">מבקש</p>
                 <h3 className="text-xl font-bold text-gray-800 mb-2">{shift.role}</h3>
+                
+                {/* הצגת השעות המקוריות לכיסוי רק אם זה חלקי */}
+                {shift.swap_start_time && shift.swap_end_time && (shift.swap_start_time !== '09:00' || shift.swap_end_time !== '09:00') && (
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-600 bg-white/60 py-1.5 px-3 rounded-full mx-auto w-fit border border-red-100 mb-2">
+                        <Clock className="w-3 h-3" />
+                        <span>דרוש: {shift.swap_start_time} - {shift.swap_end_time}</span>
+                    </div>
+                )}
+
                 <div className="flex items-center justify-center gap-2 text-xs text-gray-600 bg-white/60 py-1.5 px-3 rounded-full mx-auto w-fit border border-red-100">
                     <Clock className="w-3 h-3" />
                     <span>משמרת מלאה (24 שעות)</span>
@@ -224,8 +235,7 @@ export default function CoverSegmentModal({
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-2">
                             <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                             <p className="text-xs text-blue-700 leading-tight">
-                                המערכת חישבה את היתרה שנותרה לכיסוי. ניתן לשנות את השעות במידת הצורך. <br/>
-                                <span dir="ltr" className="font-bold">{endDate} {endTime} - {startDate} {startTime}</span>
+                                המערכת חישבה את היתרה שנותרה לכיסוי ({startDate} {startTime} - {endDate} {endTime}).<br/> ניתן לשנות את השעות במידת הצורך.
                             </p>
                         </div>
 
