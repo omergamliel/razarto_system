@@ -5,54 +5,57 @@ import { Card } from "@/components/ui/card";
 
 export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onKPIClick }) {
 
-  // --- פונקציית עזר לבדיקת משמרת מלאה (24 שעות) ---
-  // מחזירה אמת רק אם השעות הן 09:00 עד 09:00
+  // --- פונקציית עזר קריטית: האם זו משמרת של 24 שעות? ---
   const isFull24Hours = (s) => {
-    // אם אין שעות החלפה מוגדרות, נניח שזה לא רלוונטי או מלא (תלוי דאטה),
-    // אבל כאן נחמיר: אם יש זמנים, הם חייבים להיות 09:00-09:00
+    // נדרש שגם ההתחלה וגם הסיום יהיו קיימים ושווים ל-09:00
     if (s.swap_start_time && s.swap_end_time) {
-        return s.swap_start_time === '09:00' && s.swap_end_time === '09:00';
+        // שימוש ב-startsWith כדי למנוע בעיות של שניות (למשל 09:00:00)
+        return s.swap_start_time.startsWith('09:00') && s.swap_end_time.startsWith('09:00');
     }
-    // אם אין זמנים והסטטוס הוא החלפה - נניח שזה מלא כברירת מחדל (אלא אם תשנה את זה)
+    // אם אין שעות החלפה ספציפיות, והסטטוס הוא החלפה - נניח שזה מלא
     return true; 
   };
 
-  // --- 1. KPI אדום: בקשות להחלפה למשמרת מלאה ---
-  const swapRequests = shifts.filter(s => {
-    // בודק אם הסטטוס הוא "דרושה החלפה" (או סטטוס ישן)
-    const isSwapStatus = s.status === 'REQUIRES_SWAP' || s.status === 'swap_requested';
+  // --- 1. KPI אדום: בקשות להחלפה למשמרת מלאה (בלבד!) ---
+  const swapRequestsList = shifts.filter(s => {
+    // רשימת הסטטוסים שיכולים להיות החלפה
+    const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
+                         s.status === 'REQUIRES_SWAP' || 
+                         s.status === 'swap_requested';
     
-    // תנאי קריטי: חייב להיות 24 שעות מלאות!
-    // אם זה "דרושה החלפה" אבל השעות הן חלקיות - זה לא ייכנס לפה.
+    // תנאי ברזל: חייב להיות 24 שעות מלאות
     return isSwapStatus && isFull24Hours(s);
-  }).length;
+  });
+  
+  const swapRequestsCount = swapRequestsList.length;
 
 
   // --- 2. KPI צהוב: בקשות להחלפה חלקית ---
-  const partialGaps = shifts.filter(s => {
-    // מקרה א': הסטטוס הוא מפורשות "כיסוי חלקי"
+  const partialGapsList = shifts.filter(s => {
+    // בדיקה 1: סטטוסים שהם במוצהר "חלקי"
     const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
                               s.status === 'partially_covered' ||
                               s.status === 'REQUIRES_PARTIAL';
 
-    // מקרה ב': הסטטוס הוא "דרושה החלפה" (כאילו מלא), אבל השעות הן לא 24 מלאות
-    // (למשל: מישהו כבר לקח חלק מהמשמרת, או שביקשו מראש רק על חלק)
-    const isDegradedFullSwap = (s.status === 'REQUIRES_SWAP' || s.status === 'swap_requested') && !isFull24Hours(s);
+    // בדיקה 2: סטטוסים של "החלפה" (אדום לשעבר) אבל שהשעות הן כבר לא 24 מלאות
+    const isDegradedFullSwap = (s.status === 'REQUIRES_FULL_COVERAGE' || 
+                                s.status === 'REQUIRES_SWAP' || 
+                                s.status === 'swap_requested') && !isFull24Hours(s);
 
     return isOfficialPartial || isDegradedFullSwap;
-  }).length;
+  });
+
+  const partialGapsCount = partialGapsList.length;
 
 
-  // --- 3. KPI ירוק: היסטוריית החלפות שבוצעו ---
-  const approved = shifts.filter(s => 
-    // סופר כל מה שנסגר מעגל: הוחלף או כוסה
+  // --- 3. KPI ירוק: היסטוריית החלפות ---
+  const approvedCount = shifts.filter(s => 
     s.status === 'SWAPPED' || s.status === 'COVERED' || s.status === 'approved'
   ).length;
 
 
   // --- 4. KPI כחול: המשמרות העתידיות שלי ---
-  const myShifts = shifts.filter(s => {
-    // בדיקת תאריך (עתידי + היום)
+  const myShiftsCount = shifts.filter(s => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const shiftDate = new Date(s.date);
@@ -60,21 +63,20 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onK
     
     if (shiftDate < today) return false;
 
-    // בדיקת שייכות:
-    // בודק אם ה-ID או המייל שלי מופיעים כמי שמשובץ למשמרת בפועל.
-    // זה תופס גם שיבוץ מקורי וגם אם התנדבתי והחלפתי מישהו (וה-assigned עודכן).
     const isAssignedToMe = (s.assigned_user_id === currentUserId) || 
-                           (s.email === currentUserEmail); // גיבוי למקרה שאין ID
+                           (s.email === currentUserEmail) ||
+                           (s.role === currentUserEmail); // גיבוי נוסף
 
     return isAssignedToMe;
   }).length;
 
 
+  // --- בניית האובייקטים לרינדור ---
   const kpis = [
     {
       id: 'swap_requests',
       title: 'בקשות להחלפה למשמרת מלאה',
-      count: swapRequests,
+      count: swapRequestsCount,
       icon: AlertCircle,
       color: 'from-red-500 to-red-600',
       bgColor: 'bg-red-50',
@@ -84,7 +86,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onK
     {
       id: 'partial_gaps',
       title: 'בקשות להחלפה למשמרת חלקית',
-      count: partialGaps,
+      count: partialGapsCount,
       icon: Clock,
       color: 'from-yellow-500 to-yellow-600',
       bgColor: 'bg-yellow-50',
@@ -94,7 +96,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onK
     {
       id: 'approved',
       title: 'היסטוריית החלפות שבוצעו',
-      count: approved,
+      count: approvedCount,
       icon: CheckCircle,
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
@@ -104,7 +106,7 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onK
     {
       id: 'my_shifts',
       title: 'המשמרות העתידיות שלי',
-      count: myShifts,
+      count: myShiftsCount,
       icon: Calendar,
       color: 'from-blue-500 to-blue-600',
       bgColor: 'bg-blue-50',
