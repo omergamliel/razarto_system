@@ -2,11 +2,25 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Clock, CheckCircle, Calendar } from 'lucide-react';
 import { Card } from "@/components/ui/card";
+// 1. הוספת אימפורטים נדרשים
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
-// שינוי 1: מקבלים את currentUser המלא במקום שדות נפרדים
 export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
 
-  // --- פונקציית עזר: האם זו משמרת של 24 שעות? ---
+  // 2. שליפת הכיסויים החלקיים שלי מהשרת
+  const { data: myCoverages = [] } = useQuery({
+    queryKey: ['my-coverages', currentUser?.email],
+    queryFn: async () => {
+      if (!currentUser?.email) return [];
+      // מביא את כל הרשומות בטבלת הכיסויים שבהן אני הוא המכסה
+      return await base44.entities.ShiftCoverage.filter({
+        covering_email: currentUser.email
+      });
+    },
+    enabled: !!currentUser?.email
+  });
+
   const isFull24Hours = (s) => {
     if (s.swap_start_time && s.swap_end_time) {
         return s.swap_start_time.startsWith('09:00') && s.swap_end_time.startsWith('09:00');
@@ -14,7 +28,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return true; 
   };
 
-  // --- 1. KPI אדום: בקשות להחלפה למשמרת מלאה ---
+  // --- 1. KPI אדום ---
   const swapRequestsCount = shifts.filter(s => {
     const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
                          s.status === 'REQUIRES_SWAP' || 
@@ -22,8 +36,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return isSwapStatus && isFull24Hours(s);
   }).length;
 
-
-  // --- 2. KPI צהוב: בקשות להחלפה חלקית ---
+  // --- 2. KPI צהוב ---
   const partialGapsCount = shifts.filter(s => {
     const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
                               s.status === 'partially_covered' ||
@@ -36,16 +49,13 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return isOfficialPartial || isDegradedFullSwap;
   }).length;
 
-
-  // --- 3. KPI ירוק: היסטוריית החלפות ---
+  // --- 3. KPI ירוק ---
   const approvedCount = shifts.filter(s => 
     s.status === 'SWAPPED' || s.status === 'COVERED' || s.status === 'approved'
   ).length;
 
-
-  // --- 4. KPI כחול: המשמרות העתידיות שלי (התיקון הגדול) ---
+  // --- 4. KPI כחול (התיקון) ---
   const myShiftsCount = shifts.filter(s => {
-    // א. בדיקת תאריך (עתידי בלבד)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const shiftDate = new Date(s.date);
@@ -53,23 +63,21 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     
     if (shiftDate < today) return false;
 
-    // ב. בדיקת שייכות למשתמש (בדיוק כמו במודל)
-    
-    // 1. האם המשמרת מוגדרת לתפקיד שלי?
-    // זה קריטי: בודק אם התפקיד של המשתמש (למשל 'חמליסט') נמצא בתוך שם המשמרת
+    // בדיקה א': תפקיד או שיבוץ ישיר (מה שהיה קודם)
     const isMyRole = currentUser?.assigned_role && 
                      s.role && 
                      typeof s.role === 'string' && 
                      s.role.includes(currentUser.assigned_role);
     
-    // 2. האם אני משובץ ישירות למשמרת?
-    // בודק גם ID וגם אימייל. תופס משמרות שהתנדבת להחליף בהן (כי השם שלך עליהן)
     const isAssignedDirectly = s.assigned_user_id === currentUser?.id || 
                                s.email === currentUser?.email;
 
-    return isMyRole || isAssignedDirectly;
-  }).length;
+    // בדיקה ב' (החדשה): האם אני מופיע בטבלת הכיסויים של המשמרת הזו?
+    const isCoveringPartially = myCoverages.some(coverage => coverage.shift_id === s.id);
 
+    // אם אחד התנאים מתקיים - תספור את זה
+    return isMyRole || isAssignedDirectly || isCoveringPartially;
+  }).length;
 
   const kpis = [
     {
