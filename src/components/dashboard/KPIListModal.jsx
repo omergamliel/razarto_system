@@ -61,9 +61,8 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
     const gStart = formatGCalDate(startDate);
     const gEnd = formatGCalDate(endDate);
 
-    const title = encodeURIComponent(`משמרת - ${shift.role || 'תפקיד'}`);
-    const details = encodeURIComponent(`משמרת בניהול המערכת. בהצלחה! 👮‍♂️`);
-    const location = encodeURIComponent('בסיס');
+    const title = encodeURIComponent(`משמרת רזרתו שלי`);
+    const details = encodeURIComponent(`משמרת נעימה ובהצלחה! 👮‍♂️`);
 
     const gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${gStart}/${gEnd}&details=${details}&location=${location}`;
 
