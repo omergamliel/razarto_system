@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -123,9 +123,11 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
           const shiftDate = new Date(s.date);
           shiftDate.setHours(0, 0, 0, 0);
           if (shiftDate < today) return false;
+          
           const isMyRole = currentUser?.assigned_role && s.role && typeof s.role === 'string' && s.role.includes(currentUser.assigned_role);
           const isAssignedDirectly = s.assigned_user_id === currentUser?.id || s.email === currentUser?.email;
           const isCoveringPartially = allCoverages.some(c => c.shift_id === s.id);
+          
           return isMyRole || isAssignedDirectly || isCoveringPartially;
         }).sort((a, b) => new Date(a.date) - new Date(b.date));
       default: return [];
@@ -157,13 +159,11 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                   const myPartialCoverages = type === 'my_shifts' ? shiftCoverages.filter(c => c.covering_email === currentUser?.email) : [];
                   const isMySwapRequest = shift.assigned_email === currentUser?.email && shift.status !== 'regular' && shift.status !== 'approved';
 
-                  // --- לוגיקה לקביעת פעולת כפתור הוואטסאפ ---
-                  // אם אני כבר בבקשה -> שתף. אם אני רגיל -> פתח בקשה.
+                  // לוגיקה לכפתור החכם: אם יש בקשה פעילה -> שתף, אחרת -> פתח בקשה
                   const handleWhatsAppClick = () => {
                       if (isMySwapRequest) {
                           handleWhatsAppShare(shift);
                       } else {
-                          // סוגר את המודל הנוכחי ופותח את מודל הבקשה
                           onClose();
                           if (onRequestSwap) onRequestSwap(shift);
                       }
@@ -224,20 +224,20 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <div className="flex items-center gap-2 text-xs text-orange-600 mt-2"><AlertCircle className="w-3 h-3" /><span>נותרו לכיסוי: {shift.remaining_hours}</span></div>
                           )}
                           
-                          {/* --- אזור הכפתורים החדש - רק אייקונים --- */}
+                          {/* --- אזור הכפתורים (אייקונים בלבד) --- */}
                           <div className="mt-4 flex flex-row-reverse justify-end gap-3">
                               
-                              {/* כפתור אני אחליף (עבור אחרים) - נשאר עם טקסט כי הוא פעולה ראשית */}
+                              {/* 1. אני אחליף (עבור משמרות של אחרים) - עדיין כפתור מלא */}
                               {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
                                     <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white w-full hover:bg-blue-600">
                                         אני אחליף <ArrowRight className="w-4 h-4 mr-1" />
                                     </Button>
                               )}
                               
-                              {/* --- אייקונים למשמרות שלי --- */}
+                              {/* 2. אייקונים למשמרות שלי (בין אם רגילות ובין אם בבקשה) */}
                               {type === 'my_shifts' && (shift.assigned_email === currentUser?.email || myPartialCoverages.length > 0) && (
                                 <>
-                                    {/* 1. כפתור יומן (תמיד מופיע) */}
+                                    {/* כפתור יומן - תמיד מופיע */}
                                     <Button 
                                         onClick={() => handleAddToCalendar(shift)} 
                                         size="icon" 
@@ -248,20 +248,19 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
 
-                                    {/* 2. כפתור וואטסאפ (חכם) */}
-                                    {/* מופיע רק אם זו משמרת ראשית שלי (לא כיסוי חלקי) */}
+                                    {/* כפתור החלפה/שיתוף - מופיע רק למשמרות ראשיות שלי */}
                                     {shift.assigned_email === currentUser?.email && (
                                         <Button 
                                             onClick={handleWhatsAppClick}
                                             size="icon"
                                             className={`rounded-full w-10 h-10 transition-all shadow-sm ${
                                                 isMySwapRequest 
-                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // ירוק מלא אם כבר ביקשתי
-                                                : "bg-white border border-green-200 text-green-600 hover:bg-green-50" // מסגרת ירוקה אם טרם ביקשתי
+                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // ירוק מלא (שיתוף)
+                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50" // מסגרת אדומה (בקשת החלפה)
                                             }`}
                                             title={isMySwapRequest ? "שתף בווצאפ" : "בקש החלפה"}
                                         >
-                                            <MessageCircle className="w-5 h-5" />
+                                            {isMySwapRequest ? <MessageCircle className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />}
                                         </Button>
                                     )}
                                 </>
