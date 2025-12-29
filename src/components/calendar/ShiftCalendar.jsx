@@ -19,6 +19,7 @@ import OnboardingModal from '../onboarding/OnboardingModal';
 import KPIHeader from '../dashboard/KPIHeader';
 import KPIListModal from '../dashboard/KPIListModal';
 import AdminSettingsModal from '../admin/AdminSettingsModal';
+import SwapSuccessModal from './SwapSuccessModal';
 import SeedRolesData from '../admin/SeedRolesData';
 
 export default function ShiftCalendar() {
@@ -40,6 +41,8 @@ export default function ShiftCalendar() {
   const [showKPIList, setShowKPIList] = useState(false);
   const [kpiType, setKPIType] = useState('');
   const [showAdminSettings, setShowAdminSettings] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastUpdatedShift, setLastUpdatedShift] = useState(null);
 
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -96,20 +99,28 @@ export default function ShiftCalendar() {
       const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
 
       if (existingShift) {
-        return base44.entities.Shift.update(existingShift.id, {
+        const updatedShift = await base44.entities.Shift.update(existingShift.id, {
           status: swapData.status || 'swap_requested', // Use the specific status (Full/Partial)
           swap_request_by: currentUser?.email,
           swap_type: swapData.swapType,
           swap_start_time: swapData.swapType === 'partial' ? swapData.startTime : '09:00',
           swap_end_time: swapData.swapType === 'partial' ? swapData.endTime : '09:00'
         });
+        return updatedShift;
       }
       return null;
     },
-    onSuccess: () => {
+    onSuccess: (updatedShift) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setShowSwapModal(false);
-      toast.success('בקשת ההחלפה נשלחה בהצלחה');
+      
+      // Show success modal with WhatsApp sharing
+      if (updatedShift) {
+        setLastUpdatedShift(updatedShift);
+        setShowSuccessModal(true);
+      } else {
+        toast.success('בקשת ההחלפה נשלחה בהצלחה');
+      }
     },
     onError: () => {
       toast.error('שגיאה בשליחת הבקשה');
@@ -513,6 +524,12 @@ export default function ShiftCalendar() {
           date={selectedDate}
           onSubmit={(segmentData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: segmentData })}
           isSubmitting={offerCoverMutation.isPending}
+        />
+
+        <SwapSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          shift={lastUpdatedShift}
         />
       </div>
 
