@@ -3,47 +3,72 @@ import { motion } from 'framer-motion';
 import { AlertCircle, Clock, CheckCircle, Calendar } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 
-export default function KPIHeader({ shifts, currentUserEmail, currentUserRole, onKPIClick }) {
-  
-  // --- תיקון הלוגיקה כאן ---
-  
-  // 1. חישוב בקשות למשמרת מלאה (אדום)
-  // סופר רק אם הסטטוס הוא מפורש "מלא" או אם זה בקשה ישנה מסוג "מלא"
-  const swapRequests = shifts.filter(s => 
-    s.status === 'REQUIRES_FULL_COVERAGE' || 
-    (s.status === 'swap_requested' && (s.swapType === 'full' || s.swap_type === 'full'))
+export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onKPIClick }) {
+
+  // --- פונקציית עזר לבדיקת משמרת מלאה (24 שעות) ---
+  // מחזירה אמת רק אם השעות הן 09:00 עד 09:00
+  const isFull24Hours = (s) => {
+    // אם אין שעות החלפה מוגדרות, נניח שזה לא רלוונטי או מלא (תלוי דאטה),
+    // אבל כאן נחמיר: אם יש זמנים, הם חייבים להיות 09:00-09:00
+    if (s.swap_start_time && s.swap_end_time) {
+        return s.swap_start_time === '09:00' && s.swap_end_time === '09:00';
+    }
+    // אם אין זמנים והסטטוס הוא החלפה - נניח שזה מלא כברירת מחדל (אלא אם תשנה את זה)
+    return true; 
+  };
+
+  // --- 1. KPI אדום: בקשות להחלפה למשמרת מלאה ---
+  const swapRequests = shifts.filter(s => {
+    // בודק אם הסטטוס הוא "דרושה החלפה" (או סטטוס ישן)
+    const isSwapStatus = s.status === 'REQUIRES_SWAP' || s.status === 'swap_requested';
+    
+    // תנאי קריטי: חייב להיות 24 שעות מלאות!
+    // אם זה "דרושה החלפה" אבל השעות הן חלקיות - זה לא ייכנס לפה.
+    return isSwapStatus && isFull24Hours(s);
+  }).length;
+
+
+  // --- 2. KPI צהוב: בקשות להחלפה חלקית ---
+  const partialGaps = shifts.filter(s => {
+    // מקרה א': הסטטוס הוא מפורשות "כיסוי חלקי"
+    const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
+                              s.status === 'partially_covered' ||
+                              s.status === 'REQUIRES_PARTIAL';
+
+    // מקרה ב': הסטטוס הוא "דרושה החלפה" (כאילו מלא), אבל השעות הן לא 24 מלאות
+    // (למשל: מישהו כבר לקח חלק מהמשמרת, או שביקשו מראש רק על חלק)
+    const isDegradedFullSwap = (s.status === 'REQUIRES_SWAP' || s.status === 'swap_requested') && !isFull24Hours(s);
+
+    return isOfficialPartial || isDegradedFullSwap;
+  }).length;
+
+
+  // --- 3. KPI ירוק: היסטוריית החלפות שבוצעו ---
+  const approved = shifts.filter(s => 
+    // סופר כל מה שנסגר מעגל: הוחלף או כוסה
+    s.status === 'SWAPPED' || s.status === 'COVERED' || s.status === 'approved'
   ).length;
 
-  // 2. חישוב בקשות להחלפה חלקית (צהוב)
-  // סופר סטטוסים של "דרוש כיסוי חלקי", "מכוסה חלקית", או בקשה ישנה מסוג "חלקי"
-  const partialGaps = shifts.filter(s => 
-    s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
-    s.status === 'partially_covered' || 
-    (s.status === 'swap_requested' && (s.swapType === 'partial' || s.swap_type === 'partial'))
-  ).length;
 
-  // 3. החלפות שאושרו
-  const approved = shifts.filter(s => s.status === 'approved').length;
-
-  // 4. המשמרות שלי
+  // --- 4. KPI כחול: המשמרות העתידיות שלי ---
   const myShifts = shifts.filter(s => {
-    // Compare dates without time
+    // בדיקת תאריך (עתידי + היום)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const shiftDate = new Date(s.date);
     shiftDate.setHours(0, 0, 0, 0);
-    const isFutureShift = shiftDate >= today;
     
-    if (!isFutureShift) return false;
-    
-    // Check if shift role contains user role
-    if (currentUserRole && s.role && typeof s.role === 'string' && 
-        s.role.includes(currentUserRole)) {
-      return true;
-    }
-    
-    return false;
+    if (shiftDate < today) return false;
+
+    // בדיקת שייכות:
+    // בודק אם ה-ID או המייל שלי מופיעים כמי שמשובץ למשמרת בפועל.
+    // זה תופס גם שיבוץ מקורי וגם אם התנדבתי והחלפתי מישהו (וה-assigned עודכן).
+    const isAssignedToMe = (s.assigned_user_id === currentUserId) || 
+                           (s.email === currentUserEmail); // גיבוי למקרה שאין ID
+
+    return isAssignedToMe;
   }).length;
+
 
   const kpis = [
     {
