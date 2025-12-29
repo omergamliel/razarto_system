@@ -377,11 +377,10 @@ export default function ShiftCalendar() {
           hideNavigation
         />
 
-        <KPIHeader
-          shifts={shifts}
-          currentUserEmail={currentUser?.email}
-          currentUserRole={currentUser?.assigned_role}
-          onKPIClick={handleKPIClick}
+        <KPIHeader 
+          shifts={shifts} 
+          currentUser={currentUser} 
+          onKPIClick={handleKPIClick} 
         />
 
         <CalendarHeader
