@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react';
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -163,6 +163,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                       if (isMySwapRequest) {
                           handleWhatsAppShare(shift);
                       } else {
+                          // אם המשמרת רגילה, פותחים את המודל בקשה
                           onClose();
                           if (onRequestSwap) onRequestSwap(shift);
                       }
@@ -171,7 +172,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                   return (
                     <div key={shift.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all">
                       
-                      {/* Flex Container ראשי - מיישר הכל לשורה אחת */}
                       <div className="flex items-center justify-between gap-3">
                         
                         {/* צד ימין - פרטי המשמרת */}
@@ -181,7 +181,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {/* תוכן נוסף (כיסוי חלקי וכו') */}
                           {myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email ? (
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 mt-1">
                                 <div className="flex justify-between items-start"><p className="text-xs text-gray-600">משמרת ראשית: <b>{shift.role}</b></p></div>
@@ -227,20 +226,18 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           )}
                         </div>
 
-                        {/* צד שמאל - אייקונים בלבד! */}
+                        {/* צד שמאל - אייקונים */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                               
-                              {/* 1. כפתור 'אני אחליף' לאחרים (נשאר כפתור רגיל כי זה פעולה ראשית) */}
                               {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
                                     <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white hover:bg-blue-600 px-3 h-9">
                                         אחליף <ArrowRight className="w-4 h-4 mr-1" />
                                     </Button>
                               )}
                               
-                              {/* 2. אייקונים למשמרות שלי */}
                               {type === 'my_shifts' && (shift.assigned_email === currentUser?.email || myPartialCoverages.length > 0) && (
                                 <>
-                                    {/* יומן */}
+                                    {/* יומן - תמיד מופיע */}
                                     <Button 
                                         onClick={() => handleAddToCalendar(shift)} 
                                         size="icon" 
@@ -251,19 +248,19 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
 
-                                    {/* ווצאפ/בקשה (רק למשמרות ראשיות) */}
+                                    {/* וואטסאפ - תמיד מופיע, צבע משתנה לפי סטטוס */}
                                     {shift.assigned_email === currentUser?.email && (
                                         <Button 
                                             onClick={handleWhatsAppClick}
                                             size="icon"
                                             className={`rounded-full w-10 h-10 transition-all shadow-sm ${
                                                 isMySwapRequest 
-                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" 
-                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50"
+                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // פעיל: ירוק מלא
+                                                : "bg-white border border-green-200 text-green-600 hover:bg-green-50" // לא פעיל: מסגרת ירוקה
                                             }`}
                                             title={isMySwapRequest ? "שתף בווצאפ" : "בקש החלפה"}
                                         >
-                                            {isMySwapRequest ? <MessageCircle className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />}
+                                            <MessageCircle className="w-5 h-5" />
                                         </Button>
                                     )}
                                 </>
