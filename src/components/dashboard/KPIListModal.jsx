@@ -61,8 +61,9 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
     const gStart = formatGCalDate(startDate);
     const gEnd = formatGCalDate(endDate);
 
-    const title = encodeURIComponent(`משמרת רזרתו שלי`);
-    const details = encodeURIComponent(`משמרת נעימה ובהצלחה! 👮‍♂️`);
+    const title = encodeURIComponent(`משמרת - ${shift.role || 'תפקיד'}`);
+    const details = encodeURIComponent(`משמרת בניהול המערכת. בהצלחה! 👮‍♂️`);
+    const location = encodeURIComponent('בסיס');
 
     const gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${gStart}/${gEnd}&details=${details}&location=${location}`;
 
@@ -158,7 +159,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                   const myPartialCoverages = type === 'my_shifts' ? shiftCoverages.filter(c => c.covering_email === currentUser?.email) : [];
                   const isMySwapRequest = shift.assigned_email === currentUser?.email && shift.status !== 'regular' && shift.status !== 'approved';
 
-                  // לוגיקה לכפתור החכם: אם יש בקשה פעילה -> שתף, אחרת -> פתח בקשה
                   const handleWhatsAppClick = () => {
                       if (isMySwapRequest) {
                           handleWhatsAppShare(shift);
@@ -170,22 +170,26 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
 
                   return (
                     <div key={shift.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-3">
+                      
+                      {/* Flex Container ראשי - מיישר הכל לשורה אחת */}
+                      <div className="flex items-center justify-between gap-3">
+                        
+                        {/* צד ימין - פרטי המשמרת */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
                             <Calendar className="w-4 h-4 text-gray-500" />
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {/* תוכן פרטי המשמרת */}
+                          {/* תוכן נוסף (כיסוי חלקי וכו') */}
                           {myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email ? (
-                             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                                <div className="flex justify-between items-start mb-2"><p className="text-sm text-gray-600">משמרת ראשית של: <b>{shift.role}</b></p></div>
-                                <div className="text-sm font-bold text-blue-700 flex flex-col gap-1">
-                                   <div className="flex items-center gap-2"><Clock className="w-4 h-4" /><span>אתה מכסה את השעות:</span></div>
-                                   <div className="pr-6">
+                             <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 mt-1">
+                                <div className="flex justify-between items-start"><p className="text-xs text-gray-600">משמרת ראשית: <b>{shift.role}</b></p></div>
+                                <div className="text-xs font-bold text-blue-700 mt-1">
+                                   <div className="flex items-center gap-1"><Clock className="w-3 h-3" /><span>כיסוי חלקי:</span></div>
+                                   <div className="pr-4">
                                        {myPartialCoverages.map(c => (
-                                           <div key={c.id} className="bg-white/50 w-fit px-2 py-0.5 rounded text-xs mt-1">{format(new Date(c.start_date), 'd/M')} {c.start_time} - {format(new Date(c.end_date), 'd/M')} {c.end_time}</div>
+                                           <div key={c.id}>{c.start_time} - {c.end_time}</div>
                                        ))}
                                    </div>
                                 </div>
@@ -193,11 +197,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           ) : (
                               <>
                                 {type === 'approved' ? (
-                                    <div className="space-y-2">
+                                    <div className="space-y-1 mt-1">
                                     {shiftCoverages.map((coverage) => (
-                                        <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
-                                            <div className="text-sm font-bold text-green-700 text-center">{coverage.covering_role || 'תפקיד'}</div>
-                                            <div className="text-xs text-center mt-1">{format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {coverage.end_time}</div>
+                                        <div key={coverage.id} className="text-xs text-green-700 bg-green-50 p-1 rounded border border-green-100">
+                                            <b>{coverage.covering_role}</b> ({coverage.start_time}-{coverage.end_time})
                                         </div>
                                     ))}
                                     </div>
@@ -205,13 +208,13 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     <>
                                     <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
                                     {(type === 'swap_requests' || type === 'partial_gaps' || isMySwapRequest) && (
-                                        <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 bg-white/50 rounded-lg px-2 py-1">
-                                        <Clock className="w-3 h-3" />
-                                        {shift.swap_start_time && shift.swap_end_time ? (
-                                            <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {shift.swap_start_time} - {shift.swap_end_time}</span>
-                                        ) : (
-                                            <span>09:00 - 09:00 (למחרת)</span>
-                                        )}
+                                        <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
+                                            <Clock className="w-3 h-3" />
+                                            {shift.swap_start_time && shift.swap_end_time ? (
+                                                <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {shift.swap_start_time}-{shift.swap_end_time}</span>
+                                            ) : (
+                                                <span>09:00-09:00</span>
+                                            )}
                                         </div>
                                     )}
                                     </>
@@ -220,42 +223,43 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           )}
 
                           {shift.remaining_hours && type !== 'approved' && (
-                            <div className="flex items-center gap-2 text-xs text-orange-600 mt-2"><AlertCircle className="w-3 h-3" /><span>נותרו לכיסוי: {shift.remaining_hours}</span></div>
+                            <div className="flex items-center gap-2 text-xs text-orange-600 mt-1"><AlertCircle className="w-3 h-3" /><span>נותר: {shift.remaining_hours} ש'</span></div>
                           )}
-                          
-                          {/* --- אזור הכפתורים (אייקונים בלבד) --- */}
-                          <div className="mt-4 flex flex-row-reverse justify-end gap-3">
+                        </div>
+
+                        {/* צד שמאל - אייקונים בלבד! */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
                               
-                              {/* 1. אני אחליף (עבור משמרות של אחרים) - עדיין כפתור מלא */}
+                              {/* 1. כפתור 'אני אחליף' לאחרים (נשאר כפתור רגיל כי זה פעולה ראשית) */}
                               {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
-                                    <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white w-full hover:bg-blue-600">
-                                        אני אחליף <ArrowRight className="w-4 h-4 mr-1" />
+                                    <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white hover:bg-blue-600 px-3 h-9">
+                                        אחליף <ArrowRight className="w-4 h-4 mr-1" />
                                     </Button>
                               )}
                               
-                              {/* 2. אייקונים למשמרות שלי (בין אם רגילות ובין אם בבקשה) */}
+                              {/* 2. אייקונים למשמרות שלי */}
                               {type === 'my_shifts' && (shift.assigned_email === currentUser?.email || myPartialCoverages.length > 0) && (
                                 <>
-                                    {/* כפתור יומן - תמיד מופיע */}
+                                    {/* יומן */}
                                     <Button 
                                         onClick={() => handleAddToCalendar(shift)} 
                                         size="icon" 
                                         variant="outline" 
-                                        className="rounded-full w-10 h-10 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors shadow-sm"
-                                        title="הוסף ליומן גוגל"
+                                        className="rounded-full w-10 h-10 border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
+                                        title="הוסף ליומן"
                                     >
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
 
-                                    {/* כפתור החלפה/שיתוף - מופיע רק למשמרות ראשיות שלי */}
+                                    {/* ווצאפ/בקשה (רק למשמרות ראשיות) */}
                                     {shift.assigned_email === currentUser?.email && (
                                         <Button 
                                             onClick={handleWhatsAppClick}
                                             size="icon"
                                             className={`rounded-full w-10 h-10 transition-all shadow-sm ${
                                                 isMySwapRequest 
-                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // ירוק מלא (שיתוף)
-                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50" // מסגרת אדומה (בקשת החלפה)
+                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" 
+                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50"
                                             }`}
                                             title={isMySwapRequest ? "שתף בווצאפ" : "בקש החלפה"}
                                         >
@@ -264,9 +268,8 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     )}
                                 </>
                               )}
-                          </div>
-
                         </div>
+
                       </div>
                     </div>
                   );
