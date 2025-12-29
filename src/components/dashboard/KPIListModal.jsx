@@ -24,6 +24,14 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
 
   if (!isOpen) return null;
 
+  // --- פונקציית עזר: בדיקת 24 שעות (הועתק מ-KPIHeader לסנכרון מלא) ---
+  const isFull24Hours = (s) => {
+    if (s.swap_start_time && s.swap_end_time) {
+        return s.swap_start_time.startsWith('09:00') && s.swap_end_time.startsWith('09:00');
+    }
+    return true; 
+  };
+
   const formatTimeBreakdown = (shift) => {
     if (!shift.covered_start_time) return null;
     
@@ -63,19 +71,38 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
     }
   };
 
+  // --- לוגיקת הסינון החדשה (תואמת ל-KPIHeader) ---
   const filterShifts = () => {
     switch (type) {
-      case 'swap_requests':
-        return shifts.filter(s => s.status === 'swap_requested');
-      case 'partial_gaps':
-        return shifts.filter(s => s.status === 'partially_covered');
-      case 'approved':
-        // Sort by shift date (closest first)
+      case 'swap_requests': // אדום
+        return shifts.filter(s => {
+            const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
+                                 s.status === 'REQUIRES_SWAP' || 
+                                 s.status === 'swap_requested';
+            // מציג רק אם זה 24 שעות מלאות
+            return isSwapStatus && isFull24Hours(s);
+        });
+
+      case 'partial_gaps': // צהוב
+        return shifts.filter(s => {
+            const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
+                                      s.status === 'partially_covered' ||
+                                      s.status === 'REQUIRES_PARTIAL';
+            
+            // תופס גם משמרות שהתחילו כמלאות אבל נשברו (זמנים לא 09-09)
+            const isDegradedFullSwap = (s.status === 'REQUIRES_FULL_COVERAGE' || 
+                                        s.status === 'REQUIRES_SWAP' || 
+                                        s.status === 'swap_requested') && !isFull24Hours(s);
+
+            return isOfficialPartial || isDegradedFullSwap;
+        });
+
+      case 'approved': // ירוק
         return shifts
-          .filter(s => s.status === 'approved')
+          .filter(s => s.status === 'approved' || s.status === 'SWAPPED' || s.status === 'COVERED')
           .sort((a, b) => new Date(a.date) - new Date(b.date));
-      case 'my_shifts':
-        // All shifts with my role (regardless of current assignment status)
+
+      case 'my_shifts': // כחול
         return shifts.filter(s => {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -85,14 +112,13 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
 
           if (!isFutureShift) return false;
 
-          // Check if shift role contains user role
-          if (currentUser?.assigned_role && s.role && typeof s.role === 'string' && 
-              s.role.includes(currentUser.assigned_role)) {
-            return true;
-          }
+          // בדיקה מורחבת (גם לפי תפקיד וגם לפי שיבוץ ישיר)
+          const isMyRole = currentUser?.assigned_role && s.role && typeof s.role === 'string' && s.role.includes(currentUser.assigned_role);
+          const isAssignedDirectly = s.assigned_user_id === currentUser?.id || s.email === currentUser?.email;
 
-          return false;
+          return isMyRole || isAssignedDirectly;
         }).sort((a, b) => new Date(a.date) - new Date(b.date));
+
       default:
         return [];
     }
@@ -259,7 +285,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           </div>
                           );
                           })}
-              </div>
+            </div>
             )}
           </div>
         </motion.div>
