@@ -3,49 +3,38 @@ import { motion } from 'framer-motion';
 import { AlertCircle, Clock, CheckCircle, Calendar } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 
-export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onKPIClick }) {
+// שינוי 1: מקבלים את currentUser המלא במקום שדות נפרדים
+export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
 
-  // --- פונקציית עזר קריטית: האם זו משמרת של 24 שעות? ---
+  // --- פונקציית עזר: האם זו משמרת של 24 שעות? ---
   const isFull24Hours = (s) => {
-    // נדרש שגם ההתחלה וגם הסיום יהיו קיימים ושווים ל-09:00
     if (s.swap_start_time && s.swap_end_time) {
-        // שימוש ב-startsWith כדי למנוע בעיות של שניות (למשל 09:00:00)
         return s.swap_start_time.startsWith('09:00') && s.swap_end_time.startsWith('09:00');
     }
-    // אם אין שעות החלפה ספציפיות, והסטטוס הוא החלפה - נניח שזה מלא
     return true; 
   };
 
-  // --- 1. KPI אדום: בקשות להחלפה למשמרת מלאה (בלבד!) ---
-  const swapRequestsList = shifts.filter(s => {
-    // רשימת הסטטוסים שיכולים להיות החלפה
+  // --- 1. KPI אדום: בקשות להחלפה למשמרת מלאה ---
+  const swapRequestsCount = shifts.filter(s => {
     const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
                          s.status === 'REQUIRES_SWAP' || 
                          s.status === 'swap_requested';
-    
-    // תנאי ברזל: חייב להיות 24 שעות מלאות
     return isSwapStatus && isFull24Hours(s);
-  });
-  
-  const swapRequestsCount = swapRequestsList.length;
+  }).length;
 
 
   // --- 2. KPI צהוב: בקשות להחלפה חלקית ---
-  const partialGapsList = shifts.filter(s => {
-    // בדיקה 1: סטטוסים שהם במוצהר "חלקי"
+  const partialGapsCount = shifts.filter(s => {
     const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
                               s.status === 'partially_covered' ||
                               s.status === 'REQUIRES_PARTIAL';
 
-    // בדיקה 2: סטטוסים של "החלפה" (אדום לשעבר) אבל שהשעות הן כבר לא 24 מלאות
     const isDegradedFullSwap = (s.status === 'REQUIRES_FULL_COVERAGE' || 
                                 s.status === 'REQUIRES_SWAP' || 
                                 s.status === 'swap_requested') && !isFull24Hours(s);
 
     return isOfficialPartial || isDegradedFullSwap;
-  });
-
-  const partialGapsCount = partialGapsList.length;
+  }).length;
 
 
   // --- 3. KPI ירוק: היסטוריית החלפות ---
@@ -54,8 +43,9 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onK
   ).length;
 
 
-  // --- 4. KPI כחול: המשמרות העתידיות שלי ---
+  // --- 4. KPI כחול: המשמרות העתידיות שלי (התיקון הגדול) ---
   const myShiftsCount = shifts.filter(s => {
+    // א. בדיקת תאריך (עתידי בלבד)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const shiftDate = new Date(s.date);
@@ -63,15 +53,24 @@ export default function KPIHeader({ shifts, currentUserEmail, currentUserId, onK
     
     if (shiftDate < today) return false;
 
-    const isAssignedToMe = (s.assigned_user_id === currentUserId) || 
-                           (s.email === currentUserEmail) ||
-                           (s.role === currentUserEmail); // גיבוי נוסף
+    // ב. בדיקת שייכות למשתמש (בדיוק כמו במודל)
+    
+    // 1. האם המשמרת מוגדרת לתפקיד שלי?
+    // זה קריטי: בודק אם התפקיד של המשתמש (למשל 'חמליסט') נמצא בתוך שם המשמרת
+    const isMyRole = currentUser?.assigned_role && 
+                     s.role && 
+                     typeof s.role === 'string' && 
+                     s.role.includes(currentUser.assigned_role);
+    
+    // 2. האם אני משובץ ישירות למשמרת?
+    // בודק גם ID וגם אימייל. תופס משמרות שהתנדבת להחליף בהן (כי השם שלך עליהן)
+    const isAssignedDirectly = s.assigned_user_id === currentUser?.id || 
+                               s.email === currentUser?.email;
 
-    return isAssignedToMe;
+    return isMyRole || isAssignedDirectly;
   }).length;
 
 
-  // --- בניית האובייקטים לרינדור ---
   const kpis = [
     {
       id: 'swap_requests',
