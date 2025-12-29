@@ -34,7 +34,7 @@ export default function SwapSuccessModal({ isOpen, onClose, shift }) {
     const roleName = shift.role || 'תפקיד';
     const appLink = window.location.href;
 
-    const message = `היי, פתחתי בקשה להחלפה למשמרת *${roleName}* 👮‍♂️
+    const message = `היי, פתחתי בקשה ב-Razarto להחלפה למשמרת *${roleName}* 👮‍♂️
 ${timeDescription} ⏰
 
 מי יכול לעזור? 🙏
