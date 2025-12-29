@@ -31,21 +31,22 @@ export default function CoverSegmentModal({
         let baseDate = new Date(date);
         if (!isValid(baseDate)) baseDate = parseISO(date);
 
-        // 1. הגדרות ברירת מחדל (משמרת מלאה רגילה - יום עד יום למחרת)
+        // 1. ברירת מחדל: משמרת מלאה (09:00 עד 09:00 למחרת)
         let newStartDate = format(baseDate, 'yyyy-MM-dd');
         let newStartTime = '09:00';
         let newEndDate = format(addDays(baseDate, 1), 'yyyy-MM-dd');
         let newEndTime = '09:00';
         let type = 'full';
 
-        // בדיקה: האם זו בעצם משמרת מלאה בתחפושת? (09:00 עד 09:00)
+        // בדיקה: האם השעות השמורות הן בעצם יום מלא?
         const isFull24Hours = shift.swap_start_time === '09:00' && shift.swap_end_time === '09:00';
 
-        // 2. בדיקה: האם יש שעות ספציפיות להחלפה שהן *לא* יום שלם?
+        // 2. בדיקה אגרסיבית: אם יש שעות מוגדרות והן לא יום שלם - תשתמש בהן!
+        // התעלמנו כאן בכוונה מהסטטוס (status) כדי למנוע פספוסים.
+        // אם יש שעות, המערכת תמיד תציע אותן.
         if (shift.swap_start_time && shift.swap_end_time && !isFull24Hours) {
             type = 'partial'; // מעביר אוטומטית למצב "כיסוי חלקי"
             
-            // לוקחים את השעות מהיתרה שנשמרה במשמרת
             newStartTime = shift.swap_start_time;
             newEndTime = shift.swap_end_time;
 
@@ -65,16 +66,17 @@ export default function CoverSegmentModal({
             // חישוב תאריך סיום:
             let endBaseObj = startBaseObj;
             
-            // אם שעת הסיום קטנה או שווה לשעת ההתחלה, עברנו יום
-            // (למשל: התחיל ב-23:00 ונגמר ב-02:00, או התחיל ב-14:00 ונגמר ב-14:00 למחרת)
-            if (endH <= startH) {
+            // אם שעת הסיום קטנה משעת ההתחלה (למשל 23:00 עד 02:00), עברנו יום.
+            // אם שעת הסיום שווה לשעת ההתחלה (נדיר), או גדולה ממנה - זה אותו יום.
+            // במקרה שלך (06:00 עד 09:00): 9 > 6, לכן זה נשאר באותו יום (שהוא כבר היום למחרת).
+            if (endH < startH) {
                 endBaseObj = addDays(startBaseObj, 1);
             } 
             
             newEndDate = format(endBaseObj, 'yyyy-MM-dd');
         }
 
-        // 3. עדכון ה-State
+        // 3. עדכון ה-State הסופי
         setStartDate(newStartDate);
         setStartTime(newStartTime);
         setEndDate(newEndDate);
@@ -91,7 +93,7 @@ export default function CoverSegmentModal({
   // Handle Full/Partial Toggle
   const handleTypeChange = (type) => {
     setCoverageType(type);
-    setError(''); // Clear errors when switching
+    setError(''); 
     
     // אם המשתמש לוחץ ידנית על "כן" (מלא), נאפס לברירת המחדל של 24 שעות
     if (type === 'full') {
@@ -110,7 +112,6 @@ export default function CoverSegmentModal({
     e.preventDefault();
     setError('');
 
-    // בדיקת תקינות זמנים
     const startDateTime = new Date(`${startDate}T${startTime}`);
     const endDateTime = new Date(`${endDate}T${endTime}`);
 
@@ -124,14 +125,13 @@ export default function CoverSegmentModal({
         return;
     }
 
-    // Submit the data
     onSubmit({
       startDate,
       startTime,
       endDate,
       endTime,
-      role: '', // Parent will fill from currentUser
-      department: '' // Parent will fill from currentUser
+      role: '', 
+      department: ''
     });
   };
 
@@ -231,11 +231,12 @@ export default function CoverSegmentModal({
                         exit={{ opacity: 0, height: 0 }}
                         className="space-y-4 overflow-hidden"
                     >
-                        {/* Info Alert - מראה שהמערכת טענה את היתרה */}
+                        {/* Info Alert */}
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 mt-2">
                             <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                             <p className="text-xs text-blue-700 leading-tight">
-                                המערכת חישבה את היתרה שנותרה לכיסוי ({startDate} {startTime} - {endDate} {endTime}).<br/> ניתן לשנות את השעות במידת הצורך.
+                                המערכת טענה את השעות הנדרשות לכיסוי.<br/>
+                                <span dir="ltr" className="font-bold">{startDate} {startTime} - {endDate} {endTime}</span>
                             </p>
                         </div>
 
