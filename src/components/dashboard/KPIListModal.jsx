@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react';
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -241,10 +241,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     </Button>
                               )}
                               
-                              {/* 2. אייקונים למשמרות שלי - ללא תנאי אימייל, רק תנאי שהם ברשימה הזו */}
+                              {/* 2. אייקונים למשמרות שלי */}
                               {type === 'my_shifts' && (
                                 <>
-                                    {/* יומן - תמיד מופיע לכולם ב-KPI הזה */}
+                                    {/* יומן - תמיד מופיע */}
                                     <Button 
                                         onClick={() => handleAddToCalendar(shift)} 
                                         size="icon" 
@@ -256,19 +256,19 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                     </Button>
 
                                     {/* ווצאפ/בקשה - מופיע לכולם ב-KPI הזה, למעט מי שרק מכסה חלקי */}
-                                    {/* הסרתי את הבדיקה הקשוחה של האימייל כאן, כי אם זה הופיע ברשימה, כנראה זה שלך */}
                                     {!amICoveringOnly && (
                                         <Button 
                                             onClick={handleWhatsAppClick}
                                             size="icon"
                                             className={`rounded-full w-10 h-10 transition-all shadow-sm ${
                                                 isMySwapRequest 
-                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" 
-                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50"
+                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // ירוק מלא
+                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50" // מסגרת אדומה
                                             }`}
                                             title={isMySwapRequest ? "שתף בווצאפ" : "בקש החלפה"}
                                         >
-                                            {isMySwapRequest ? <MessageCircle className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />}
+                                            {/* שינוי: אייקון הודעה בשני המצבים */}
+                                            <MessageCircle className="w-5 h-5" />
                                         </Button>
                                     )}
                                 </>
