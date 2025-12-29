@@ -8,52 +8,38 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
 export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover, onRequestSwap }) {
-  // Fetch all shift coverages for approved shifts
+  
+  // 1. שינוי: טוענים את הכיסויים גם עבור "המשמרות שלי" וגם עבור "אושר"
   const { data: allCoverages = [] } = useQuery({
-    queryKey: ['all-shift-coverages'],
+    queryKey: ['all-shift-coverages-modal', type, currentUser?.email],
     queryFn: async () => {
-      const approvedShifts = shifts.filter(s => s.status === 'approved');
-      const coveragePromises = approvedShifts.map(shift => 
-        base44.entities.ShiftCoverage.filter({ shift_id: shift.id })
-      );
-      const results = await Promise.all(coveragePromises);
-      return results.flat();
+      // אם זה "אושר" - מביאים רק למשמרות המאושרות (לוגיקה קיימת)
+      if (type === 'approved') {
+          const approvedShifts = shifts.filter(s => s.status === 'approved');
+          const coveragePromises = approvedShifts.map(shift => 
+            base44.entities.ShiftCoverage.filter({ shift_id: shift.id })
+          );
+          const results = await Promise.all(coveragePromises);
+          return results.flat();
+      }
+      // אם זה "המשמרות שלי" - מביאים את כל הכיסויים שבהם אני משתתף (לוגיקה חדשה)
+      if (type === 'my_shifts' && currentUser?.email) {
+          return await base44.entities.ShiftCoverage.filter({ covering_email: currentUser.email });
+      }
+      return [];
     },
-    enabled: isOpen && type === 'approved'
+    // מפעילים את השאילתה בשני המצבים האלו
+    enabled: isOpen && (type === 'approved' || type === 'my_shifts')
   });
 
   if (!isOpen) return null;
 
-  // --- פונקציית עזר: בדיקת 24 שעות (הועתק מ-KPIHeader לסנכרון מלא) ---
+  // --- פונקציית עזר: בדיקת 24 שעות ---
   const isFull24Hours = (s) => {
     if (s.swap_start_time && s.swap_end_time) {
         return s.swap_start_time.startsWith('09:00') && s.swap_end_time.startsWith('09:00');
     }
     return true; 
-  };
-
-  const formatTimeBreakdown = (shift) => {
-    if (!shift.covered_start_time) return null;
-    
-    const isFull = shift.covered_start_time === '09:00' && 
-                   (shift.covered_end_time === '09:00' || shift.covered_end_time === '09:00 (למחרת)');
-    
-    if (isFull) {
-      return '09:00 - 09:00 (למחרת) - החלפה מלאה';
-    }
-
-    return (
-      <div className="space-y-1 text-xs mt-2">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
-          <span>09:00 - {shift.covered_start_time}: {shift.role}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-          <span>{shift.covered_start_time} - {shift.covered_end_time}: {shift.covering_role}</span>
-        </div>
-      </div>
-    );
   };
 
   const getTitleAndColor = () => {
@@ -71,25 +57,23 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
     }
   };
 
-  // --- לוגיקת הסינון החדשה (תואמת ל-KPIHeader) ---
+  // --- לוגיקת הסינון החדשה ---
   const filterShifts = () => {
     switch (type) {
-      case 'swap_requests': // אדום
+      case 'swap_requests':
         return shifts.filter(s => {
             const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
                                  s.status === 'REQUIRES_SWAP' || 
                                  s.status === 'swap_requested';
-            // מציג רק אם זה 24 שעות מלאות
             return isSwapStatus && isFull24Hours(s);
         });
 
-      case 'partial_gaps': // צהוב
+      case 'partial_gaps':
         return shifts.filter(s => {
             const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
                                       s.status === 'partially_covered' ||
                                       s.status === 'REQUIRES_PARTIAL';
             
-            // תופס גם משמרות שהתחילו כמלאות אבל נשברו (זמנים לא 09-09)
             const isDegradedFullSwap = (s.status === 'REQUIRES_FULL_COVERAGE' || 
                                         s.status === 'REQUIRES_SWAP' || 
                                         s.status === 'swap_requested') && !isFull24Hours(s);
@@ -97,12 +81,12 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
             return isOfficialPartial || isDegradedFullSwap;
         });
 
-      case 'approved': // ירוק
+      case 'approved':
         return shifts
           .filter(s => s.status === 'approved' || s.status === 'SWAPPED' || s.status === 'COVERED')
           .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-      case 'my_shifts': // כחול
+      case 'my_shifts':
         return shifts.filter(s => {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -112,11 +96,15 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
 
           if (!isFutureShift) return false;
 
-          // בדיקה מורחבת (גם לפי תפקיד וגם לפי שיבוץ ישיר)
+          // לוגיקה מקורית (תפקיד או שיבוץ ישיר)
           const isMyRole = currentUser?.assigned_role && s.role && typeof s.role === 'string' && s.role.includes(currentUser.assigned_role);
           const isAssignedDirectly = s.assigned_user_id === currentUser?.id || s.email === currentUser?.email;
+          
+          // לוגיקה חדשה: האם אני מופיע ברשימת הכיסויים שטענו?
+          const isCoveringPartially = allCoverages.some(c => c.shift_id === s.id);
 
-          return isMyRole || isAssignedDirectly;
+          // אם אחד התנאים מתקיים - הצג את המשמרת
+          return isMyRole || isAssignedDirectly || isCoveringPartially;
         }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
       default:
@@ -165,6 +153,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
             ) : (
               <div className="space-y-3">
                 {filteredShifts.map((shift) => {
+                  // מחשבים את הכיסויים הספציפיים למשמרת הזו (מתוך מה שטענו)
                   const shiftCoverages = allCoverages
                     .filter(c => c.shift_id === shift.id)
                     .sort((a, b) => {
@@ -172,6 +161,11 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                       const bTime = new Date(`${b.start_date}T${b.start_time}:00`);
                       return aTime - bTime;
                     });
+
+                  // בודקים אם אני מכסה את המשמרת הזו חלקית (לצורך תצוגה)
+                  const myPartialCoverages = type === 'my_shifts' 
+                        ? shiftCoverages.filter(c => c.covering_email === currentUser?.email)
+                        : [];
 
                   return (
                     <div
@@ -187,105 +181,121 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             </span>
                           </div>
 
-                          {type === 'approved' ? (
-                            <div className="space-y-2">
-                              {shiftCoverages.map((coverage, idx) => (
-                                <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
-                                  <div className="flex items-center justify-center gap-3 text-sm">
-                                    <div className="text-center flex-1">
-                                      <div className="text-sm font-bold text-gray-800">
-                                        {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
-                                      </div>
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-green-600 flex-shrink-0" />
-                                    <div className="text-center flex-1">
-                                      <div className="text-sm font-bold text-green-700">
-                                        {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
-                                    <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
-                                      <Clock className="w-3 h-3" />
-                                      <span>
-                                        {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
-                                      </span>
-                                    </div>
-                                    <div className="text-[10px] text-gray-500 text-center">
-                                      אושר ב: {(() => {
-                                        const date = new Date(shift.updated_date);
-                                        const israelTime = new Date(date.getTime() + (2 * 60 * 60 * 1000));
-                                        return format(israelTime, 'd/M/yy בשעה HH:mm');
-                                      })()}
-                                    </div>
-                                  </div>
+                          {/* --- תצוגה מיוחדת לכיסוי חלקי שלי --- */}
+                          {myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email ? (
+                             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                                <div className="flex justify-between items-start mb-2">
+                                    <p className="text-sm text-gray-600">משמרת ראשית של: <b>{shift.role}</b></p>
                                 </div>
-                              ))}
-                            </div>
+                                <div className="text-sm font-bold text-blue-700 flex flex-col gap-1">
+                                   <div className="flex items-center gap-2">
+                                        <Clock className="w-4 h-4" />
+                                        <span>אתה מכסה את השעות:</span>
+                                   </div>
+                                   <div className="pr-6">
+                                       {myPartialCoverages.map(c => (
+                                           <div key={c.id} className="bg-white/50 w-fit px-2 py-0.5 rounded text-xs mt-1">
+                                               {c.start_time} - {c.end_time}
+                                           </div>
+                                       ))}
+                                   </div>
+                                </div>
+                             </div>
                           ) : (
-                            <>
-                              <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
-                              
-                              {/* Display timing for swap requests and partial gaps */}
-                              {(type === 'swap_requests' || type === 'partial_gaps') && (
-                                <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 bg-white/50 rounded-lg px-2 py-1">
-                                  <Clock className="w-3 h-3" />
-                                  {shift.swap_start_time && shift.swap_end_time ? (
-                                    (() => {
-                                      const startHour = parseInt(shift.swap_start_time.split(':')[0]);
-                                      const endHour = parseInt(shift.swap_end_time.split(':')[0]);
-                                      const startDateObj = new Date(shift.date);
-                                      const endDateObj = endHour < startHour ? new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)) : startDateObj;
-                                      const startDate = format(startDateObj, 'd/M');
-                                      const endDate = format(endDateObj, 'd/M');
-                                      return <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {shift.swap_start_time} {startDate} - {shift.swap_end_time} {endDate}</span>;
-                                    })()
-                                  ) : (
-                                    <span>09:00 {format(new Date(shift.date), 'd/M')} - 09:00 {format(new Date(shift.date), 'd/M')} (למחרת)</span>
-                                  )}
-                                </div>
-                              )}
-                            </>
+                              // --- תצוגה רגילה (כמו שהיה קודם) ---
+                              <>
+                                {type === 'approved' ? (
+                                    <div className="space-y-2">
+                                    {shiftCoverages.map((coverage) => (
+                                        <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                                            <div className="flex items-center justify-center gap-3 text-sm">
+                                                <div className="text-center flex-1">
+                                                <div className="text-sm font-bold text-gray-800">
+                                                    {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
+                                                </div>
+                                                </div>
+                                                <ArrowRight className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                                <div className="text-center flex-1">
+                                                <div className="text-sm font-bold text-green-700">
+                                                    {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').replace(/^רז״ר\s+/, '').replace(/^רע״ן\s+/, '').trim() || 'תפקיד'}
+                                                </div>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
+                                                <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
+                                                <Clock className="w-3 h-3" />
+                                                <span>
+                                                    {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
+                                                </span>
+                                                </div>
+                                                <div className="text-[10px] text-gray-500 text-center">
+                                                אושר ב: {(() => {
+                                                    const date = new Date(shift.updated_date);
+                                                    const israelTime = new Date(date.getTime() + (2 * 60 * 60 * 1000));
+                                                    return format(israelTime, 'd/M/yy בשעה HH:mm');
+                                                })()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    </div>
+                                ) : (
+                                    <>
+                                    <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
+                                    
+                                    {(type === 'swap_requests' || type === 'partial_gaps') && (
+                                        <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 bg-white/50 rounded-lg px-2 py-1">
+                                        <Clock className="w-3 h-3" />
+                                        {shift.swap_start_time && shift.swap_end_time ? (
+                                            (() => {
+                                            const startHour = parseInt(shift.swap_start_time.split(':')[0]);
+                                            const endHour = parseInt(shift.swap_end_time.split(':')[0]);
+                                            const startDateObj = new Date(shift.date);
+                                            const endDateObj = endHour < startHour ? new Date(new Date(shift.date).setDate(new Date(shift.date).getDate() + 1)) : startDateObj;
+                                            const startDate = format(startDateObj, 'd/M');
+                                            const endDate = format(endDateObj, 'd/M');
+                                            return <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {shift.swap_start_time} {startDate} - {shift.swap_end_time} {endDate}</span>;
+                                            })()
+                                        ) : (
+                                            <span>09:00 {format(new Date(shift.date), 'd/M')} - 09:00 {format(new Date(shift.date), 'd/M')} (למחרת)</span>
+                                        )}
+                                        </div>
+                                    )}
+                                    </>
+                                )}
+                              </>
                           )}
 
-                          {shift.remaining_hours && (
+                          {shift.remaining_hours && type !== 'approved' && (
                             <div className="flex items-center gap-2 text-xs text-orange-600 mt-2">
                               <AlertCircle className="w-3 h-3" />
                               <span>נותרו לכיסוי: {shift.remaining_hours}</span>
                             </div>
                           )}
-                          </div>
+                          
+                          {/* כפתורים */}
                           {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
-                          <Button
-                            onClick={() => {
-                              onClose();
-                              onOfferCover(shift);
-                            }}
-                            size="sm"
-                            className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white"
-                          >
-                            אני אחליף
-                            <ArrowRight className="w-4 h-4 mr-1" />
-                          </Button>
+                            <div className="mt-3">
+                                <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white w-full hover:bg-blue-600">
+                                    אני אחליף <ArrowRight className="w-4 h-4 mr-1" />
+                                </Button>
+                            </div>
                           )}
+                          
                           {(type === 'my_shifts' || (shift.assigned_email === currentUser?.email && shift.status === 'regular')) && onRequestSwap && (
-                          <Button
-                            onClick={() => {
-                              onClose();
-                              onRequestSwap(shift);
-                            }}
-                            size="sm"
-                            className="bg-gradient-to-r from-[#E57373] to-[#EF5350] hover:from-[#EF5350] hover:to-[#F44336] text-white"
-                          >
-                            בקש החלפה
-                            <ArrowRight className="w-4 h-4 mr-1" />
-                          </Button>
+                            <div className="mt-3">
+                                <Button onClick={() => { onClose(); onRequestSwap(shift); }} size="sm" variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 w-full">
+                                    בקש החלפה <ArrowRight className="w-4 h-4 mr-1" />
+                                </Button>
+                            </div>
                           )}
-                          </div>
-                          </div>
-                          );
-                          })}
-            </div>
+
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </motion.div>
