@@ -9,11 +9,9 @@ import { base44 } from '@/api/base44Client';
 
 export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover, onRequestSwap }) {
   
-  // 1. שינוי: טוענים את הכיסויים גם עבור "המשמרות שלי" וגם עבור "אושר"
   const { data: allCoverages = [] } = useQuery({
     queryKey: ['all-shift-coverages-modal', type, currentUser?.email],
     queryFn: async () => {
-      // אם זה "אושר" - מביאים רק למשמרות המאושרות (לוגיקה קיימת)
       if (type === 'approved') {
           const approvedShifts = shifts.filter(s => s.status === 'approved');
           const coveragePromises = approvedShifts.map(shift => 
@@ -22,19 +20,16 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
           const results = await Promise.all(coveragePromises);
           return results.flat();
       }
-      // אם זה "המשמרות שלי" - מביאים את כל הכיסויים שבהם אני משתתף (לוגיקה חדשה)
       if (type === 'my_shifts' && currentUser?.email) {
           return await base44.entities.ShiftCoverage.filter({ covering_email: currentUser.email });
       }
       return [];
     },
-    // מפעילים את השאילתה בשני המצבים האלו
     enabled: isOpen && (type === 'approved' || type === 'my_shifts')
   });
 
   if (!isOpen) return null;
 
-  // --- פונקציית עזר: בדיקת 24 שעות ---
   const isFull24Hours = (s) => {
     if (s.swap_start_time && s.swap_end_time) {
         return s.swap_start_time.startsWith('09:00') && s.swap_end_time.startsWith('09:00');
@@ -57,7 +52,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
     }
   };
 
-  // --- לוגיקת הסינון החדשה ---
   const filterShifts = () => {
     switch (type) {
       case 'swap_requests':
@@ -96,14 +90,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
 
           if (!isFutureShift) return false;
 
-          // לוגיקה מקורית (תפקיד או שיבוץ ישיר)
           const isMyRole = currentUser?.assigned_role && s.role && typeof s.role === 'string' && s.role.includes(currentUser.assigned_role);
           const isAssignedDirectly = s.assigned_user_id === currentUser?.id || s.email === currentUser?.email;
-          
-          // לוגיקה חדשה: האם אני מופיע ברשימת הכיסויים שטענו?
           const isCoveringPartially = allCoverages.some(c => c.shift_id === s.id);
 
-          // אם אחד התנאים מתקיים - הצג את המשמרת
           return isMyRole || isAssignedDirectly || isCoveringPartially;
         }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -153,7 +143,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
             ) : (
               <div className="space-y-3">
                 {filteredShifts.map((shift) => {
-                  // מחשבים את הכיסויים הספציפיים למשמרת הזו (מתוך מה שטענו)
                   const shiftCoverages = allCoverages
                     .filter(c => c.shift_id === shift.id)
                     .sort((a, b) => {
@@ -162,7 +151,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                       return aTime - bTime;
                     });
 
-                  // בודקים אם אני מכסה את המשמרת הזו חלקית (לצורך תצוגה)
                   const myPartialCoverages = type === 'my_shifts' 
                         ? shiftCoverages.filter(c => c.covering_email === currentUser?.email)
                         : [];
@@ -195,14 +183,14 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                    <div className="pr-6">
                                        {myPartialCoverages.map(c => (
                                            <div key={c.id} className="bg-white/50 w-fit px-2 py-0.5 rounded text-xs mt-1">
-                                               {c.start_time} - {c.end_time}
+                                               {/* תיקון: פורמט תאריך ושעה */}
+                                               {format(new Date(c.start_date), 'd/M')} {c.start_time} - {format(new Date(c.end_date), 'd/M')} {c.end_time}
                                            </div>
                                        ))}
                                    </div>
                                 </div>
                              </div>
                           ) : (
-                              // --- תצוגה רגילה (כמו שהיה קודם) ---
                               <>
                                 {type === 'approved' ? (
                                     <div className="space-y-2">
@@ -242,7 +230,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                 ) : (
                                     <>
                                     <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
-                                    
                                     {(type === 'swap_requests' || type === 'partial_gaps') && (
                                         <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 bg-white/50 rounded-lg px-2 py-1">
                                         <Clock className="w-3 h-3" />
@@ -273,7 +260,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             </div>
                           )}
                           
-                          {/* כפתורים */}
                           {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
                             <div className="mt-3">
                                 <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white w-full hover:bg-blue-600">
@@ -284,7 +270,12 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           
                           {(type === 'my_shifts' || (shift.assigned_email === currentUser?.email && shift.status === 'regular')) && onRequestSwap && (
                             <div className="mt-3">
-                                <Button onClick={() => { onClose(); onRequestSwap(shift); }} size="sm" variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 w-full">
+                                {/* תיקון: כפתור אדום פסטל */}
+                                <Button 
+                                    onClick={() => { onClose(); onRequestSwap(shift); }} 
+                                    size="sm" 
+                                    className="bg-red-100 text-red-600 hover:bg-red-200 border-none w-full"
+                                >
                                     בקש החלפה <ArrowRight className="w-4 h-4 mr-1" />
                                 </Button>
                             </div>
