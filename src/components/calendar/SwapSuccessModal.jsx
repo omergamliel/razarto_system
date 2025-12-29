@@ -2,26 +2,40 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, Share2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 export default function SwapSuccessModal({ isOpen, onClose, shift }) {
   if (!isOpen || !shift) return null;
 
   const handleWhatsAppShare = () => {
-    const shiftDate = format(new Date(shift.date), 'dd/MM', { locale: he });
+    // 1. Extract dates and times
+    const baseDate = new Date(shift.date);
+    const startDateStr = format(baseDate, 'dd/MM', { locale: he });
     
-    let shiftTimes = "09:00 - 09:00";
-    if (shift.swap_start_time && shift.swap_end_time) {
-        shiftTimes = `${shift.swap_start_time} - ${shift.swap_end_time}`;
+    // Default to full shift if times are missing
+    const startTime = shift.swap_start_time || '09:00';
+    const endTime = shift.swap_end_time || '09:00';
+
+    // 2. Smart End Date Calculation
+    // If end time is before start time (overnight) OR it is exactly 09:00-09:00 (24h), add a day.
+    let endDateObj = baseDate;
+    const startH = parseInt(startTime.split(':')[0]);
+    const endH = parseInt(endTime.split(':')[0]);
+
+    if (endH < startH || (endH === startH && startTime === '09:00' && endTime === '09:00')) {
+        endDateObj = addDays(baseDate, 1);
     }
     
+    const endDateStr = format(endDateObj, 'dd/MM', { locale: he });
+
+    // 3. Build the message
+    const timeDescription = `מתאריך ${startDateStr} בשעה ${startTime} ועד תאריך ${endDateStr} בשעה ${endTime}`;
     const roleName = shift.role || 'תפקיד';
     const appLink = window.location.href;
 
     const message = `היי, פתחתי בקשה להחלפה למשמרת *${roleName}* 👮‍♂️
-בתאריך: *${shiftDate}*
-בשעות: *${shiftTimes}* ⏰
+${timeDescription} ⏰
 
 מי יכול לעזור? 🙏
 אפשר לאשר כאן: ${appLink}`;
