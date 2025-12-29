@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ArrowRight, Clock, AlertCircle } from 'lucide-react';
+import { X, Calendar, User, ArrowRight, Clock, AlertCircle, Share2 } from 'lucide-react'; // הוספנו Share2
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -29,6 +29,31 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
   });
 
   if (!isOpen) return null;
+
+  // --- פונקציה לשיתוף בוואטסאפ ---
+  const handleWhatsAppShare = (shift) => {
+    const shiftDate = format(new Date(shift.date), 'dd/MM', { locale: he });
+    // חישוב שעות להודעה
+    let shiftTimes = "09:00 - 09:00";
+    if (shift.swap_start_time && shift.swap_end_time) {
+        shiftTimes = `${shift.swap_start_time} - ${shift.swap_end_time}`;
+    }
+    
+    const roleName = shift.role || 'תפקיד';
+    const appLink = window.location.href; // הלינק לאפליקציה
+
+    // נוסח ההודעה האוטומטי
+    const message = `היי, אני צריך/ה עזרה בהחלפה למשמרת *${roleName}* 👮‍♂️
+בתאריך: *${shiftDate}*
+בשעות: *${shiftTimes}* ⏰
+
+מי יכול לעזור? 🙏
+אפשר לאשר כאן: ${appLink}`;
+
+    // פתיחת וואטסאפ עם ההודעה
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   const isFull24Hours = (s) => {
     if (s.swap_start_time && s.swap_end_time) {
@@ -67,11 +92,9 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
             const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
                                       s.status === 'partially_covered' ||
                                       s.status === 'REQUIRES_PARTIAL';
-            
             const isDegradedFullSwap = (s.status === 'REQUIRES_FULL_COVERAGE' || 
                                         s.status === 'REQUIRES_SWAP' || 
                                         s.status === 'swap_requested') && !isFull24Hours(s);
-
             return isOfficialPartial || isDegradedFullSwap;
         });
 
@@ -183,7 +206,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                    <div className="pr-6">
                                        {myPartialCoverages.map(c => (
                                            <div key={c.id} className="bg-white/50 w-fit px-2 py-0.5 rounded text-xs mt-1">
-                                               {/* תיקון: פורמט תאריך ושעה */}
                                                {format(new Date(c.start_date), 'd/M')} {c.start_time} - {format(new Date(c.end_date), 'd/M')} {c.end_time}
                                            </div>
                                        ))}
@@ -260,6 +282,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             </div>
                           )}
                           
+                          {/* כפתורים */}
                           {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
                             <div className="mt-3">
                                 <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white w-full hover:bg-blue-600">
@@ -269,14 +292,22 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           )}
                           
                           {(type === 'my_shifts' || (shift.assigned_email === currentUser?.email && shift.status === 'regular')) && onRequestSwap && (
-                            <div className="mt-3">
-                                {/* תיקון: כפתור אדום פסטל */}
+                            <div className="mt-3 flex gap-2">
                                 <Button 
                                     onClick={() => { onClose(); onRequestSwap(shift); }} 
                                     size="sm" 
-                                    className="bg-red-100 text-red-600 hover:bg-red-200 border-none w-full"
+                                    className="bg-red-100 text-red-600 hover:bg-red-200 border-none flex-1"
                                 >
                                     בקש החלפה <ArrowRight className="w-4 h-4 mr-1" />
+                                </Button>
+                                {/* כפתור שיתוף לוואטסאפ */}
+                                <Button
+                                    onClick={() => handleWhatsAppShare(shift)}
+                                    size="sm"
+                                    className="bg-[#25D366] hover:bg-[#128C7E] text-white px-3 flex-shrink-0"
+                                    title="שלח לקבוצה בוואטסאפ"
+                                >
+                                    <Share2 className="w-4 h-4" />
                                 </Button>
                             </div>
                           )}
