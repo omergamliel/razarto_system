@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -156,14 +156,18 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
               <div className="space-y-3">
                 {filteredShifts.map((shift) => {
                   const shiftCoverages = allCoverages.filter(c => c.shift_id === shift.id).sort((a, b) => new Date(`${a.start_date}T${a.start_time}:00`) - new Date(`${b.start_date}T${b.start_time}:00`));
+                  
+                  // בדיקה: האם אני רק מכסה חלקית את המשמרת הזו?
                   const myPartialCoverages = type === 'my_shifts' ? shiftCoverages.filter(c => c.covering_email === currentUser?.email) : [];
+                  const amICoveringOnly = myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email;
+
+                  // בדיקה: האם כבר ביקשתי החלפה? (רלוונטי רק אם אני הראשי)
                   const isMySwapRequest = shift.assigned_email === currentUser?.email && shift.status !== 'regular' && shift.status !== 'approved';
 
                   const handleWhatsAppClick = () => {
                       if (isMySwapRequest) {
                           handleWhatsAppShare(shift);
                       } else {
-                          // אם המשמרת רגילה, פותחים את המודל בקשה
                           onClose();
                           if (onRequestSwap) onRequestSwap(shift);
                       }
@@ -181,7 +185,8 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email ? (
+                          {/* תוכן נוסף (כיסוי חלקי וכו') */}
+                          {amICoveringOnly ? (
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 mt-1">
                                 <div className="flex justify-between items-start"><p className="text-xs text-gray-600">משמרת ראשית: <b>{shift.role}</b></p></div>
                                 <div className="text-xs font-bold text-blue-700 mt-1">
@@ -229,15 +234,17 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                         {/* צד שמאל - אייקונים */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                               
+                              {/* 1. אני אחליף (עבור אחרים) - עדיין כפתור מלא */}
                               {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
                                     <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white hover:bg-blue-600 px-3 h-9">
                                         אחליף <ArrowRight className="w-4 h-4 mr-1" />
                                     </Button>
                               )}
                               
-                              {type === 'my_shifts' && (shift.assigned_email === currentUser?.email || myPartialCoverages.length > 0) && (
+                              {/* 2. אייקונים למשמרות שלי - ללא תנאי אימייל, רק תנאי שהם ברשימה הזו */}
+                              {type === 'my_shifts' && (
                                 <>
-                                    {/* יומן - תמיד מופיע */}
+                                    {/* יומן - תמיד מופיע לכולם ב-KPI הזה */}
                                     <Button 
                                         onClick={() => handleAddToCalendar(shift)} 
                                         size="icon" 
@@ -248,19 +255,20 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
 
-                                    {/* וואטסאפ - תמיד מופיע, צבע משתנה לפי סטטוס */}
-                                    {shift.assigned_email === currentUser?.email && (
+                                    {/* ווצאפ/בקשה - מופיע לכולם ב-KPI הזה, למעט מי שרק מכסה חלקי */}
+                                    {/* הסרתי את הבדיקה הקשוחה של האימייל כאן, כי אם זה הופיע ברשימה, כנראה זה שלך */}
+                                    {!amICoveringOnly && (
                                         <Button 
                                             onClick={handleWhatsAppClick}
                                             size="icon"
                                             className={`rounded-full w-10 h-10 transition-all shadow-sm ${
                                                 isMySwapRequest 
-                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // פעיל: ירוק מלא
-                                                : "bg-white border border-green-200 text-green-600 hover:bg-green-50" // לא פעיל: מסגרת ירוקה
+                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" 
+                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50"
                                             }`}
                                             title={isMySwapRequest ? "שתף בווצאפ" : "בקש החלפה"}
                                         >
-                                            <MessageCircle className="w-5 h-5" />
+                                            {isMySwapRequest ? <MessageCircle className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />}
                                         </Button>
                                     )}
                                 </>
