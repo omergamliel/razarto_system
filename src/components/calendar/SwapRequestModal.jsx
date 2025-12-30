@@ -30,6 +30,7 @@ export default function SwapRequestModal({
       setEndDate(format(date, 'yyyy-MM-dd'));
     }
   }, [isOpen, date]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
@@ -99,7 +100,8 @@ export default function SwapRequestModal({
             {shift && (
               <div className="bg-gray-50 rounded-xl p-4">
                 <p className="text-sm text-gray-500 mb-1">משובץ כרגע</p>
-                <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
+                {/* --- תיקון: שימוש ב assigned_role במקום assigned_person --- */}
+                <p className="font-semibold text-gray-800">{shift.assigned_role || shift.role}</p>
                 <p className="text-xs text-gray-400 mt-1">09:00 - 09:00 (למחרת)</p>
               </div>
             )}
