@@ -22,6 +22,15 @@ export default function CalendarHeader({
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
 
+  // --- פונקציה לברכה דינמית לפי שעה ---
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'בוקר טוב';
+    if (hour >= 12 && hour < 18) return 'צהריים טובים';
+    if (hour >= 18 && hour < 22) return 'ערב טוב';
+    return 'לילה טוב';
+  };
+
   // --- לוגיקה של לוגו ---
   const { data: appSettings = [] } = useQuery({
     queryKey: ['app-settings'],
@@ -109,9 +118,9 @@ export default function CalendarHeader({
             {/* ----------------------------- */}
             <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm px-6 py-3 rounded-b-2xl -mx-4 -mt-6 mb-8 flex items-center justify-between transition-all">
                 
-                {/* צד ימין: שלום למשתמש */}
+                {/* צד ימין: ברכה דינמית + שם משתמש */}
                 <div className="flex flex-col items-start">
-                    <span className="text-gray-500 text-xs font-medium">ברוך הבא,</span>
+                    <span className="text-gray-500 text-xs font-medium">{getTimeBasedGreeting()},</span>
                     <span className="text-gray-900 font-bold text-lg leading-tight">
                         {currentUser?.assigned_role || currentUser?.full_name || 'אורח'}
                     </span>
@@ -167,11 +176,12 @@ export default function CalendarHeader({
 
             {/* ----------------------------- */}
             {/* 2. אזור המיתוג (לוגו + כותרת) */}
+            {/* הוספתי 'hidden md:flex' כדי להסתיר במובייל ולהציג רק במחשב */}
             {/* ----------------------------- */}
-            <div className="flex flex-col md:flex-row items-center justify-between mb-8 px-2 relative">
+            <div className="hidden md:flex flex-col md:flex-row items-center justify-between mb-8 px-2 relative">
                 
                 {/* לוגו (צד ימין ב-RTL) */}
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
+                <div className="absolute right-0 top-1/2 -translate-y-1/2">
                      {/* Input נסתר להעלאת תמונה */}
                      {isAdmin && (
                         <input
@@ -203,32 +213,6 @@ export default function CalendarHeader({
                     </motion.div>
                 </div>
 
-                {/* לוגו (במובייל - במרכז מעל הכותרת או בצד) */}
-                <div className="md:hidden mb-4">
-                     {isAdmin && (
-                        <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        />
-                    )}
-                    <motion.div
-                        whileHover={isAdmin ? { scale: 1.05 } : {}}
-                        onClick={isAdmin ? handleLogoClick : undefined}
-                        className={`w-14 h-14 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer' : ''}`}
-                    >
-                        {logoUrl ? (
-                        <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
-                        ) : (
-                        <div className="text-white text-[10px] font-bold text-center leading-tight">
-                            חטיבת<br/>מבצעים
-                        </div>
-                        )}
-                    </motion.div>
-                </div>
-
                 {/* כותרת ראשית (מרכז) */}
                 <div className="flex-1 text-center">
                     <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.1em' }}>
@@ -245,7 +229,7 @@ export default function CalendarHeader({
                 </div>
 
                 {/* אלמנט מאזן ריק בצד שמאל (כדי שהכותרת תהיה באמת באמצע בדסקטופ) */}
-                <div className="w-16 hidden md:block"></div>
+                <div className="w-16"></div>
             </div>
         </>
       )}
