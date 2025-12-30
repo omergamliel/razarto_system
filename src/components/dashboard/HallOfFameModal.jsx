@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trophy, Medal, TrendingUp, User } from 'lucide-react'; // הסרתי את Star
+import { X, Trophy, Medal, TrendingUp, User } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -11,7 +11,7 @@ export default function HallOfFameModal({ isOpen, onClose }) {
   const { data: allCoverages = [], isLoading } = useQuery({
     queryKey: ['all-coverages-hof'],
     queryFn: () => base44.entities.ShiftCoverage.list(),
-    enabled: isOpen // שליפה רק כשהמודל נפתח
+    enabled: isOpen
   });
 
   // 2. עיבוד הנתונים לדירוג
@@ -21,14 +21,14 @@ export default function HallOfFameModal({ isOpen, onClose }) {
     const stats = {};
 
     allCoverages.forEach(coverage => {
-      // נספור לפי אימייל (חד ערכי)
+      // שימוש באימייל כמפתח ייחודי
       const email = coverage.covering_email;
       if (!email) return;
 
       if (!stats[email]) {
         stats[email] = {
-          name: coverage.covering_person || 'משתמש לא ידוע',
-          role: coverage.covering_role || 'ללא תפקיד',
+          // --- התיקון: השם הוא ה-assigned_role (שנשמר כ-covering_role בטבלה הזו) ---
+          name: coverage.covering_role || 'משתמש לא ידוע', 
           swaps: 0,
           email: email
         };
@@ -36,10 +36,10 @@ export default function HallOfFameModal({ isOpen, onClose }) {
       stats[email].swaps += 1;
     });
 
-    // המרת האובייקט למערך ומיון
+    // מיון ולקחת טופ 3
     return Object.values(stats)
-      .sort((a, b) => b.swaps - a.swaps) // מיון יורד לפי כמות החלפות
-      .slice(0, 3) // רק טופ 3
+      .sort((a, b) => b.swaps - a.swaps)
+      .slice(0, 3)
       .map((user, index) => ({
         ...user,
         rank: index + 1,
@@ -51,9 +51,9 @@ export default function HallOfFameModal({ isOpen, onClose }) {
 
   const getRankBadge = (rank) => {
     const badges = {
-      1: { bg: 'from-yellow-400 to-yellow-500', icon: Trophy, text: 'מקום ראשון!' },
-      2: { bg: 'from-gray-300 to-gray-400', icon: Medal, text: 'מקום שני' },
-      3: { bg: 'from-orange-400 to-orange-500', icon: Medal, text: 'מקום שלישי' }
+      1: { bg: 'from-yellow-400 to-yellow-500', icon: Trophy },
+      2: { bg: 'from-gray-300 to-gray-400', icon: Medal },
+      3: { bg: 'from-orange-400 to-orange-500', icon: Medal }
     };
     return badges[rank] || badges[3];
   };
@@ -119,7 +119,7 @@ export default function HallOfFameModal({ isOpen, onClose }) {
                     
                     return (
                     <motion.div
-                        key={swapper.email} // שימוש באימייל כמפתח ייחודי
+                        key={swapper.email}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
@@ -141,15 +141,14 @@ export default function HallOfFameModal({ isOpen, onClose }) {
                         
                         {/* Info */}
                         <div className="flex-1">
+                            {/* שם המשתמש (מתוך covering_role) */}
                             <h3 className="text-xl font-bold text-gray-800 mb-1">{swapper.name}</h3>
-                            <p className="text-sm text-gray-600 mb-2">{swapper.role}</p>
                             
-                            <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-4 text-sm mt-2">
                             <div className="flex items-center gap-1">
                                 <TrendingUp className="w-4 h-4 text-green-600" />
                                 <span className="font-semibold text-gray-700">{swapper.swaps} החלפות</span>
                             </div>
-                            {/* הוסר החלק של הציון כפי שביקשת */}
                             </div>
                         </div>
 
