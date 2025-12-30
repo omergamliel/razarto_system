@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Calendar, List, CheckCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Calendar, List, Settings, Upload, CheckCircle, Info } from 'lucide-react';
 import { format, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
@@ -22,7 +22,7 @@ export default function CalendarHeader({
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
 
-  // שמרתי את הלוגיקה של הלוגו ברקע למקרה שתצטרך אותה בעתיד, למרות שהיא לא מוצגת כרגע
+  // --- לוגיקה של לוגו (נשמר ברקע לשימוש עתידי או למקומות אחרים) ---
   const { data: appSettings = [] } = useQuery({
     queryKey: ['app-settings'],
     queryFn: () => base44.entities.AppSettings.list(),
@@ -42,6 +42,7 @@ export default function CalendarHeader({
     }
   });
 
+  // --- ניווט בתאריכים ---
   const navigatePrev = () => {
     if (viewMode === 'month') {
       setCurrentDate(subMonths(currentDate, 1));
@@ -66,58 +67,72 @@ export default function CalendarHeader({
     }
   };
 
-  // פונקציות עזר לכפתורים החדשים
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      updateLogoMutation.mutate(file_url);
+      toast.success('הלוגו עודכן בהצלחה');
+    } catch (error) {
+      toast.error('שגיאה בהעלאת הלוגו');
+    }
+  };
+
+  // --- פונקציה לכפתורים שעדיין לא פותחו ---
   const handleComingSoon = (featureName) => {
     toast.info(`פיצ'ר ${featureName} יהיה זמין בקרוב!`, {
-        icon: <CheckCircle className="w-4 h-4 text-blue-500" />,
-        duration: 2000
+        icon: <Info className="w-4 h-4 text-blue-500" />,
+        duration: 2000,
+        style: { direction: 'rtl', fontFamily: 'Heebo' }
     });
   };
 
   return (
-    <div className="relative z-50 mb-6">
-      
-      {/* --- פס עליון סטיקי ומעוצב --- */}
+    <motion.div 
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="relative z-50 mb-6"
+    >
       {!hideHeader && (
-        <motion.div 
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200 px-6 py-3 flex items-center justify-between rounded-b-2xl mx-[-1rem] mt-[-1.5rem] mb-6"
-        >
+        // --- הבר העליון הסטיקי החדש ---
+        // שים לב: -mx-4 ו-mt-6 נועדו "למתוח" את הבר לצדדים כדי שייראה כמו Header אמיתי
+        <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm px-6 py-3 rounded-2xl mb-6 flex items-center justify-between transition-all">
+            
             {/* צד ימין: שלום למשתמש */}
-            <div className="flex flex-col">
+            <div className="flex flex-col items-start">
                 <span className="text-gray-500 text-xs font-medium">ברוך הבא,</span>
-                <span className="text-gray-800 font-bold text-lg leading-tight">
-                    {currentUser?.assigned_role || currentUser?.full_name || 'אורח'}
+                <span className="text-gray-900 font-bold text-lg leading-tight">
+                    {currentUser?.assigned_role || currentUser?.full_name || currentUser?.email || 'אורח'}
                 </span>
             </div>
 
-            {/* צד שמאל: אייקונים וכפתורים */}
-            <div className="flex items-center gap-4">
+            {/* צד שמאל: שורת האייקונים */}
+            <div className="flex items-center gap-3">
                 
                 {/* 1. היכל התהילה */}
                 <button 
                     onClick={() => handleComingSoon('היכל התהילה')}
-                    className="group relative flex flex-col items-center justify-center p-2 rounded-xl hover:bg-gray-50 transition-all duration-200"
+                    className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
                     title="היכל התהילה"
                 >
                     <img 
                         src="https://cdn-icons-png.flaticon.com/128/1021/1021202.png" 
                         alt="Hall of Fame" 
-                        className="w-6 h-6 object-contain group-hover:scale-110 transition-transform"
+                        className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
                     />
                 </button>
 
                 {/* 2. הדרכה ועזרה */}
                 <button 
                     onClick={() => handleComingSoon('הדרכה ועזרה')}
-                    className="group relative flex flex-col items-center justify-center p-2 rounded-xl hover:bg-gray-50 transition-all duration-200"
+                    className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
                     title="הדרכה ועזרה"
                 >
                     <img 
                         src="https://cdn-icons-png.flaticon.com/128/189/189665.png" 
                         alt="Help" 
-                        className="w-6 h-6 object-contain group-hover:scale-110 transition-transform"
+                        className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
                     />
                 </button>
 
@@ -125,25 +140,28 @@ export default function CalendarHeader({
                 {isAdmin && (
                     <button 
                         onClick={onOpenAdminSettings}
-                        className="group relative flex flex-col items-center justify-center p-2 rounded-xl hover:bg-blue-50 transition-all duration-200 border border-transparent hover:border-blue-100"
+                        className="group relative p-2 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all duration-200"
                         title="לוח ניהול"
                     >
                         <img 
                             src="https://cdn-icons-png.flaticon.com/128/2965/2965279.png" 
                             alt="Admin Panel" 
-                            className="w-6 h-6 object-contain group-hover:scale-110 transition-transform"
+                            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
                         />
+                        {/* אינדיקטור קטן למנהל */}
+                        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                     </button>
                 )}
             </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* --- סרגל ניווט תאריכים (נשאר למטה) --- */}
+      {/* --- סרגל הניווט התחתון (חודשי/שבועי) - נשאר ללא שינוי --- */}
       {!hideNavigation && (
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* View Toggle */}
+          
+          {/* כפתורי תצוגה */}
           <div className="flex items-center bg-gray-100 rounded-xl p-1">
             <button
               onClick={() => setViewMode('month')}
@@ -169,7 +187,7 @@ export default function CalendarHeader({
             </button>
           </div>
 
-          {/* Navigation */}
+          {/* חיצים וכותרת תאריך */}
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -196,6 +214,6 @@ export default function CalendarHeader({
         </div>
       </div>
       )}
-    </div>
+    </motion.div>
   );
 }
