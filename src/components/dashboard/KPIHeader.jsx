@@ -118,10 +118,9 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     }
   ];
 
-  // --- עיצוב חדש ומתוקן ---
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    // --- הקונטיינר הראשי: במובייל Flex עם גלילה, במחשב Grid רגיל ---
+    <div className="flex overflow-x-auto pb-4 gap-3 -mx-4 px-4 md:grid md:grid-cols-4 md:gap-4 md:mx-0 md:px-0 md:overflow-visible md:pb-0 snap-x scrollbar-hide mb-6">
       {kpis.map((kpi, index) => (
         <motion.div
           key={kpi.id}
@@ -129,7 +128,9 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
           onClick={() => onKPIClick && onKPIClick(kpi.id)}
+          // --- הגדרת רוחב: במובייל 85% מהמסך, במחשב גמיש ---
           className={`
+            min-w-[85vw] md:min-w-0 snap-center
             ${kpi.bgColor} border-2 ${kpi.borderColor} 
             rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all
             relative overflow-hidden group
