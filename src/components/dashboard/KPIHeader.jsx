@@ -1,19 +1,18 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Clock, CheckCircle, Calendar } from 'lucide-react';
-import { Card } from "@/components/ui/card";
-// 1. הוספת אימפורטים נדרשים
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
 export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
 
-  // 2. שליפת הכיסויים החלקיים שלי מהשרת
+  // --- לוגיקה קיימת (ללא שינוי) ---
+
+  // שליפת הכיסויים החלקיים שלי מהשרת
   const { data: myCoverages = [] } = useQuery({
     queryKey: ['my-coverages', currentUser?.email],
     queryFn: async () => {
       if (!currentUser?.email) return [];
-      // מביא את כל הרשומות בטבלת הכיסויים שבהן אני הוא המכסה
       return await base44.entities.ShiftCoverage.filter({
         covering_email: currentUser.email
       });
@@ -28,7 +27,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return true; 
   };
 
-  // --- 1. KPI אדום ---
+  // 1. KPI אדום
   const swapRequestsCount = shifts.filter(s => {
     const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
                          s.status === 'REQUIRES_SWAP' || 
@@ -36,7 +35,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return isSwapStatus && isFull24Hours(s);
   }).length;
 
-  // --- 2. KPI צהוב ---
+  // 2. KPI צהוב
   const partialGapsCount = shifts.filter(s => {
     const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
                               s.status === 'partially_covered' ||
@@ -49,12 +48,12 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return isOfficialPartial || isDegradedFullSwap;
   }).length;
 
-  // --- 3. KPI ירוק ---
+  // 3. KPI ירוק
   const approvedCount = shifts.filter(s => 
     s.status === 'SWAPPED' || s.status === 'COVERED' || s.status === 'approved'
   ).length;
 
-  // --- 4. KPI כחול (התיקון) ---
+  // 4. KPI כחול
   const myShiftsCount = shifts.filter(s => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -63,7 +62,6 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     
     if (shiftDate < today) return false;
 
-    // בדיקה א': תפקיד או שיבוץ ישיר (מה שהיה קודם)
     const isMyRole = currentUser?.assigned_role && 
                      s.role && 
                      typeof s.role === 'string' && 
@@ -72,10 +70,8 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     const isAssignedDirectly = s.assigned_user_id === currentUser?.id || 
                                s.email === currentUser?.email;
 
-    // בדיקה ב' (החדשה): האם אני מופיע בטבלת הכיסויים של המשמרת הזו?
     const isCoveringPartially = myCoverages.some(coverage => coverage.shift_id === s.id);
 
-    // אם אחד התנאים מתקיים - תספור את זה
     return isMyRole || isAssignedDirectly || isCoveringPartially;
   }).length;
 
@@ -85,7 +81,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
       title: 'בקשות להחלפה למשמרת מלאה',
       count: swapRequestsCount,
       icon: AlertCircle,
-      color: 'from-red-500 to-red-600',
+      gradient: 'from-red-500 to-red-600',
       bgColor: 'bg-red-50',
       textColor: 'text-red-600',
       borderColor: 'border-red-200'
@@ -95,7 +91,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
       title: 'בקשות להחלפה למשמרת חלקית',
       count: partialGapsCount,
       icon: Clock,
-      color: 'from-yellow-500 to-yellow-600',
+      gradient: 'from-yellow-500 to-yellow-600',
       bgColor: 'bg-yellow-50',
       textColor: 'text-yellow-600',
       borderColor: 'border-yellow-200'
@@ -105,7 +101,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
       title: 'היסטוריית החלפות שבוצעו',
       count: approvedCount,
       icon: CheckCircle,
-      color: 'from-green-500 to-green-600',
+      gradient: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
       textColor: 'text-green-600',
       borderColor: 'border-green-200'
@@ -115,38 +111,54 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
       title: 'המשמרות העתידיות שלי',
       count: myShiftsCount,
       icon: Calendar,
-      color: 'from-blue-500 to-blue-600',
+      gradient: 'from-blue-500 to-blue-600',
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',
       borderColor: 'border-blue-200'
     }
   ];
 
+  // --- עיצוב חדש ומתוקן ---
+
   return (
-    <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       {kpis.map((kpi, index) => (
         <motion.div
           key={kpi.id}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
+          onClick={() => onKPIClick && onKPIClick(kpi.id)}
+          className={`
+            ${kpi.bgColor} border-2 ${kpi.borderColor} 
+            rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all
+            relative overflow-hidden group
+          `}
         >
-          <Card
-            onClick={() => onKPIClick(kpi.id)}
-            className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 ${kpi.borderColor} ${kpi.bgColor} p-2 md:p-4`}
-          >
-            <div className="flex flex-col md:flex-row items-center justify-between mb-1 md:mb-3">
-              <div className={`p-1 md:p-2 rounded-lg bg-gradient-to-br ${kpi.color}`}>
-                <kpi.icon className="w-3 h-3 md:w-5 md:h-5 text-white" />
-              </div>
-              <span className={`text-xl md:text-3xl font-bold ${kpi.textColor}`}>
-                {kpi.count}
-              </span>
+          {/* שורה עליונה: אייקון ומספר צמודים */}
+          <div className="flex items-center gap-3 mb-3">
+            
+            {/* אייקון בתוך ריבוע צבעוני */}
+            <div className={`p-3 rounded-xl bg-gradient-to-br ${kpi.gradient} text-white shadow-sm group-hover:scale-110 transition-transform`}>
+              <kpi.icon className="w-6 h-6" />
             </div>
-            <h3 className="text-[10px] md:text-sm font-semibold text-gray-700 leading-tight">
+
+            {/* המספר הגדול */}
+            <span className={`text-4xl font-extrabold ${kpi.textColor}`}>
+              {kpi.count}
+            </span>
+
+          </div>
+
+          {/* כותרת */}
+          <div className="relative z-10">
+            <p className="text-sm font-medium text-gray-700 leading-tight">
               {kpi.title}
-            </h3>
-          </Card>
+            </p>
+          </div>
+
+          {/* עיגול דקורטיבי ברקע (לעיצוב בלבד) */}
+          <div className={`absolute -bottom-4 -left-4 w-24 h-24 rounded-full bg-gradient-to-tr ${kpi.gradient} opacity-5 group-hover:scale-125 transition-transform duration-500`} />
         </motion.div>
       ))}
     </div>
