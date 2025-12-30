@@ -6,9 +6,8 @@ import { base44 } from '@/api/base44Client';
 
 export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
 
-  // --- לוגיקה קיימת (ללא שינוי) ---
+  // --- לוגיקה (ללא שינוי) ---
 
-  // שליפת הכיסויים החלקיים שלי מהשרת
   const { data: myCoverages = [] } = useQuery({
     queryKey: ['my-coverages', currentUser?.email],
     queryFn: async () => {
@@ -78,7 +77,8 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
   const kpis = [
     {
       id: 'swap_requests',
-      title: 'בקשות להחלפה למשמרת מלאה',
+      mobileTitle: 'בקשות למלאה',
+      desktopTitle: 'בקשות להחלפה מלאה',
       count: swapRequestsCount,
       icon: AlertCircle,
       gradient: 'from-red-500 to-red-600',
@@ -88,7 +88,8 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     },
     {
       id: 'partial_gaps',
-      title: 'בקשות להחלפה למשמרת חלקית',
+      mobileTitle: 'בקשות לחלקית',
+      desktopTitle: 'בקשות להחלפה חלקית',
       count: partialGapsCount,
       icon: Clock,
       gradient: 'from-yellow-500 to-yellow-600',
@@ -98,7 +99,8 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     },
     {
       id: 'approved',
-      title: 'היסטוריית החלפות שבוצעו',
+      mobileTitle: 'היסטוריה',
+      desktopTitle: 'היסטוריית החלפות',
       count: approvedCount,
       icon: CheckCircle,
       gradient: 'from-green-500 to-green-600',
@@ -108,7 +110,8 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     },
     {
       id: 'my_shifts',
-      title: 'המשמרות העתידיות שלי',
+      mobileTitle: 'המשמרות שלי',
+      desktopTitle: 'המשמרות העתידיות שלי',
       count: myShiftsCount,
       icon: Calendar,
       gradient: 'from-blue-500 to-blue-600',
@@ -119,47 +122,44 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
   ];
 
   return (
-    // --- הקונטיינר הראשי: במובייל Flex עם גלילה, במחשב Grid רגיל ---
-    <div className="flex overflow-x-auto pb-4 gap-3 -mx-4 px-4 md:grid md:grid-cols-4 md:gap-4 md:mx-0 md:px-0 md:overflow-visible md:pb-0 snap-x scrollbar-hide mb-6">
+    // Grid: 4 עמודות גם במובייל וגם במחשב (grid-cols-4)
+    // gap-2: רווח קטן כדי שייכנס למסך צר
+    <div className="grid grid-cols-4 gap-2 mb-6">
       {kpis.map((kpi, index) => (
         <motion.div
           key={kpi.id}
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
+          transition={{ delay: index * 0.05 }}
           onClick={() => onKPIClick && onKPIClick(kpi.id)}
-          // --- הגדרת רוחב: במובייל 85% מהמסך, במחשב גמיש ---
           className={`
-            min-w-[85vw] md:min-w-0 snap-center
-            ${kpi.bgColor} border-2 ${kpi.borderColor} 
-            rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all
-            relative overflow-hidden group
+            ${kpi.bgColor} border ${kpi.borderColor} 
+            rounded-xl cursor-pointer hover:shadow-md transition-all
+            flex flex-col items-center justify-center text-center
+            p-2 md:p-4 md:flex-row md:justify-between md:text-right
+            h-full
           `}
         >
-          {/* שורה עליונה: אייקון ומספר צמודים */}
-          <div className="flex items-center gap-3 mb-3">
-            
-            {/* אייקון בתוך ריבוע צבעוני */}
-            <div className={`p-3 rounded-xl bg-gradient-to-br ${kpi.gradient} text-white shadow-sm group-hover:scale-110 transition-transform`}>
-              <kpi.icon className="w-6 h-6" />
-            </div>
+          {/* מובייל: הכל באמצע אחת מתחת לשני. דסקטופ: שורה */}
+          
+          {/* אייקון */}
+          <div className={`p-1.5 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-br ${kpi.gradient} text-white shadow-sm mb-1 md:mb-0`}>
+            <kpi.icon className="w-4 h-4 md:w-6 md:h-6" />
+          </div>
 
-            {/* המספר הגדול */}
-            <span className={`text-4xl font-extrabold ${kpi.textColor}`}>
+          {/* מספר וכותרת */}
+          <div className="flex flex-col items-center md:items-start">
+            {/* המספר */}
+            <span className={`text-xl md:text-3xl font-extrabold ${kpi.textColor} leading-none mb-1 md:mb-0`}>
               {kpi.count}
             </span>
-
-          </div>
-
-          {/* כותרת */}
-          <div className="relative z-10">
-            <p className="text-sm font-medium text-gray-700 leading-tight">
-              {kpi.title}
+            
+            {/* הכותרת - קטנה מאוד במובייל כדי להיכנס */}
+            <p className="text-[10px] md:text-xs font-bold text-gray-700 leading-tight">
+              <span className="md:hidden block px-1">{kpi.mobileTitle}</span>
+              <span className="hidden md:block">{kpi.desktopTitle}</span>
             </p>
           </div>
-
-          {/* עיגול דקורטיבי ברקע (לעיצוב בלבד) */}
-          <div className={`absolute -bottom-4 -left-4 w-24 h-24 rounded-full bg-gradient-to-tr ${kpi.gradient} opacity-5 group-hover:scale-125 transition-transform duration-500`} />
         </motion.div>
       ))}
     </div>
