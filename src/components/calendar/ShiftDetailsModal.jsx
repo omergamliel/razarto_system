@@ -105,9 +105,10 @@ export default function ShiftDetailsModal({
                     <p className="text-gray-600 text-sm mb-4">פרטי המחליף:</p>
                     
                     <div className="bg-white rounded-xl p-4 border border-green-200">
-                        <h3 className="font-bold text-lg text-gray-800">{shift.covering_person || 'מחליף לא ידוע'}</h3>
-                        {/* שינוי: הצגת assigned_role במקום role */}
-                        <p className="text-gray-500">{shift.assigned_role || shift.role}</p>
+                        {/* כאן השינוי: מציגים רק את assigned_role בגדול, ומחקנו את covering_person */}
+                        <h3 className="font-bold text-lg text-gray-800">
+                            {shift.assigned_role || shift.role}
+                        </h3>
                     </div>
                 </div>
             )}
@@ -117,7 +118,7 @@ export default function ShiftDetailsModal({
                 <div className={`border rounded-2xl p-6 text-center shadow-sm ${
                     isPartial ? 'bg-yellow-50 border-yellow-100' : 'bg-red-50 border-red-100'
                 }`}>
-                    {/* שינוי: שימוש ב assigned_role כאן בכותרת */}
+                    {/* כאן גם משתמשים ב assigned_role */}
                     <h2 className={`text-3xl font-bold mb-2 ${
                         isPartial ? 'text-yellow-600' : 'text-red-500'
                     }`}>
