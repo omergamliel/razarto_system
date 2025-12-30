@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -156,12 +156,8 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
               <div className="space-y-3">
                 {filteredShifts.map((shift) => {
                   const shiftCoverages = allCoverages.filter(c => c.shift_id === shift.id).sort((a, b) => new Date(`${a.start_date}T${a.start_time}:00`) - new Date(`${b.start_date}T${b.start_time}:00`));
-                  
-                  // בדיקה: האם אני רק מכסה חלקית את המשמרת הזו?
                   const myPartialCoverages = type === 'my_shifts' ? shiftCoverages.filter(c => c.covering_email === currentUser?.email) : [];
                   const amICoveringOnly = myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email;
-
-                  // בדיקה: האם כבר ביקשתי החלפה? (רלוונטי רק אם אני הראשי)
                   const isMySwapRequest = shift.assigned_email === currentUser?.email && shift.status !== 'regular' && shift.status !== 'approved';
 
                   const handleWhatsAppClick = () => {
@@ -185,8 +181,43 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {/* תוכן נוסף (כיסוי חלקי וכו') */}
-                          {amICoveringOnly ? (
+                          {/* --- החלק ששונה: תצוגת ההחלפות המאושרות (חזרה לעיצוב הישן) --- */}
+                          {type === 'approved' ? (
+                             <div className="space-y-2 mt-2">
+                                {shiftCoverages.map((coverage) => (
+                                    <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                                        <div className="flex items-center justify-center gap-3 text-sm">
+                                            <div className="text-center flex-1">
+                                                <div className="text-sm font-bold text-gray-800">
+                                                    {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
+                                                </div>
+                                            </div>
+                                            <ArrowRight className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                            <div className="text-center flex-1">
+                                                <div className="text-sm font-bold text-green-700">
+                                                    {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
+                                            <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
+                                                <Clock className="w-3 h-3" />
+                                                <span>
+                                                    {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
+                                                </span>
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 text-center">
+                                                אושר ב: {(() => {
+                                                    const date = new Date(shift.updated_date);
+                                                    const israelTime = new Date(date.getTime() + (2 * 60 * 60 * 1000));
+                                                    return format(israelTime, 'd/M/yy בשעה HH:mm');
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                             </div>
+                          ) : amICoveringOnly ? (
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 mt-1">
                                 <div className="flex justify-between items-start"><p className="text-xs text-gray-600">משמרת ראשית: <b>{shift.role}</b></p></div>
                                 <div className="text-xs font-bold text-blue-700 mt-1">
@@ -200,28 +231,16 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                              </div>
                           ) : (
                               <>
-                                {type === 'approved' ? (
-                                    <div className="space-y-1 mt-1">
-                                    {shiftCoverages.map((coverage) => (
-                                        <div key={coverage.id} className="text-xs text-green-700 bg-green-50 p-1 rounded border border-green-100">
-                                            <b>{coverage.covering_role}</b> ({coverage.start_time}-{coverage.end_time})
-                                        </div>
-                                    ))}
+                                <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
+                                {(type === 'swap_requests' || type === 'partial_gaps' || isMySwapRequest) && (
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
+                                        <Clock className="w-3 h-3" />
+                                        {shift.swap_start_time && shift.swap_end_time ? (
+                                            <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {shift.swap_start_time}-{shift.swap_end_time}</span>
+                                        ) : (
+                                            <span>09:00-09:00</span>
+                                        )}
                                     </div>
-                                ) : (
-                                    <>
-                                    <p className="text-sm text-[#E57373] font-medium">{shift.role}</p>
-                                    {(type === 'swap_requests' || type === 'partial_gaps' || isMySwapRequest) && (
-                                        <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
-                                            <Clock className="w-3 h-3" />
-                                            {shift.swap_start_time && shift.swap_end_time ? (
-                                                <span>{type === 'partial_gaps' ? 'נשאר' : 'פער'}: {shift.swap_start_time}-{shift.swap_end_time}</span>
-                                            ) : (
-                                                <span>09:00-09:00</span>
-                                            )}
-                                        </div>
-                                    )}
-                                    </>
                                 )}
                               </>
                           )}
@@ -262,12 +281,11 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                             size="icon"
                                             className={`rounded-full w-10 h-10 transition-all shadow-sm ${
                                                 isMySwapRequest 
-                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" // ירוק מלא
-                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50" // מסגרת אדומה
+                                                ? "bg-[#25D366] hover:bg-[#128C7E] text-white" 
+                                                : "bg-white border border-red-200 text-red-500 hover:bg-red-50"
                                             }`}
                                             title={isMySwapRequest ? "שתף בווצאפ" : "בקש החלפה"}
                                         >
-                                            {/* שינוי: אייקון הודעה בשני המצבים */}
                                             <MessageCircle className="w-5 h-5" />
                                         </Button>
                                     )}
