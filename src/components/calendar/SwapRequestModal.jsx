@@ -35,15 +35,13 @@ export default function SwapRequestModal({
     e.preventDefault();
     
     // לוגיקה חדשה: קביעת הסטטוס לפי סוג ההחלפה
-    // אם נבחרה משמרת מלאה -> סטטוס מלא (אדום)
-    // אחרת -> סטטוס חלקי (צהוב)
     const status = swapType === 'full' 
       ? 'REQUIRES_FULL_COVERAGE' 
       : 'REQUIRES_PARTIAL_COVERAGE';
 
     onSubmit({
       swapType,
-      status, // <--- הוספנו את השדה הזה
+      status, 
       startDate: swapType === 'partial' ? startDate : null,
       startTime: swapType === 'partial' ? startTime : null,
       endDate: swapType === 'partial' ? endDate : null,
@@ -100,7 +98,7 @@ export default function SwapRequestModal({
             {shift && (
               <div className="bg-gray-50 rounded-xl p-4">
                 <p className="text-sm text-gray-500 mb-1">משובץ כרגע</p>
-                {/* --- תיקון: שימוש ב assigned_role במקום assigned_person --- */}
+                {/* התיקון: שימוש ב assigned_role */}
                 <p className="font-semibold text-gray-800">{shift.assigned_role || shift.role}</p>
                 <p className="text-xs text-gray-400 mt-1">09:00 - 09:00 (למחרת)</p>
               </div>
