@@ -342,7 +342,7 @@ export default function ShiftCalendar() {
     base44.auth.me().then(user => setCurrentUser(user));
   };
 
-  const isAdmin = currentUser?.user_type === 'admin';
+  const isAdmin = ['admin', 'manager'].includes(currentUser?.user_type);
 
   return (
     <div 
