@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowLeft, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react'; // שים לב: ArrowLeft
+import { X, Calendar, ArrowLeft, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -181,33 +181,35 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {/* --- החלק ששונה: תצוגת ההחלפות המאושרות עם תיקון כיווניות --- */}
+                          {/* --- החלק ששונה: תצוגת ההחלפות המאושרות עם תיקון סדר אנשים --- */}
                           {type === 'approved' ? (
                              <div className="space-y-2 mt-2">
                                 {shiftCoverages.map((coverage) => (
                                     <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
                                         
-                                        {/* שורת האנשים - חץ שמאלה כדי להראות זרימה מימין לשמאל */}
+                                        {/* שורת האנשים - הוחלף הסדר כדי שב-RTL המחליף יהיה בימין */}
                                         <div className="flex items-center justify-center gap-3 text-sm">
-                                            {/* המקורי - בצד ימין (Flex ברירת מחדל בRTL) */}
+                                            
+                                            {/* 1. המחליף (הירוק) - ראשון בקוד => יופיע בצד ימין */}
+                                            <div className="text-center flex-1">
+                                                <div className="text-sm font-bold text-green-700">
+                                                    {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
+                                                </div>
+                                            </div>
+
+                                            {/* חץ */}
+                                            <ArrowLeft className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                            
+                                            {/* 2. המקורי (האפור) - שני בקוד => יופיע בצד שמאל */}
                                             <div className="text-center flex-1">
                                                 <div className="text-sm font-bold text-gray-800">
                                                     {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
                                                 </div>
                                             </div>
                                             
-                                            {/* חץ מצביע שמאלה - מהמקורי למחליף */}
-                                            <ArrowLeft className="w-4 h-4 text-green-600 flex-shrink-0" />
-                                            
-                                            {/* המחליף - בצד שמאל */}
-                                            <div className="text-center flex-1">
-                                                <div className="text-sm font-bold text-green-700">
-                                                    {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
-                                                </div>
-                                            </div>
                                         </div>
 
-                                        {/* שורת השעות - שימוש ב LTR כדי שהמספרים לא יתהפכו */}
+                                        {/* שורת השעות - LTR */}
                                         <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
                                             <div className="flex items-center justify-center gap-2 text-xs text-gray-600" dir="ltr">
                                                 <span>
