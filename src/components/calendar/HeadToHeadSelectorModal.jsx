@@ -17,13 +17,11 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     enabled: isOpen && !!currentUser?.email
   });
 
-  // --- הלוגיקה המתוקנת והמורחבת ---
+  // סינון משמרות (אותה לוגיקה מתוקנת ממקודם)
   const myFutureFullShifts = allShifts.filter(shift => {
-    // 1. בדיקה שהמשמרת שייכת למשתמש הנוכחי (בדיקה לא רגישה לאותיות גדולות/קטנות)
     const isMyShift = shift.assigned_email?.toLowerCase() === currentUser?.email?.toLowerCase();
     if (!isMyShift) return false;
     
-    // 2. בדיקה שהתאריך הוא עתידי (כולל היום)
     const shiftDate = new Date(shift.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -31,16 +29,11 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     
     if (shiftDate < today) return false;
     
-    // 3. בדיקה אם זו משמרת מלאה (לא חלקית)
-    // נחשב מלא אם אין זמני החלפה, או שהם בדיפולט, או שהם מוגדרים כ-09:00 עד 09:00
     const hasNoSwapTimes = !shift.swap_start_time || !shift.swap_end_time;
     const isFullHours = (shift.swap_start_time === '09:00' && shift.swap_end_time === '09:00');
     
     if (!hasNoSwapTimes && !isFullHours) return false;
 
-    // 4. בדיקת סטטוס - התיקון החשוב!
-    // אנחנו מציגים את המשמרת אם היא רגילה או מאושרת, 
-    // אבל מסתירים אותה אם המשתמש כבר ביקש עליה החלפה פעילה
     const activeSwapStatuses = ['swap_requested', 'REQUIRES_FULL_COVERAGE', 'REQUIRES_PARTIAL_COVERAGE', 'partially_covered'];
     if (activeSwapStatuses.includes(shift.status)) return false;
 
@@ -57,19 +50,30 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
       return;
     }
 
+    // יצירת הקישור
     const appLink = window.location.origin + window.location.pathname;
-    // בניית הלינק עם כל הפרמטרים הדרושים
     const proposalLink = `${appLink}?mode=head_to_head_approval&targetId=${targetShift.id}&offerId=${selectedShift.id}`;
     
+    // פורמט תאריכים
     const targetDate = format(new Date(targetShift.date), 'dd/MM', { locale: he });
     const offerDate = format(new Date(selectedShift.date), 'dd/MM', { locale: he });
     
-    const message = `היי! 👋
-אני מעוניין להחליף איתך משמרת ראש בראש:
+    // פונקציית עזר להצגת שעות (ברירת מחדל 09:00 אם אין)
+    const formatShiftTimes = (s) => {
+        const start = s.swap_start_time || '09:00';
+        const end = s.swap_end_time || '09:00';
+        return `${start} - ${end}`;
+    };
 
-🔄 *הצעת החלפה:*
-📅 המשמרת שלך: *${targetShift.role}* בתאריך ${targetDate}
-🔁 המשמרת שלי: *${selectedShift.role}* בתאריך ${offerDate}
+    // שם המשתמש שאליו פונים
+    const targetName = targetShift.assigned_role || 'חבר';
+
+    // --- בניית ההודעה החדשה והנקייה ---
+    const message = `היי ${targetName},
+אני מעוניין להחליף איתך משמרת ראש בראש.
+
+המשמרת שלך: ${targetDate} (${formatShiftTimes(targetShift)})
+המשמרת שלי: ${offerDate} (${formatShiftTimes(selectedShift)})
 
 לחץ כאן לאישור ההחלפה בתוך המערכת:
 ${proposalLink}`;
@@ -126,7 +130,7 @@ ${proposalLink}`;
               <p className="text-sm text-purple-700 font-medium mb-2">המשמרת שאתה רוצה לקחת:</p>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-gray-800">{targetShift.role}</p>
+                  <p className="font-bold text-gray-800">{targetShift.assigned_role || targetShift.role}</p>
                   <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
                     <Calendar className="w-4 h-4" />
                     <span>{format(new Date(targetShift.date), 'EEEE, d בMMMM', { locale: he })}</span>
