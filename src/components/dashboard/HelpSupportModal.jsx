@@ -55,7 +55,7 @@ export default function HelpSupportModal({ isOpen, onClose }) {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" dir="rtl">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -68,10 +68,11 @@ export default function HelpSupportModal({ isOpen, onClose }) {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+          // שיניתי ל-max-w-2xl וסידרתי גובה למובייל
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white flex-shrink-0">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-5 md:p-6 text-white flex-shrink-0">
             <button
               onClick={onClose}
               className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors"
@@ -80,35 +81,37 @@ export default function HelpSupportModal({ isOpen, onClose }) {
             </button>
             
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/20 rounded-xl">
+              <div className="p-2.5 md:p-3 bg-white/20 rounded-xl">
                 <HelpCircle className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold">מרכז עזרה ותמיכה</h2>
-                <p className="text-white/90 text-sm mt-1">כל מה שצריך לדעת על המערכת</p>
+                <h2 className="text-xl md:text-2xl font-bold">מרכז עזרה ותמיכה</h2>
+                <p className="text-white/90 text-xs md:text-sm mt-1">כל מה שצריך לדעת על המערכת</p>
               </div>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {/* Quick Links */}
+          {/* Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-5 md:p-6">
+            
+            {/* Quick Links - Responsive Grid */}
+            {/* שינוי חשוב: 1 עמודה במובייל, 3 במחשב */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
               {quickLinks.map((link, index) => {
                 const Icon = link.icon;
                 return (
                   <motion.button
                     key={index}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className={`
-                      p-4 rounded-xl border-2 hover:shadow-lg transition-all text-center
+                      flex md:block items-center gap-3 md:gap-0 p-4 rounded-xl border-2 hover:shadow-lg transition-all text-right md:text-center
                       ${link.color === 'blue' ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : ''}
                       ${link.color === 'purple' ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : ''}
                       ${link.color === 'green' ? 'border-green-200 bg-green-50 hover:bg-green-100' : ''}
                     `}
                   >
-                    <Icon className={`w-6 h-6 mx-auto mb-2 ${
+                    <Icon className={`w-6 h-6 md:mx-auto md:mb-2 flex-shrink-0 ${
                       link.color === 'blue' ? 'text-blue-600' : ''
                     }${link.color === 'purple' ? 'text-purple-600' : ''}${
                       link.color === 'green' ? 'text-green-600' : ''
@@ -121,18 +124,20 @@ export default function HelpSupportModal({ isOpen, onClose }) {
 
             {/* FAQ Section */}
             <div className="mb-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">שאלות נפוצות (FAQ)</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                שאלות נפוצות
+              </h3>
               <div className="space-y-3">
                 {faqItems.map((item, index) => (
                   <div
                     key={index}
-                    className="border border-gray-200 rounded-xl overflow-hidden bg-white hover:shadow-md transition-all"
+                    className="border border-gray-200 rounded-xl overflow-hidden bg-white hover:shadow-sm transition-all"
                   >
                     <button
                       onClick={() => toggleExpand(index)}
-                      className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                      className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-right"
                     >
-                      <span className="font-semibold text-gray-800 text-right flex-1">
+                      <span className="font-semibold text-gray-800 text-sm md:text-base leading-tight ml-3">
                         {item.question}
                       </span>
                       {expandedIndex === index ? (
@@ -162,25 +167,25 @@ export default function HelpSupportModal({ isOpen, onClose }) {
             </div>
 
             {/* Tips Box */}
-            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5">
-              <h4 className="font-bold text-indigo-900 mb-2 flex items-center gap-2">
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-4 md:p-5">
+              <h4 className="font-bold text-indigo-900 mb-2 flex items-center gap-2 text-sm md:text-base">
                 <span className="text-xl">💡</span>
                 טיפים מהירים
               </h4>
-              <ul className="text-sm text-indigo-800 space-y-2">
-                <li>• השתמש בסינון לפי מחלקה כדי למצוא משמרות רלוונטיות מהר יותר</li>
-                <li>• שמור את קישור האפליקציה במועדפים בטלפון לגישה מהירה</li>
-                <li>• הגדר התראות בקבוצת WhatsApp כדי לקבל עדכונים על בקשות חדשות</li>
-                <li>• בדוק את ה-KPI Dashboard מדי יום לעדכונים</li>
+              <ul className="text-xs md:text-sm text-indigo-800 space-y-2 pr-1">
+                <li>• השתמש בסינון לפי מחלקה למציאת משמרות</li>
+                <li>• שמור את האפליקציה במועדפים לגישה מהירה</li>
+                <li>• הגדר התראות בוואטסאפ לעדכונים מיידיים</li>
+                <li>• בדוק את הדאשבורד מדי יום להתעדכן בסטטוס</li>
               </ul>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="p-6 pt-0 flex-shrink-0">
+          <div className="p-5 md:p-6 pt-0 flex-shrink-0 bg-white border-t border-gray-100 mt-auto pt-4">
             <Button
               onClick={onClose}
-              className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-xl"
+              className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-md"
             >
               הבנתי, תודה!
             </Button>
