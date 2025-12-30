@@ -1,6 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Calendar, List, Settings, Upload, CheckCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Calendar, List, CheckCircle } from 'lucide-react';
 import { format, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
@@ -22,15 +22,12 @@ export default function CalendarHeader({
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
 
-  // Fetch logo from DB
+  // שמרתי את הלוגיקה של הלוגו ברקע למקרה שתצטרך אותה בעתיד, למרות שהיא לא מוצגת כרגע
   const { data: appSettings = [] } = useQuery({
     queryKey: ['app-settings'],
     queryFn: () => base44.entities.AppSettings.list(),
   });
 
-  const logoUrl = appSettings.find(s => s.setting_key === 'logo')?.logo_url || '';
-
-  // Update logo mutation
   const updateLogoMutation = useMutation({
     mutationFn: async (url) => {
       const existing = appSettings.find(s => s.setting_key === 'logo');
@@ -69,101 +66,80 @@ export default function CalendarHeader({
     }
   };
 
-  const handleLogoClick = () => {
-    if (isAdmin) {
-      fileInputRef.current?.click();
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      updateLogoMutation.mutate(file_url);
-      toast.success('הלוגו עודכן בהצלחה');
-    } catch (error) {
-      toast.error('שגיאה בהעלאת הלוגו');
-    }
+  // פונקציות עזר לכפתורים החדשים
+  const handleComingSoon = (featureName) => {
+    toast.info(`פיצ'ר ${featureName} יהיה זמין בקרוב!`, {
+        icon: <CheckCircle className="w-4 h-4 text-blue-500" />,
+        duration: 2000
+    });
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative z-10 mb-6"
-    >
+    <div className="relative z-50 mb-6">
+      
+      {/* --- פס עליון סטיקי ומעוצב --- */}
       {!hideHeader && (
-      <div className="flex items-start justify-between mb-6 pt-2">
-        {/* Logo - Right */}
-        <div>
-          {isAdmin && (
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          )}
-          <motion.div
-            whileHover={isAdmin ? { scale: 1.05 } : {}}
-            whileTap={isAdmin ? { scale: 0.95 } : {}}
-            onClick={isAdmin ? handleLogoClick : undefined}
-            className={`w-16 h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer group' : ''}`}
-          >
-            {logoUrl ? (
-              <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
-            ) : (
-              <div className="text-white text-xs font-bold text-center leading-tight">
-                חטיבת<br/>מבצעים
-              </div>
-            )}
-            {isAdmin && (
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Upload className="w-6 h-6 text-white" />
-              </div>
-            )}
-          </motion.div>
-        </div>
-
-        {/* Center - Title */}
-        <div className="flex-1 text-center">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-wider mb-1" style={{ letterSpacing: '0.15em' }}>
-            Razarto
-          </h1>
-          <p className="text-gray-600 text-sm md:text-base font-medium">
-            מערכת לניהול משמרות
-          </p>
-          <p className="text-gray-400 text-xs md:text-sm mt-0.5">
-            צפייה במשמרות | ביצוע החלפות מסודרות
-          </p>
-        </div>
-
-        {/* Left - User Info & Settings */}
-        <div className="flex flex-col items-start gap-2">
-          {currentUser && (
-            <div className="text-left">
-              <p className="font-semibold text-gray-800 text-sm">
-                שלום, {currentUser.assigned_role || currentUser.full_name || currentUser.email}
-              </p>
+        <motion.div 
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200 px-6 py-3 flex items-center justify-between rounded-b-2xl mx-[-1rem] mt-[-1.5rem] mb-6"
+        >
+            {/* צד ימין: שלום למשתמש */}
+            <div className="flex flex-col">
+                <span className="text-gray-500 text-xs font-medium">ברוך הבא,</span>
+                <span className="text-gray-800 font-bold text-lg leading-tight">
+                    {currentUser?.assigned_role || currentUser?.full_name || 'אורח'}
+                </span>
             </div>
-          )}
-          {isAdmin && (
-            <Button
-              onClick={onOpenAdminSettings}
-              variant="outline"
-              size="sm"
-              className="rounded-xl border-2"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      </div>
+
+            {/* צד שמאל: אייקונים וכפתורים */}
+            <div className="flex items-center gap-4">
+                
+                {/* 1. היכל התהילה */}
+                <button 
+                    onClick={() => handleComingSoon('היכל התהילה')}
+                    className="group relative flex flex-col items-center justify-center p-2 rounded-xl hover:bg-gray-50 transition-all duration-200"
+                    title="היכל התהילה"
+                >
+                    <img 
+                        src="https://cdn-icons-png.flaticon.com/128/1021/1021202.png" 
+                        alt="Hall of Fame" 
+                        className="w-6 h-6 object-contain group-hover:scale-110 transition-transform"
+                    />
+                </button>
+
+                {/* 2. הדרכה ועזרה */}
+                <button 
+                    onClick={() => handleComingSoon('הדרכה ועזרה')}
+                    className="group relative flex flex-col items-center justify-center p-2 rounded-xl hover:bg-gray-50 transition-all duration-200"
+                    title="הדרכה ועזרה"
+                >
+                    <img 
+                        src="https://cdn-icons-png.flaticon.com/128/189/189665.png" 
+                        alt="Help" 
+                        className="w-6 h-6 object-contain group-hover:scale-110 transition-transform"
+                    />
+                </button>
+
+                {/* 3. לוח ניהול (רק למנהלים) */}
+                {isAdmin && (
+                    <button 
+                        onClick={onOpenAdminSettings}
+                        className="group relative flex flex-col items-center justify-center p-2 rounded-xl hover:bg-blue-50 transition-all duration-200 border border-transparent hover:border-blue-100"
+                        title="לוח ניהול"
+                    >
+                        <img 
+                            src="https://cdn-icons-png.flaticon.com/128/2965/2965279.png" 
+                            alt="Admin Panel" 
+                            className="w-6 h-6 object-contain group-hover:scale-110 transition-transform"
+                        />
+                    </button>
+                )}
+            </div>
+        </motion.div>
       )}
 
+      {/* --- סרגל ניווט תאריכים (נשאר למטה) --- */}
       {!hideNavigation && (
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -220,6 +196,6 @@ export default function CalendarHeader({
         </div>
       </div>
       )}
-    </motion.div>
+    </div>
   );
 }
