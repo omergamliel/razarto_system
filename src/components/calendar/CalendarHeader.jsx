@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Calendar, List, Settings, Upload, CheckCircle, Info } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Calendar, List, Settings, Upload, Info, Trophy, HelpCircle } from 'lucide-react';
 import { format, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
@@ -22,11 +22,13 @@ export default function CalendarHeader({
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
 
-  // --- לוגיקה של לוגו (נשמר ברקע לשימוש עתידי או למקומות אחרים) ---
+  // --- לוגיקה של לוגו ---
   const { data: appSettings = [] } = useQuery({
     queryKey: ['app-settings'],
     queryFn: () => base44.entities.AppSettings.list(),
   });
+
+  const logoUrl = appSettings.find(s => s.setting_key === 'logo')?.logo_url || '';
 
   const updateLogoMutation = useMutation({
     mutationFn: async (url) => {
@@ -67,6 +69,12 @@ export default function CalendarHeader({
     }
   };
 
+  const handleLogoClick = () => {
+    if (isAdmin) {
+      fileInputRef.current?.click();
+    }
+  };
+
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -95,68 +103,156 @@ export default function CalendarHeader({
       className="relative z-50 mb-6"
     >
       {!hideHeader && (
-        // --- הבר העליון הסטיקי החדש ---
-        // שים לב: -mx-4 ו-mt-6 נועדו "למתוח" את הבר לצדדים כדי שייראה כמו Header אמיתי
-        <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm px-6 py-3 rounded-2xl mb-6 flex items-center justify-between transition-all">
-            
-            {/* צד ימין: שלום למשתמש */}
-            <div className="flex flex-col items-start">
-                <span className="text-gray-500 text-xs font-medium">ברוך הבא,</span>
-                <span className="text-gray-900 font-bold text-lg leading-tight">
-                    {currentUser?.assigned_role || currentUser?.full_name || currentUser?.email || 'אורח'}
-                </span>
-            </div>
-
-            {/* צד שמאל: שורת האייקונים */}
-            <div className="flex items-center gap-3">
+        <>
+            {/* ----------------------------- */}
+            {/* 1. פס עליון סטיקי (User + Icons) */}
+            {/* ----------------------------- */}
+            <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm px-6 py-3 rounded-b-2xl -mx-4 -mt-6 mb-8 flex items-center justify-between transition-all">
                 
-                {/* 1. היכל התהילה */}
-                <button 
-                    onClick={() => handleComingSoon('היכל התהילה')}
-                    className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
-                    title="היכל התהילה"
-                >
-                    <img 
-                        src="https://cdn-icons-png.flaticon.com/128/1021/1021202.png" 
-                        alt="Hall of Fame" 
-                        className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
-                    />
-                </button>
+                {/* צד ימין: שלום למשתמש */}
+                <div className="flex flex-col items-start">
+                    <span className="text-gray-500 text-xs font-medium">ברוך הבא,</span>
+                    <span className="text-gray-900 font-bold text-lg leading-tight">
+                        {currentUser?.assigned_role || currentUser?.full_name || 'אורח'}
+                    </span>
+                </div>
 
-                {/* 2. הדרכה ועזרה */}
-                <button 
-                    onClick={() => handleComingSoon('הדרכה ועזרה')}
-                    className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
-                    title="הדרכה ועזרה"
-                >
-                    <img 
-                        src="https://cdn-icons-png.flaticon.com/128/189/189665.png" 
-                        alt="Help" 
-                        className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
-                    />
-                </button>
-
-                {/* 3. לוח ניהול (רק למנהלים) */}
-                {isAdmin && (
+                {/* צד שמאל: שורת האייקונים */}
+                <div className="flex items-center gap-3">
+                    
+                    {/* 1. היכל התהילה */}
                     <button 
-                        onClick={onOpenAdminSettings}
-                        className="group relative p-2 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all duration-200"
-                        title="לוח ניהול"
+                        onClick={() => handleComingSoon('היכל התהילה')}
+                        className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+                        title="היכל התהילה"
                     >
                         <img 
-                            src="https://cdn-icons-png.flaticon.com/128/2965/2965279.png" 
-                            alt="Admin Panel" 
+                            src="https://cdn-icons-png.flaticon.com/128/1021/1021202.png" 
+                            alt="Hall of Fame" 
                             className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
                         />
-                        {/* אינדיקטור קטן למנהל */}
-                        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                     </button>
-                )}
+
+                    {/* 2. הדרכה ועזרה */}
+                    <button 
+                        onClick={() => handleComingSoon('הדרכה ועזרה')}
+                        className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+                        title="הדרכה ועזרה"
+                    >
+                        <img 
+                            src="https://cdn-icons-png.flaticon.com/128/189/189665.png" 
+                            alt="Help" 
+                            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
+                        />
+                    </button>
+
+                    {/* 3. לוח ניהול (רק למנהלים) */}
+                    {isAdmin && (
+                        <button 
+                            onClick={onOpenAdminSettings}
+                            className="group relative p-2 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all duration-200"
+                            title="לוח ניהול"
+                        >
+                            <img 
+                                src="https://cdn-icons-png.flaticon.com/128/2965/2965279.png" 
+                                alt="Admin Panel" 
+                                className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
+                            />
+                            {/* אינדיקטור קטן למנהל */}
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                        </button>
+                    )}
+                </div>
             </div>
-        </div>
+
+            {/* ----------------------------- */}
+            {/* 2. אזור המיתוג (לוגו + כותרת) */}
+            {/* ----------------------------- */}
+            <div className="flex flex-col md:flex-row items-center justify-between mb-8 px-2 relative">
+                
+                {/* לוגו (צד ימין ב-RTL) */}
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
+                     {/* Input נסתר להעלאת תמונה */}
+                     {isAdmin && (
+                        <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        />
+                    )}
+                    <motion.div
+                        whileHover={isAdmin ? { scale: 1.05 } : {}}
+                        whileTap={isAdmin ? { scale: 0.95 } : {}}
+                        onClick={isAdmin ? handleLogoClick : undefined}
+                        className={`w-16 h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer group' : ''}`}
+                    >
+                        {logoUrl ? (
+                        <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
+                        ) : (
+                        <div className="text-white text-xs font-bold text-center leading-tight">
+                            חטיבת<br/>מבצעים
+                        </div>
+                        )}
+                        {isAdmin && (
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Upload className="w-6 h-6 text-white" />
+                        </div>
+                        )}
+                    </motion.div>
+                </div>
+
+                {/* לוגו (במובייל - במרכז מעל הכותרת או בצד) */}
+                <div className="md:hidden mb-4">
+                     {isAdmin && (
+                        <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        />
+                    )}
+                    <motion.div
+                        whileHover={isAdmin ? { scale: 1.05 } : {}}
+                        onClick={isAdmin ? handleLogoClick : undefined}
+                        className={`w-14 h-14 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer' : ''}`}
+                    >
+                        {logoUrl ? (
+                        <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
+                        ) : (
+                        <div className="text-white text-[10px] font-bold text-center leading-tight">
+                            חטיבת<br/>מבצעים
+                        </div>
+                        )}
+                    </motion.div>
+                </div>
+
+                {/* כותרת ראשית (מרכז) */}
+                <div className="flex-1 text-center">
+                    <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.1em' }}>
+                        Razarto
+                    </h1>
+                    <div className="flex flex-col items-center gap-1">
+                        <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
+                            מערכת לניהול משמרות
+                        </span>
+                        <p className="text-gray-400 text-xs mt-1">
+                            צפייה במשמרות | ביצוע החלפות מסודרות
+                        </p>
+                    </div>
+                </div>
+
+                {/* אלמנט מאזן ריק בצד שמאל (כדי שהכותרת תהיה באמת באמצע בדסקטופ) */}
+                <div className="w-16 hidden md:block"></div>
+            </div>
+        </>
       )}
 
-      {/* --- סרגל הניווט התחתון (חודשי/שבועי) - נשאר ללא שינוי --- */}
+      {/* ----------------------------- */}
+      {/* 3. סרגל ניווט תחתון (ללא שינוי) */}
+      {/* ----------------------------- */}
       {!hideNavigation && (
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
