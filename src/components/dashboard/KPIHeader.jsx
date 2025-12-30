@@ -136,7 +136,8 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
             ${kpi.bgColor} border ${kpi.borderColor} 
             rounded-xl cursor-pointer hover:shadow-md transition-all
             flex flex-col items-center justify-center text-center
-            p-2 md:p-4 md:flex-row md:justify-between md:text-right
+            // תיקון כאן: הורדתי את md:justify-between והוספתי md:gap-3 ו-md:items-center
+            p-2 md:p-4 md:flex-row md:gap-3 md:items-center md:text-right
             h-full
           `}
         >
