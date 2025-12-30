@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings, Plus, Trash2, Users, Edit2, AlertCircle, Save, Search, Shield } from 'lucide-react';
+import { X, Settings, Plus, Trash2, Users, Edit2, AlertCircle, Save, Shield } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -24,7 +24,6 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [editingRole, setEditingRole] = useState(null);
   const [editedName, setEditedName] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   
   // New states for permissions
   const [showAddPermission, setShowAddPermission] = useState(false);
@@ -112,7 +111,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     }
   });
 
-  // NEW: Change user permission level
+  // Change user permission level
   const changePermissionMutation = useMutation({
     mutationFn: async ({ userId, newRole }) => {
       return base44.entities.User.update(userId, { user_type: newRole });
@@ -123,7 +122,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     }
   });
 
-  // NEW: Add permission to a user
+  // Add permission to a user
   const addPermissionMutation = useMutation({
     mutationFn: async () => {
       const user = allUsers.find(u => u.id === selectedUser);
@@ -185,7 +184,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -198,7 +197,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-right"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-5 md:p-6 text-white flex-shrink-0 rounded-t-3xl">
@@ -427,7 +426,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-gray-800">ניהול הרשאות</h3>
-                      <p className="text-xs text-gray-500">מנהלים ומפקחים</p>
+                      <p className="text-xs text-gray-500">מנהלים ובעלי הרשאות</p>
                     </div>
                     <Button
                       onClick={() => setShowAddPermission(!showAddPermission)}
@@ -461,13 +460,14 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                               בחר משתמש
                             </label>
                             <Select value={selectedUser} onValueChange={setSelectedUser}>
-                              <SelectTrigger className="w-full rounded-xl">
+                              <SelectTrigger className="w-full rounded-xl text-right" dir="rtl">
                                 <SelectValue placeholder="בחר משתמש מהרשימה" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent dir="rtl">
                                 {regularUsers.map(user => (
                                   <SelectItem key={user.id} value={user.id}>
-                                    {user.full_name} ({user.email})
+                                    {/* כאן השינוי: מציג Assigned Role או שם מלא אם אין */}
+                                    {user.assigned_role || user.full_name} ({user.email})
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -479,11 +479,11 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                               בחר רמת הרשאה
                             </label>
                             <Select value={selectedRole} onValueChange={setSelectedRole}>
-                              <SelectTrigger className="w-full rounded-xl">
+                              <SelectTrigger className="w-full rounded-xl text-right" dir="rtl">
                                 <SelectValue placeholder="בחר תפקיד" />
                               </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="manager">מפקח (Manager)</SelectItem>
+                              <SelectContent dir="rtl">
+                                <SelectItem value="manager">בעל הרשאות (Manager)</SelectItem>
                                 <SelectItem value="admin">מנהל (Admin)</SelectItem>
                               </SelectContent>
                             </Select>
@@ -526,7 +526,8 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                               <div className="flex items-center gap-2 mb-1">
                                 <Users className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                 <p className="font-bold text-gray-800 truncate">
-                                  {user.full_name}
+                                  {/* כאן השינוי: מציג Assigned Role ברשימה */}
+                                  {user.assigned_role || user.full_name}
                                 </p>
                               </div>
                               <p className="text-xs text-gray-500 truncate">{user.email}</p>
@@ -537,12 +538,12 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                                 value={user.user_type} 
                                 onValueChange={(value) => handleRoleChange(user.id, value)}
                               >
-                                <SelectTrigger className="w-full md:w-40 h-10 rounded-xl">
+                                <SelectTrigger className="w-full md:w-48 h-10 rounded-xl text-right" dir="rtl">
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent dir="rtl">
                                   <SelectItem value="admin">מנהל (Admin)</SelectItem>
-                                  <SelectItem value="manager">מפקח (Manager)</SelectItem>
+                                  <SelectItem value="manager">בעל הרשאות (Manager)</SelectItem>
                                   <SelectItem value="user">משתמש רגיל</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -552,14 +553,6 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                       ))
                     )}
                   </div>
-
-                  {/* Info Box */}
-                  <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-4 mt-6">
-                    <p className="text-sm text-indigo-900">
-                      <span className="font-bold">💡 הסבר:</span> מנהלים ומפקחים יכולים לנהל משמרות, לאשר החלפות ולערוך תפקידים. 
-                      המערכת מעניקה להם גישה מלאה לכל הפונקציות הניהוליות.
-                    </p>
-                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -568,7 +561,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-          <DialogContent>
+          <DialogContent dir="rtl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 text-red-500" />
@@ -581,7 +574,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                 }
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
                 ביטול
               </Button>
