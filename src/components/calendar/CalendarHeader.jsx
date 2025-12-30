@@ -15,8 +15,8 @@ export default function CalendarHeader({
   setViewMode,
   isAdmin,
   onOpenAdminSettings,
-  onOpenHallOfFame, // <--- חדש
-  onOpenHelp,       // <--- חדש
+  onOpenHallOfFame, 
+  onOpenHelp, 
   currentUser,
   hideHeader = false,
   hideNavigation = false
@@ -124,7 +124,7 @@ export default function CalendarHeader({
                     
                     {/* 1. היכל התהילה */}
                     <button 
-                        onClick={onOpenHallOfFame} // <--- חיבור לפונקציה
+                        onClick={onOpenHallOfFame}
                         className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
                         title="היכל התהילה"
                     >
@@ -137,7 +137,7 @@ export default function CalendarHeader({
 
                     {/* 2. הדרכה ועזרה */}
                     <button 
-                        onClick={onOpenHelp} // <--- חיבור לפונקציה
+                        onClick={onOpenHelp}
                         className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
                         title="הדרכה ועזרה"
                     >
@@ -226,14 +226,15 @@ export default function CalendarHeader({
       )}
 
       {/* ----------------------------- */}
-      {/* 3. סרגל ניווט תחתון (ללא שינוי) */}
+      {/* 3. סרגל ניווט תחתון (ממורכז) */}
       {/* ----------------------------- */}
       {!hideNavigation && (
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* שיניתי את הסדר כאן כדי למרכז */}
+        <div className="flex flex-col md:flex-row-reverse items-center justify-between gap-4">
           
-          {/* כפתורי תצוגה */}
-          <div className="flex items-center bg-gray-100 rounded-xl p-1">
+          {/* כפתורי תצוגה (ימין ב-RTL, שמאל במסך) */}
+          <div className="flex items-center bg-gray-100 rounded-xl p-1 order-2 md:order-1">
             <button
               onClick={() => setViewMode('month')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -258,8 +259,8 @@ export default function CalendarHeader({
             </button>
           </div>
 
-          {/* חיצים וכותרת תאריך */}
-          <div className="flex items-center gap-4">
+          {/* חיצים וכותרת תאריך (מרכז) */}
+          <div className="flex items-center gap-4 flex-1 justify-center order-1 md:order-2">
             <Button
               variant="ghost"
               size="icon"
@@ -282,6 +283,9 @@ export default function CalendarHeader({
               <ChevronLeft className="w-5 h-5" />
             </Button>
           </div>
+
+          {/* אלמנט דמי לאיזון (שמאל ב-RTL) */}
+          <div className="hidden md:block w-[180px] order-3"></div>
         </div>
       </div>
       )}
