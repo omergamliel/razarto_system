@@ -1,38 +1,53 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trophy, Medal, Star, TrendingUp } from 'lucide-react';
+import { X, Trophy, Medal, TrendingUp, User } from 'lucide-react'; // הסרתי את Star
 import { Button } from "@/components/ui/button";
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 export default function HallOfFameModal({ isOpen, onClose }) {
-  if (!isOpen) return null;
+  
+  // 1. שליפת כל הכיסויים מהדאטה-בייס
+  const { data: allCoverages = [], isLoading } = useQuery({
+    queryKey: ['all-coverages-hof'],
+    queryFn: () => base44.entities.ShiftCoverage.list(),
+    enabled: isOpen // שליפה רק כשהמודל נפתח
+  });
 
-  // Mock data for top swappers
-  const topSwappers = [
-    { 
-      rank: 1, 
-      name: 'דני כהן', 
-      role: 'רז"ר מבצעים', 
-      swaps: 24, 
-      helpScore: 95,
-      avatar: '🏆'
-    },
-    { 
-      rank: 2, 
-      name: 'שירה לוי', 
-      role: 'רע"ן תצפית', 
-      swaps: 19, 
-      helpScore: 88,
-      avatar: '🥈'
-    },
-    { 
-      rank: 3, 
-      name: 'יוסי אברהם', 
-      role: 'רז"ר קשר', 
-      swaps: 16, 
-      helpScore: 82,
-      avatar: '🥉'
-    }
-  ];
+  // 2. עיבוד הנתונים לדירוג
+  const topSwappers = React.useMemo(() => {
+    if (!allCoverages || allCoverages.length === 0) return [];
+
+    const stats = {};
+
+    allCoverages.forEach(coverage => {
+      // נספור לפי אימייל (חד ערכי)
+      const email = coverage.covering_email;
+      if (!email) return;
+
+      if (!stats[email]) {
+        stats[email] = {
+          name: coverage.covering_person || 'משתמש לא ידוע',
+          role: coverage.covering_role || 'ללא תפקיד',
+          swaps: 0,
+          email: email
+        };
+      }
+      stats[email].swaps += 1;
+    });
+
+    // המרת האובייקט למערך ומיון
+    return Object.values(stats)
+      .sort((a, b) => b.swaps - a.swaps) // מיון יורד לפי כמות החלפות
+      .slice(0, 3) // רק טופ 3
+      .map((user, index) => ({
+        ...user,
+        rank: index + 1,
+        avatar: index === 0 ? '🏆' : index === 1 ? '🥈' : '🥉'
+      }));
+  }, [allCoverages]);
+
+  if (!isOpen) return null;
 
   const getRankBadge = (rank) => {
     const badges = {
@@ -81,72 +96,79 @@ export default function HallOfFameModal({ isOpen, onClose }) {
               </div>
               <div>
                 <h2 className="text-3xl font-bold mb-1">היכל התהילה 🏆</h2>
-                <p className="text-white/90 text-sm">המחליפים המובילים החודש</p>
+                <p className="text-white/90 text-sm">המחליפים המובילים בכל הזמנים</p>
               </div>
             </div>
           </div>
 
           {/* Content */}
           <div className="p-6">
-            <div className="space-y-4 mb-6">
-              {topSwappers.map((swapper, index) => {
-                const badge = getRankBadge(swapper.rank);
-                const BadgeIcon = badge.icon;
-                
-                return (
-                  <motion.div
-                    key={swapper.rank}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className={`
-                      relative rounded-2xl p-5 border-2 transition-all hover:shadow-xl
-                      ${swapper.rank === 1 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-300 shadow-lg' : ''}
-                      ${swapper.rank === 2 ? 'bg-gradient-to-br from-gray-50 to-slate-50 border-gray-300' : ''}
-                      ${swapper.rank === 3 ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-300' : ''}
-                    `}
-                  >
-                    {/* Rank Badge */}
-                    <div className={`absolute -top-3 -right-3 w-10 h-10 rounded-full bg-gradient-to-br ${badge.bg} flex items-center justify-center shadow-lg`}>
-                      <span className="text-white font-bold text-lg">#{swapper.rank}</span>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      {/* Avatar */}
-                      <div className="text-5xl">{swapper.avatar}</div>
-                      
-                      {/* Info */}
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-800 mb-1">{swapper.name}</h3>
-                        <p className="text-sm text-gray-600 mb-2">{swapper.role}</p>
-                        
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="w-4 h-4 text-green-600" />
-                            <span className="font-semibold text-gray-700">{swapper.swaps} החלפות</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                            <span className="font-semibold text-gray-700">ציון {swapper.helpScore}</span>
-                          </div>
+            
+            {isLoading ? (
+                <div className="text-center py-10 text-gray-500">טוען נתונים...</div>
+            ) : topSwappers.length === 0 ? (
+                <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    <p className="text-gray-500 text-lg font-medium">טרם בוצעו החלפות במערכת</p>
+                    <p className="text-gray-400 text-sm">היה הראשון להחליף והופיע כאן! 🥇</p>
+                </div>
+            ) : (
+                <div className="space-y-4 mb-6">
+                {topSwappers.map((swapper, index) => {
+                    const badge = getRankBadge(swapper.rank);
+                    const BadgeIcon = badge.icon;
+                    
+                    return (
+                    <motion.div
+                        key={swapper.email} // שימוש באימייל כמפתח ייחודי
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className={`
+                        relative rounded-2xl p-5 border-2 transition-all hover:shadow-xl
+                        ${swapper.rank === 1 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-300 shadow-lg' : ''}
+                        ${swapper.rank === 2 ? 'bg-gradient-to-br from-gray-50 to-slate-50 border-gray-300' : ''}
+                        ${swapper.rank === 3 ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-300' : ''}
+                        `}
+                    >
+                        {/* Rank Badge */}
+                        <div className={`absolute -top-3 -right-3 w-10 h-10 rounded-full bg-gradient-to-br ${badge.bg} flex items-center justify-center shadow-lg`}>
+                        <span className="text-white font-bold text-lg">#{swapper.rank}</span>
                         </div>
-                      </div>
 
-                      {/* Icon */}
-                      <div className={`p-3 bg-gradient-to-br ${badge.bg} rounded-xl`}>
-                        <BadgeIcon className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+                        <div className="flex items-center gap-4">
+                        {/* Avatar */}
+                        <div className="text-5xl">{swapper.avatar}</div>
+                        
+                        {/* Info */}
+                        <div className="flex-1">
+                            <h3 className="text-xl font-bold text-gray-800 mb-1">{swapper.name}</h3>
+                            <p className="text-sm text-gray-600 mb-2">{swapper.role}</p>
+                            
+                            <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-1">
+                                <TrendingUp className="w-4 h-4 text-green-600" />
+                                <span className="font-semibold text-gray-700">{swapper.swaps} החלפות</span>
+                            </div>
+                            {/* הוסר החלק של הציון כפי שביקשת */}
+                            </div>
+                        </div>
+
+                        {/* Icon */}
+                        <div className={`p-3 bg-gradient-to-br ${badge.bg} rounded-xl`}>
+                            <BadgeIcon className="w-6 h-6 text-white" />
+                        </div>
+                        </div>
+                    </motion.div>
+                    );
+                })}
+                </div>
+            )}
 
             {/* Info Box */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
               <p className="text-sm text-blue-800">
                 <span className="font-bold">💡 טיפ:</span> ככל שתעזור יותר לאחרים בהחלפות, כך תעלה בדירוג! 
-                היכל התהילה מתעדכן בסוף כל חודש.
+                הנתונים מתעדכנים בזמן אמת.
               </p>
             </div>
 
