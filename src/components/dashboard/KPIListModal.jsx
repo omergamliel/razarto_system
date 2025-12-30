@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowLeft, Clock, AlertCircle, CalendarPlus, MessageCircle, ChevronDown } from 'lucide-react';
+import { X, Calendar, ArrowLeft, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, ChevronDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
