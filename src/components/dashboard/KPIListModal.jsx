@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowLeft, Clock, AlertCircle, CalendarPlus, MessageCircle } from 'lucide-react';
+import { X, Calendar, ArrowLeft, Clock, AlertCircle, CalendarPlus, MessageCircle, ChevronDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -9,6 +9,16 @@ import { base44 } from '@/api/base44Client';
 
 export default function KPIListModal({ isOpen, onClose, type, shifts, currentUser, onOfferCover, onRequestSwap }) {
   
+  // State לניהול כמות המשמרות המוצגות (Pagination)
+  const [visibleCount, setVisibleCount] = useState(10);
+
+  // איפוס הכמות בכל פעם שהמודל נפתח או הסוג משתנה
+  useEffect(() => {
+    if (isOpen) {
+        setVisibleCount(10);
+    }
+  }, [isOpen, type]);
+
   const { data: allCoverages = [] } = useQuery({
     queryKey: ['all-shift-coverages-modal', type, currentUser?.email],
     queryFn: async () => {
@@ -136,6 +146,10 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
 
   const { title, color } = getTitleAndColor();
   const filteredShifts = filterShifts();
+  
+  // חיתוך הרשימה לפי הכמות הנצפית (Pagination)
+  const displayedShifts = filteredShifts.slice(0, visibleCount);
+  const hasMore = filteredShifts.length > visibleCount;
 
   return (
     <AnimatePresence>
@@ -154,7 +168,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
               <div className="text-center py-12 text-gray-500"><p>אין משמרות להצגה</p></div>
             ) : (
               <div className="space-y-3">
-                {filteredShifts.map((shift) => {
+                {displayedShifts.map((shift) => {
                   const shiftCoverages = allCoverages.filter(c => c.shift_id === shift.id).sort((a, b) => new Date(`${a.start_date}T${a.start_time}:00`) - new Date(`${b.start_date}T${b.start_time}:00`));
                   const myPartialCoverages = type === 'my_shifts' ? shiftCoverages.filter(c => c.covering_email === currentUser?.email) : [];
                   const amICoveringOnly = myPartialCoverages.length > 0 && shift.assigned_email !== currentUser?.email;
@@ -181,16 +195,16 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {/* --- החלק ששונה: תצוגת ההחלפות המאושרות עם תיקון סדר אנשים --- */}
+                          {/* --- תצוגת החלפות שבוצעו (כרטיס ירוק מודגש) --- */}
                           {type === 'approved' ? (
                              <div className="space-y-2 mt-2">
                                 {shiftCoverages.map((coverage) => (
                                     <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
                                         
-                                        {/* שורת האנשים - הוחלף הסדר כדי שב-RTL המחליף יהיה בימין */}
+                                        {/* שורת האנשים */}
                                         <div className="flex items-center justify-center gap-3 text-sm">
                                             
-                                            {/* 1. המחליף (הירוק) - ראשון בקוד => יופיע בצד ימין */}
+                                            {/* המחליף (הירוק) - בצד ימין */}
                                             <div className="text-center flex-1">
                                                 <div className="text-sm font-bold text-green-700">
                                                     {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
@@ -200,7 +214,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                             {/* חץ */}
                                             <ArrowLeft className="w-4 h-4 text-green-600 flex-shrink-0" />
                                             
-                                            {/* 2. המקורי (האפור) - שני בקוד => יופיע בצד שמאל */}
+                                            {/* המקורי (האפור) - בצד שמאל */}
                                             <div className="text-center flex-1">
                                                 <div className="text-sm font-bold text-gray-800">
                                                     {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
@@ -209,13 +223,13 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                             
                                         </div>
 
-                                        {/* שורת השעות - LTR */}
+                                        {/* שורת השעות - מודגשת במיוחד! */}
                                         <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
-                                            <div className="flex items-center justify-center gap-2 text-xs text-gray-600" dir="ltr">
-                                                <span>
+                                            <div className="flex items-center justify-center gap-2 text-sm" dir="ltr">
+                                                <span className="font-extrabold text-gray-900">
                                                     {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
                                                 </span>
-                                                <Clock className="w-3 h-3" />
+                                                <Clock className="w-4 h-4 text-gray-700" />
                                             </div>
                                             <div className="text-[10px] text-gray-500 text-center">
                                                 אושר ב: {(() => {
@@ -261,7 +275,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                           )}
                         </div>
 
-                        {/* צד שמאל - אייקונים */}
+                        {/* צד שמאל - אייקונים (רק במשמרות שלי ובקשות) */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                               
                               {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
@@ -304,6 +318,22 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                     </div>
                   );
                 })}
+
+                {/* --- כפתור טעינת עוד --- */}
+                {hasMore && (
+                    <div className="pt-2 flex justify-center">
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setVisibleCount(prev => prev + 10)}
+                            className="text-gray-500 hover:text-gray-800 hover:bg-gray-100 w-full"
+                        >
+                            <ChevronDown className="w-4 h-4 mr-2" />
+                            הצג משמרות נוספות
+                        </Button>
+                    </div>
+                )}
+
               </div>
             )}
           </div>
