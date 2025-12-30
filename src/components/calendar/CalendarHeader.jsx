@@ -135,18 +135,6 @@ export default function CalendarHeader({
                         />
                     </button>
 
-                    {/* 2. הדרכה ועזרה */}
-                    <button 
-                        onClick={onOpenHelp}
-                        className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
-                        title="הדרכה ועזרה"
-                    >
-                        <img 
-                            src="https://cdn-icons-png.flaticon.com/128/189/189665.png" 
-                            alt="Help" 
-                            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
-                        />
-                    </button>
 
                     {/* 3. לוח ניהול (רק למנהלים) */}
                     {isAdmin && (
