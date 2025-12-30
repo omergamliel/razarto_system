@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react';
+import { X, Calendar, ArrowLeft, Clock, AlertCircle, CalendarPlus, MessageCircle, RefreshCw } from 'lucide-react'; // שים לב: ArrowLeft
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -181,30 +181,39 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                             <span className="font-semibold text-gray-800">{format(new Date(shift.date), 'EEEE, d בMMMM', { locale: he })}</span>
                           </div>
 
-                          {/* --- החלק ששונה: תצוגת ההחלפות המאושרות (חזרה לעיצוב הישן) --- */}
+                          {/* --- החלק ששונה: תצוגת ההחלפות המאושרות עם תיקון כיווניות --- */}
                           {type === 'approved' ? (
                              <div className="space-y-2 mt-2">
                                 {shiftCoverages.map((coverage) => (
                                     <div key={coverage.id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                                        
+                                        {/* שורת האנשים - חץ שמאלה כדי להראות זרימה מימין לשמאל */}
                                         <div className="flex items-center justify-center gap-3 text-sm">
+                                            {/* המקורי - בצד ימין (Flex ברירת מחדל בRTL) */}
                                             <div className="text-center flex-1">
                                                 <div className="text-sm font-bold text-gray-800">
                                                     {shift.original_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
                                                 </div>
                                             </div>
-                                            <ArrowRight className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                            
+                                            {/* חץ מצביע שמאלה - מהמקורי למחליף */}
+                                            <ArrowLeft className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                            
+                                            {/* המחליף - בצד שמאל */}
                                             <div className="text-center flex-1">
                                                 <div className="text-sm font-bold text-green-700">
                                                     {coverage.covering_role?.replace(/^רז"ר\s+/, '').replace(/^רע"ן\s+/, '').trim() || 'תפקיד'}
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* שורת השעות - שימוש ב LTR כדי שהמספרים לא יתהפכו */}
                                         <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
-                                            <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
-                                                <Clock className="w-3 h-3" />
+                                            <div className="flex items-center justify-center gap-2 text-xs text-gray-600" dir="ltr">
                                                 <span>
                                                     {format(new Date(coverage.start_date), 'd/M')} {coverage.start_time} - {format(new Date(coverage.end_date), 'd/M')} {coverage.end_time}
                                                 </span>
+                                                <Clock className="w-3 h-3" />
                                             </div>
                                             <div className="text-[10px] text-gray-500 text-center">
                                                 אושר ב: {(() => {
@@ -253,17 +262,14 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                         {/* צד שמאל - אייקונים */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                               
-                              {/* 1. אני אחליף (עבור אחרים) - עדיין כפתור מלא */}
                               {(type === 'swap_requests' || type === 'partial_gaps') && shift.assigned_email !== currentUser?.email && (
                                     <Button onClick={() => { onClose(); onOfferCover(shift); }} size="sm" className="bg-blue-500 text-white hover:bg-blue-600 px-3 h-9">
                                         אחליף <ArrowRight className="w-4 h-4 mr-1" />
                                     </Button>
                               )}
                               
-                              {/* 2. אייקונים למשמרות שלי */}
                               {type === 'my_shifts' && (
                                 <>
-                                    {/* יומן - תמיד מופיע */}
                                     <Button 
                                         onClick={() => handleAddToCalendar(shift)} 
                                         size="icon" 
@@ -274,7 +280,6 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
 
-                                    {/* ווצאפ/בקשה - מופיע לכולם ב-KPI הזה, למעט מי שרק מכסה חלקי */}
                                     {!amICoveringOnly && (
                                         <Button 
                                             onClick={handleWhatsAppClick}
