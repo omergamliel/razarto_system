@@ -178,14 +178,8 @@ export default function ShiftCalendar() {
         status: 'approved'
       });
 
-      // 2. Logic for Partial/Full status update (Simplified for brevity as per previous logic)
-      const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
-      // ... (Existing logic for calculating minutes) ...
-      // For now, simply triggering update to refresh UI
-      
-      // Let's perform a basic update to notify partial coverage
       return base44.entities.Shift.update(shift.id, {
-          status: 'partially_covered' // Or calculate dynamically as before
+          status: 'partially_covered'
       });
     },
     onSuccess: () => {
