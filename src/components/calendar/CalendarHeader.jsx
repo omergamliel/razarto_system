@@ -15,6 +15,8 @@ export default function CalendarHeader({
   setViewMode,
   isAdmin,
   onOpenAdminSettings,
+  onOpenHallOfFame, // <--- חדש
+  onOpenHelp,       // <--- חדש
   currentUser,
   hideHeader = false,
   hideNavigation = false
@@ -96,15 +98,6 @@ export default function CalendarHeader({
     }
   };
 
-  // --- פונקציה לכפתורים שעדיין לא פותחו ---
-  const handleComingSoon = (featureName) => {
-    toast.info(`פיצ'ר ${featureName} יהיה זמין בקרוב!`, {
-        icon: <Info className="w-4 h-4 text-blue-500" />,
-        duration: 2000,
-        style: { direction: 'rtl', fontFamily: 'Heebo' }
-    });
-  };
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: -20 }}
@@ -131,7 +124,7 @@ export default function CalendarHeader({
                     
                     {/* 1. היכל התהילה */}
                     <button 
-                        onClick={() => handleComingSoon('היכל התהילה')}
+                        onClick={onOpenHallOfFame} // <--- חיבור לפונקציה
                         className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
                         title="היכל התהילה"
                     >
@@ -144,7 +137,7 @@ export default function CalendarHeader({
 
                     {/* 2. הדרכה ועזרה */}
                     <button 
-                        onClick={() => handleComingSoon('הדרכה ועזרה')}
+                        onClick={onOpenHelp} // <--- חיבור לפונקציה
                         className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
                         title="הדרכה ועזרה"
                     >
@@ -176,13 +169,11 @@ export default function CalendarHeader({
 
             {/* ----------------------------- */}
             {/* 2. אזור המיתוג (לוגו + כותרת) */}
-            {/* הוספתי 'hidden md:flex' כדי להסתיר במובייל ולהציג רק במחשב */}
             {/* ----------------------------- */}
             <div className="hidden md:flex flex-col md:flex-row items-center justify-between mb-8 px-2 relative">
                 
                 {/* לוגו (צד ימין ב-RTL) */}
                 <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                     {/* Input נסתר להעלאת תמונה */}
                      {isAdmin && (
                         <input
                         ref={fileInputRef}
@@ -228,7 +219,7 @@ export default function CalendarHeader({
                     </div>
                 </div>
 
-                {/* אלמנט מאזן ריק בצד שמאל (כדי שהכותרת תהיה באמת באמצע בדסקטופ) */}
+                {/* אלמנט מאזן ריק בצד שמאל */}
                 <div className="w-16"></div>
             </div>
         </>
