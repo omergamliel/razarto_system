@@ -235,6 +235,8 @@ export default function ShiftCalendar() {
     setShowCoverSegmentModal(true); 
   };
 
+  const isAdmin = ['admin', 'manager'].includes(currentUser?.user_type);
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] relative overflow-hidden" dir="rtl" style={{ fontFamily: 'Heebo, sans-serif' }}>
       <SeedRolesData />
