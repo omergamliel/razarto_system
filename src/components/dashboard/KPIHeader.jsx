@@ -6,7 +6,7 @@ import { base44 } from '@/api/base44Client';
 
 export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
 
-  // --- לוגיקה (ללא שינוי) ---
+  // --- Logic ---
 
   const { data: myCoverages = [] } = useQuery({
     queryKey: ['my-coverages', currentUser?.email],
@@ -26,7 +26,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return true; 
   };
 
-  // 1. KPI אדום
+  // 1. Red KPI: Full Swap Requests
   const swapRequestsCount = shifts.filter(s => {
     const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
                          s.status === 'REQUIRES_SWAP' || 
@@ -34,12 +34,13 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return isSwapStatus && isFull24Hours(s);
   }).length;
 
-  // 2. KPI צהוב
+  // 2. Yellow KPI: Partial Gaps
   const partialGapsCount = shifts.filter(s => {
     const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
                               s.status === 'partially_covered' ||
                               s.status === 'REQUIRES_PARTIAL';
 
+    // A requested full swap that ISN'T 24 hours counts as partial for our logic
     const isDegradedFullSwap = (s.status === 'REQUIRES_FULL_COVERAGE' || 
                                 s.status === 'REQUIRES_SWAP' || 
                                 s.status === 'swap_requested') && !isFull24Hours(s);
@@ -47,12 +48,12 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
     return isOfficialPartial || isDegradedFullSwap;
   }).length;
 
-  // 3. KPI ירוק
+  // 3. Green KPI: Approved / History
   const approvedCount = shifts.filter(s => 
     s.status === 'SWAPPED' || s.status === 'COVERED' || s.status === 'approved'
   ).length;
 
-  // 4. KPI כחול
+  // 4. Blue KPI: My Shifts
   const myShiftsCount = shifts.filter(s => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -122,8 +123,6 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
   ];
 
   return (
-    // Grid: 4 עמודות גם במובייל וגם במחשב (grid-cols-4)
-    // gap-2: רווח קטן כדי שייכנס למסך צר
     <div className="grid grid-cols-4 gap-2 mb-6">
       {kpis.map((kpi, index) => (
         <motion.div
@@ -136,26 +135,19 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
             ${kpi.bgColor} border ${kpi.borderColor} 
             rounded-xl cursor-pointer hover:shadow-md transition-all
             flex flex-col items-center justify-center text-center
-            // תיקון כאן: הורדתי את md:justify-between והוספתי md:gap-3 ו-md:items-center
             p-2 md:p-4 md:flex-row md:gap-3 md:items-center md:text-right
             h-full
           `}
         >
-          {/* מובייל: הכל באמצע אחת מתחת לשני. דסקטופ: שורה */}
-          
-          {/* אייקון */}
           <div className={`p-1.5 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-br ${kpi.gradient} text-white shadow-sm mb-1 md:mb-0`}>
             <kpi.icon className="w-4 h-4 md:w-6 md:h-6" />
           </div>
 
-          {/* מספר וכותרת */}
           <div className="flex flex-col items-center md:items-start">
-            {/* המספר */}
             <span className={`text-xl md:text-3xl font-extrabold ${kpi.textColor} leading-none mb-1 md:mb-0`}>
               {kpi.count}
             </span>
             
-            {/* הכותרת - קטנה מאוד במובייל כדי להיכנס */}
             <p className="text-[10px] md:text-xs font-bold text-gray-700 leading-tight">
               <span className="md:hidden block px-1">{kpi.mobileTitle}</span>
               <span className="hidden md:block">{kpi.desktopTitle}</span>
