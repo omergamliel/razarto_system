@@ -107,20 +107,52 @@ export default function CalendarHeader({
       {!hideHeader && (
         <>
             {/* ----------------------------- */}
-            {/* 1. פס עליון סטיקי (User + Icons) */}
+            {/* 1. פס עליון סטיקי (User + Logo + Icons) */}
             {/* ----------------------------- */}
             <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm px-6 py-3 rounded-b-2xl -mx-4 -mt-6 mb-8 flex items-center justify-between transition-all">
                 
-                {/* צד ימין: ברכה דינמית + שם משתמש */}
-                <div className="flex flex-col items-start">
-                    <span className="text-gray-500 text-xs font-medium">{getTimeBasedGreeting()},</span>
-                    <span className="text-gray-900 font-bold text-lg leading-tight">
-                        {currentUser?.assigned_role || currentUser?.full_name || 'אורח'}
-                    </span>
+                {/* צד ימין: לוגו + ברכה + שם משתמש */}
+                <div className="flex items-center gap-4">
+                    {/* LOGO AREA - MOVED HERE */}
+                    <div className="relative group">
+                        {isAdmin && (
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileUpload}
+                                className="hidden"
+                            />
+                        )}
+                        <div 
+                            onClick={isAdmin ? handleLogoClick : undefined}
+                            className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-full shadow-md flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
+                        >
+                            {logoUrl ? (
+                                <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-white font-bold text-[10px] md:text-xs">חמ"ל</span>
+                            )}
+                            
+                            {isAdmin && (
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                    <Upload className="w-4 h-4 text-white" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* TEXT AREA */}
+                    <div className="flex flex-col items-start">
+                        <span className="text-gray-500 text-xs font-medium">{getTimeBasedGreeting()},</span>
+                        <span className="text-gray-900 font-bold text-lg leading-tight">
+                            {currentUser?.assigned_role || currentUser?.full_name || 'אורח'}
+                        </span>
+                    </div>
                 </div>
 
                 {/* צד שמאל: שורת האייקונים */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 md:gap-3">
                     
                     {/* 1. היכל התהילה */}
                     <button 
@@ -131,23 +163,9 @@ export default function CalendarHeader({
                         <img 
                             src="https://cdn-icons-png.flaticon.com/128/1021/1021202.png" 
                             alt="Hall of Fame" 
-                            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
+                            className="w-6 h-6 md:w-7 md:h-7 object-contain group-hover:scale-110 transition-transform"
                         />
                     </button>
-
-                    {/* 2. הדרכה ועזרה - כרגע מוסתר בהערה */}
-                    {/* <button 
-                        onClick={onOpenHelp}
-                        className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
-                        title="הדרכה ועזרה"
-                    >
-                        <img 
-                            src="https://cdn-icons-png.flaticon.com/128/189/189665.png" 
-                            alt="Help" 
-                            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
-                        />
-                    </button> 
-                    */}
 
                     {/* 3. לוח ניהול (רק למנהלים) */}
                     {isAdmin && (
@@ -159,7 +177,7 @@ export default function CalendarHeader({
                             <img 
                                 src="https://cdn-icons-png.flaticon.com/128/2965/2965279.png" 
                                 alt="Admin Panel" 
-                                className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
+                                className="w-6 h-6 md:w-7 md:h-7 object-contain group-hover:scale-110 transition-transform"
                             />
                             {/* אינדיקטור קטן למנהל */}
                             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
@@ -169,61 +187,20 @@ export default function CalendarHeader({
             </div>
 
             {/* ----------------------------- */}
-            {/* 2. אזור המיתוג (לוגו + כותרת) */}
+            {/* 2. אזור המיתוג (כותרת ראשית בלבד - לוגו הועבר למעלה) */}
             {/* ----------------------------- */}
-            {/* השינוי: הסרתי את ה-hidden כדי שיוצג גם במובייל */}
-            <div className="flex flex-col md:flex-row items-center justify-between mb-8 px-2 relative">
-                
-                {/* לוגו (צד ימין ב-RTL) */}
-                {/* שינוי: הוספתי relative mb-4 עבור מובייל, והגבלת absolute למסכי md ומעלה */}
-                <div className="relative mb-4 md:mb-0 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2">
-                     {isAdmin && (
-                        <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        />
-                    )}
-                    <motion.div
-                        whileHover={isAdmin ? { scale: 1.05 } : {}}
-                        whileTap={isAdmin ? { scale: 0.95 } : {}}
-                        onClick={isAdmin ? handleLogoClick : undefined}
-                        className={`w-16 h-16 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-xl shadow-lg flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer group' : ''}`}
-                    >
-                        {logoUrl ? (
-                        <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
-                        ) : (
-                        <div className="text-white text-xs font-bold text-center leading-tight">
-                            חטיבת<br/>מבצעים
-                        </div>
-                        )}
-                        {isAdmin && (
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Upload className="w-6 h-6 text-white" />
-                        </div>
-                        )}
-                    </motion.div>
+            <div className="flex flex-col items-center justify-center mb-8 px-2 text-center">
+                <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.1em' }}>
+                    Razarto
+                </h1>
+                <div className="flex flex-col items-center gap-1">
+                    <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
+                        מערכת לניהול משמרות
+                    </span>
+                    <p className="text-gray-400 text-xs mt-1">
+                        צפייה במשמרות | ביצוע החלפות מסודרות
+                    </p>
                 </div>
-
-                {/* כותרת ראשית (מרכז) */}
-                <div className="flex-1 text-center">
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.1em' }}>
-                        Razarto
-                    </h1>
-                    <div className="flex flex-col items-center gap-1">
-                        <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
-                            מערכת לניהול משמרות
-                        </span>
-                        <p className="text-gray-400 text-xs mt-1">
-                            צפייה במשמרות | ביצוע החלפות מסודרות
-                        </p>
-                    </div>
-                </div>
-
-                {/* אלמנט מאזן ריק בצד שמאל - מוסתר במובייל */}
-                <div className="hidden md:block w-16"></div>
             </div>
         </>
       )}
