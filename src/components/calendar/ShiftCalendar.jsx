@@ -109,7 +109,7 @@ export default function ShiftCalendar() {
 
   const addShiftMutation = useMutation({
     mutationFn: async ({ date, shiftData }) => {
-      if (currentUser?.user_type !== 'admin') {
+      if (!isAdmin) {
         throw new Error('רק מנהלים יכולים ליצור משמרות');
       }
       return base44.entities.Shift.create({
@@ -306,7 +306,7 @@ export default function ShiftCalendar() {
 
   const approveSwapMutation = useMutation({
     mutationFn: async (shift) => {
-      if (currentUser?.user_type !== 'admin') {
+      if (!isAdmin) {
         throw new Error('רק מנהלים יכולים לאשר החלפות');
       }
       const updateData = {
@@ -333,7 +333,7 @@ export default function ShiftCalendar() {
 
   const deleteShiftMutation = useMutation({
     mutationFn: async (shiftId) => {
-      if (currentUser?.user_type !== 'admin') {
+      if (!isAdmin) {
         throw new Error('רק מנהלים יכולים למחוק משמרות');
       }
       return base44.entities.Shift.delete(shiftId);
