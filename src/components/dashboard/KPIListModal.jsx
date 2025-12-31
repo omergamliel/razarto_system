@@ -23,7 +23,7 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
     queryKey: ['all-shift-coverages-modal', type, currentUser?.email],
     queryFn: async () => {
       if (type === 'approved') {
-          const approvedShifts = shifts.filter(s => s.status === 'approved');
+          const approvedShifts = shifts.filter(s => s.status === 'approved' || s.status === 'SWAPPED' || s.status === 'COVERED');
           const coveragePromises = approvedShifts.map(shift => 
             base44.entities.ShiftCoverage.filter({ shift_id: shift.id })
           );
