@@ -333,7 +333,7 @@ export default function SwapRequestModal({
                       </div>
                   </div>
 
-                  {/* Dynamic Duration Label */}
+                  {/* Dynamic Duration Labels */}
                   {!isFullDuration && (
                       <div className="flex justify-center -mt-3">
                           <motion.div 
