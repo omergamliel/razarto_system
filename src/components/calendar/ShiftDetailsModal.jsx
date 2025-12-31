@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Trash2, CheckCircle, AlertCircle, CalendarPlus, ArrowLeftRight, XCircle } from 'lucide-react';
+import { X, Calendar, Clock, User, Trash2, CheckCircle, AlertCircle, CalendarPlus, ArrowLeftRight, XCircle, Share2, Send } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 
 export default function ShiftDetailsModal({ 
   isOpen, 
@@ -15,7 +16,7 @@ export default function ShiftDetailsModal({
   date,
   onOfferCover,
   onHeadToHead,
-  onCancelRequest, // New prop
+  onCancelRequest, 
   onDelete,
   onApprove,
   currentUserEmail,
@@ -33,6 +34,13 @@ export default function ShiftDetailsModal({
     const baseDate = new Date(shift.date);
     let startTimeStr = shift.swap_start_time || '09:00';
     let endTimeStr = shift.swap_end_time || '09:00';
+    
+    // If regular shift without swap times, use default 09:00-09:00 or shift times
+    if (shift.status === 'regular') {
+        startTimeStr = shift.start_time || '09:00';
+        endTimeStr = shift.end_time || '09:00';
+    }
+
     const [startH, startM] = startTimeStr.split(':').map(Number);
     const [endH, endM] = endTimeStr.split(':').map(Number);
     const startDate = new Date(baseDate);
@@ -51,11 +59,31 @@ export default function ShiftDetailsModal({
               date.getMinutes().toString().padStart(2, '0') +
               '00';
     };
-    const title = encodeURIComponent(`משמרת החלפה - ${shift.assigned_role || shift.role}`);
-    const details = encodeURIComponent(`פרטי משמרת להחלפה.\nתפקיד: ${shift.assigned_role || shift.role}\nשעות: ${startTimeStr} - ${endTimeStr}`);
+    const title = encodeURIComponent(`משמרת - ${shift.assigned_role || shift.role}`);
+    const details = encodeURIComponent(`פרטי משמרת.\nתפקיד: ${shift.assigned_role || shift.role}\nשעות: ${startTimeStr} - ${endTimeStr}`);
     const location = encodeURIComponent('בסיס');
     const gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatGCalDate(startDate)}/${formatGCalDate(endDate)}&details=${details}&location=${location}`;
     window.open(gCalUrl, '_blank');
+  };
+
+  // WhatsApp Share Function (Copied Logic)
+  const handleWhatsAppShare = () => {
+      if (!shift) return;
+      
+      const appLink = window.location.origin + window.location.pathname; // Simplified link to app
+      const shiftDate = format(new Date(shift.date), 'dd/MM', { locale: he });
+      const startTime = shift.swap_start_time || '09:00';
+      const endTime = shift.swap_end_time || '09:00';
+      
+      let message = '';
+      if (shift.status === 'REQUIRES_PARTIAL_COVERAGE' || shift.status === 'partially_covered') {
+          message = `היי, אשמח לעזרה בהחלפה חלקית במשמרת שלי בתאריך ${shiftDate} בשעות ${startTime} - ${endTime}.\n\nלאישור והחלפה באפליקציה:\n${appLink}`;
+      } else {
+          message = `היי, אשמח להחלפה במשמרת שלי בתאריך ${shiftDate}.\n\nלאישור והחלפה באפליקציה:\n${appLink}`;
+      }
+
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
   };
 
   const { data: shiftCoverages = [] } = useQuery({
@@ -69,7 +97,8 @@ export default function ShiftDetailsModal({
 
   if (!isOpen || !shift) return null;
 
-  const isOwnShift = shift.assigned_email === currentUserEmail;
+  // FIX: isOwnShift now includes if I am the one who requested the swap!
+  const isOwnShift = shift.assigned_email === currentUserEmail || shift.swap_request_by === currentUserEmail;
   
   // Status Analysis
   const isFullRequest = shift.status === 'REQUIRES_FULL_COVERAGE' || shift.status === 'swap_requested';
@@ -84,7 +113,7 @@ export default function ShiftDetailsModal({
       const startHour = parseInt(startStr.split(':')[0]);
       const endHour = parseInt(endStr.split(':')[0]);
       const shiftDate = new Date(baseDate);
-      const isNextDay = endHour <= startHour; 
+      const isNextDay = endHour <= startHour && !(startHour === 9 && endHour === 9); 
       const endDate = isNextDay ? addDays(shiftDate, 1) : shiftDate;
       return (
           <span className="font-bold text-lg" dir="ltr">
@@ -195,6 +224,7 @@ export default function ShiftDetailsModal({
             {/* Buttons Area */}
             <div className="pt-2 space-y-3">
                 
+                {/* ACTIONS FOR OTHERS (Cover / H2H) */}
                 {needsCoverage && !isOwnShift && (
                     <div className="flex flex-col gap-3">
                         <div className="flex gap-2">
@@ -225,7 +255,35 @@ export default function ShiftDetailsModal({
                     </div>
                 )}
 
-                {/* ADD TO CALENDAR - ONLY FOR OWN SHIFT */}
+                {/* ACTIONS FOR OWNER (Cancel / WhatsApp) */}
+                {needsCoverage && isOwnShift && (
+                    <div className="flex flex-col gap-3">
+                        {/* WhatsApp Share Button */}
+                        <Button 
+                            onClick={handleWhatsAppShare}
+                            className="w-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-xl shadow-md"
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                <Send className="w-4 h-4" />
+                                <span>שתף בקשה בוואטסאפ</span>
+                            </div>
+                        </Button>
+
+                        {/* Cancel Button */}
+                        <Button 
+                            onClick={() => { onClose(); onCancelRequest(shift); }}
+                            variant="destructive"
+                            className="w-full h-12 text-md rounded-xl shadow-lg bg-red-500 hover:bg-red-600"
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                <XCircle className="w-5 h-5" />
+                                <span>בטל בקשה (החזר לרגיל)</span>
+                            </div>
+                        </Button>
+                    </div>
+                )}
+
+                {/* ADD TO CALENDAR - ONLY FOR OWN SHIFT (Regular or Active) */}
                 {isOwnShift && (
                     <Button 
                         onClick={handleAddToCalendar}
@@ -234,20 +292,6 @@ export default function ShiftDetailsModal({
                     >
                         <CalendarPlus className="w-4 h-4 mr-2" />
                         הוסף תזכורת ליומן
-                    </Button>
-                )}
-
-                {/* CANCEL REQUEST - FOR OWN SHIFT WITH ACTIVE REQUEST */}
-                {needsCoverage && isOwnShift && (
-                    <Button 
-                        onClick={() => { onClose(); onCancelRequest(shift); }}
-                        variant="destructive"
-                        className="w-full h-14 text-lg rounded-xl shadow-lg bg-red-500 hover:bg-red-600"
-                    >
-                        <div className="flex items-center justify-center gap-2">
-                            <XCircle className="w-5 h-5" />
-                            <span>בטל בקשה (החזר לרגיל)</span>
-                        </div>
                     </Button>
                 )}
             </div>
