@@ -17,11 +17,13 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     enabled: isOpen && !!currentUser?.email
   });
 
-  // סינון משמרות (אותה לוגיקה מתוקנת ממקודם)
+  // סינון משמרות מתוקן וקפדני
   const myFutureFullShifts = allShifts.filter(shift => {
+    // 1. חייב להיות שלי
     const isMyShift = shift.assigned_email?.toLowerCase() === currentUser?.email?.toLowerCase();
     if (!isMyShift) return false;
     
+    // 2. חייב להיות בעתיד
     const shiftDate = new Date(shift.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -29,14 +31,22 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     
     if (shiftDate < today) return false;
     
-    const hasNoSwapTimes = !shift.swap_start_time || !shift.swap_end_time;
-    const isFullHours = (shift.swap_start_time === '09:00' && shift.swap_end_time === '09:00');
+    // 3. חייב להיות בסטטוס רגיל (לא בתהליך החלפה)
+    // אם אני כבר מחליף אותה, אני לא יכול להציע אותה שוב בראש בראש
+    if (shift.status !== 'regular') return false;
+
+    // 4. חייב להיות משמרת מלאה
+    // משמרת מלאה מוגדרת כמשמרת שאין לה שעות מוגדרות (כי המערכת מניחה שזה מלא)
+    // או שהשעות הן 09:00-09:00
+    const hasSwapTimes = shift.swap_start_time && shift.swap_end_time;
     
-    if (!hasNoSwapTimes && !isFullHours) return false;
-
-    const activeSwapStatuses = ['swap_requested', 'REQUIRES_FULL_COVERAGE', 'REQUIRES_PARTIAL_COVERAGE', 'partially_covered'];
-    if (activeSwapStatuses.includes(shift.status)) return false;
-
+    if (hasSwapTimes) {
+        // אם יש שעות, נבדוק שהן מלאות
+        const isFull = (shift.swap_start_time === '09:00' && shift.swap_end_time === '09:00');
+        if (!isFull) return false;
+    }
+    
+    // אם הגענו לפה, המשמרת תקינה
     return true;
   }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -50,25 +60,20 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
       return;
     }
 
-    // יצירת הקישור
     const appLink = window.location.origin + window.location.pathname;
     const proposalLink = `${appLink}?mode=head_to_head_approval&targetId=${targetShift.id}&offerId=${selectedShift.id}`;
     
-    // פורמט תאריכים
     const targetDate = format(new Date(targetShift.date), 'dd/MM', { locale: he });
     const offerDate = format(new Date(selectedShift.date), 'dd/MM', { locale: he });
     
-    // פונקציית עזר להצגת שעות (ברירת מחדל 09:00 אם אין)
     const formatShiftTimes = (s) => {
         const start = s.swap_start_time || '09:00';
         const end = s.swap_end_time || '09:00';
         return `${start} - ${end}`;
     };
 
-    // שם המשתמש שאליו פונים
     const targetName = targetShift.assigned_role || 'חבר';
 
-    // --- בניית ההודעה החדשה והנקייה ---
     const message = `היי ${targetName},
 אני מעוניין להחליף איתך משמרת ראש בראש.
 
@@ -177,7 +182,7 @@ ${proposalLink}`;
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                             <Clock className="w-3 h-3" />
-                            <span>משמרת מלאה (09:00 - 09:00)</span>
+                            <span dir="ltr">09:00 - 09:00 (למחרת)</span>
                           </div>
                         </div>
                         {selectedShift?.id === shift.id && (
