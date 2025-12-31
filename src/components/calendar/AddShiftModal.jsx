@@ -20,10 +20,10 @@ export default function AddShiftModal({
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState('');
 
-  // Fetch role definitions from DB
-  const { data: roleDefinitions = [] } = useQuery({
-    queryKey: ['role-definitions'],
-    queryFn: () => base44.entities.RoleDefinition.list(),
+  // UPDATED: Fetch Users from the new Users table instead of RoleDefinition
+  const { data: users = [] } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: () => base44.entities.Users.list(),
     enabled: isOpen
   });
 
@@ -31,27 +31,30 @@ export default function AddShiftModal({
     e.preventDefault();
     if (!department || !role) return;
     
+    // We send back the selected 'assigned_role' (name) and 'department'
+    // The parent component (ShiftCalendar) will use this to find the User ID.
     onSubmit({
       department,
-      role
+      role // This holds the user's name/assigned_role
     });
   };
 
   const handleDepartmentChange = (value) => {
     setDepartment(value);
-    setRole(''); // Reset role when department changes
+    setRole(''); // Reset role/name when department changes
   };
 
   if (!isOpen) return null;
 
-  // Get unique departments
-  const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
+  // Extract unique departments from Users table
+  const departments = [...new Set(users.map(u => u.department).filter(Boolean))].sort();
   
-  // Get roles (role_name) for selected department
+  // Filter users based on selected department to show in the dropdown
+  // We map 'assigned_role' as the display name
   const roles = department 
-    ? roleDefinitions
-        .filter(rd => rd.department === department && rd.role_name)
-        .map(rd => rd.role_name)
+    ? users
+        .filter(u => u.department === department && u.assigned_role)
+        .map(u => u.assigned_role)
     : [];
 
   return (
@@ -117,7 +120,7 @@ export default function AddShiftModal({
               </Select>
             </div>
 
-            {/* Role Selection */}
+            {/* Role/Name Selection */}
             <AnimatePresence>
               {department && (
                 <motion.div
