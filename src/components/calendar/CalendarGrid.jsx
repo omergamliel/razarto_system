@@ -41,6 +41,7 @@ export default function CalendarGrid({
   const days = getDaysToDisplay();
 
   const getShiftForDate = (date) => {
+    // Shifts array is now the merged structure from ShiftCalendar
     return shifts.find(shift => 
       isSameDay(new Date(shift.date), date)
     );
