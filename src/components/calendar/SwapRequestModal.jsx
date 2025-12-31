@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, addDays, parseISO, differenceInMinutes, addMinutes } from 'date-fns';
+import { format, addDays, parseISO, differenceInMinutes, addMinutes, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Calendar, AlertCircle, Send, CheckCircle2, ArrowLeftRight, CalendarDays, Timer } from 'lucide-react';
@@ -174,7 +174,8 @@ export default function SwapRequestModal({
             <div className="text-center space-y-4">
                 <div>
                     <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע לתפקיד</p>
-                    <h3 className="text-2xl font-extrabold text-gray-800 tracking-tight leading-none">
+                    {/* Increased Font Size and Weight for Name */}
+                    <h3 className="text-3xl font-extrabold text-gray-800 tracking-tight leading-none">
                         {shift.assigned_role || shift.role}
                     </h3>
                 </div>
@@ -333,7 +334,7 @@ export default function SwapRequestModal({
                       </div>
                   </div>
 
-                  {/* Dynamic Duration Labels */}
+                  {/* Dynamic Duration Label */}
                   {!isFullDuration && (
                       <div className="flex justify-center -mt-3">
                           <motion.div 
@@ -355,12 +356,12 @@ export default function SwapRequestModal({
                             התחלה
                         </Label>
                         <div className="relative">
-                            <Input type="time" value={startTime} onChange={(e) => handleManualInputChange('startTime', e.target.value)} className="pl-10 text-center h-12 font-mono text-lg border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
+                            <Input type="time" value={startTime} onChange={(e) => handleManualInputChange('startTime', e.target.value)} className="pl-10 text-center h-14 font-mono text-xl border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
                                 <span className="text-gray-400 text-xs">🕒</span>
                             </div>
                         </div>
-                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1 rounded-md">
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1.5 rounded-md">
                             <CalendarDays className="w-3 h-3" />
                             {startDate && formatDisplayDate(startDate)}
                         </div>
@@ -372,12 +373,12 @@ export default function SwapRequestModal({
                             סיום
                         </Label>
                         <div className="relative">
-                            <Input type="time" value={endTime} onChange={(e) => handleManualInputChange('endTime', e.target.value)} className="pl-10 text-center h-12 font-mono text-lg border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
+                            <Input type="time" value={endTime} onChange={(e) => handleManualInputChange('endTime', e.target.value)} className="pl-10 text-center h-14 font-mono text-xl border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
                                 <span className="text-gray-400 text-xs">🕒</span>
                             </div>
                         </div>
-                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1 rounded-md">
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1.5 rounded-md">
                             <CalendarDays className="w-3 h-3" />
                             {endDate && formatDisplayDate(endDate)}
                         </div>
@@ -391,10 +392,10 @@ export default function SwapRequestModal({
 
           <div className="p-6 pt-0 border-t border-gray-50 mt-auto bg-white">
             <div className="flex gap-3 mt-4">
+                <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
                 <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]">
                     {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
                 </Button>
-                <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
             </div>
           </div>
         </motion.div>
