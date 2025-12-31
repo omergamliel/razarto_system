@@ -14,7 +14,7 @@ export default function ShiftDetailsModal({
   shift,
   date,
   onOfferCover,
-  onHeadToHead, // <--- קבלת הפונקציה מהאבא
+  onHeadToHead,
   onDelete,
   onApprove,
   currentUserEmail,
@@ -27,7 +27,6 @@ export default function ShiftDetailsModal({
     setShowDeleteConfirm(false);
   };
 
-  // פונקציה להוספה ליומן גוגל
   const handleAddToCalendar = () => {
     if (!shift) return;
     const baseDate = new Date(shift.date);
@@ -71,11 +70,12 @@ export default function ShiftDetailsModal({
 
   const isOwnShift = shift.assigned_email === currentUserEmail;
   
-  const isSwapRequested = shift.status === 'swap_requested' || shift.status === 'REQUIRES_FULL_COVERAGE';
+  // Status Analysis
+  const isFullRequest = shift.status === 'REQUIRES_FULL_COVERAGE' || shift.status === 'swap_requested';
   const isPartial = shift.status === 'partially_covered' || shift.status === 'REQUIRES_PARTIAL_COVERAGE';
   const isApproved = shift.status === 'approved';
   
-  const needsCoverage = isSwapRequested || isPartial;
+  const needsCoverage = isFullRequest || isPartial;
 
   const formatShiftRange = (startStr, endStr, baseDate) => {
       if (!startStr || !endStr) return '09:00 - 09:00 (למחרת)';
@@ -121,7 +121,7 @@ export default function ShiftDetailsModal({
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
-            {/* 1. מצב משמרת שאושרה */}
+            {/* 1. Status Display */}
             {isApproved && (
                 <div className="bg-green-50 border border-green-100 rounded-2xl p-6 text-center shadow-sm">
                     <div className="flex justify-center mb-2">
@@ -137,7 +137,6 @@ export default function ShiftDetailsModal({
                 </div>
             )}
 
-            {/* 2. מצב בקשת החלפה */}
             {needsCoverage && (
                 <div className={`border rounded-2xl p-6 text-center shadow-sm ${
                     isPartial ? 'bg-yellow-50 border-yellow-100' : 'bg-red-50 border-red-100'
@@ -171,7 +170,7 @@ export default function ShiftDetailsModal({
                 </div>
             )}
 
-            {/* 3. רשימת כיסויים קיימים */}
+            {/* 3. Coverage List (Always visible if exists) */}
             {shiftCoverages.length > 0 && (
                 <div className="space-y-2">
                     <h3 className="text-sm font-bold text-gray-500 px-1">מי כבר מכסה?</h3>
@@ -186,15 +185,13 @@ export default function ShiftDetailsModal({
                 </div>
             )}
 
-            {/* --- איזור הכפתורים המשודרג --- */}
+            {/* Buttons Area */}
             <div className="pt-2 space-y-3">
                 
                 {needsCoverage && !isOwnShift && (
                     <div className="flex flex-col gap-3">
-                        
-                        {/* שורה עליונה: שני כפתורי הפעולה הראשיים */}
                         <div className="flex gap-2">
-                            {/* כפתור אני אחליף (כחול) */}
+                            {/* Blue Button - Always show for coverage */}
                             <Button 
                                 onClick={() => { onClose(); onOfferCover(shift); }}
                                 className="flex-1 bg-blue-500 hover:bg-blue-600 text-white h-12 text-md rounded-xl shadow-md"
@@ -205,19 +202,20 @@ export default function ShiftDetailsModal({
                                 </div>
                             </Button>
 
-                            {/* כפתור החלפה ראש בראש (סגול) */}
-                            <Button 
-                                onClick={() => { onClose(); onHeadToHead(shift); }} 
-                                className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white h-12 text-md rounded-xl shadow-md border-0"
-                            >
-                                <div className="flex items-center justify-center gap-2">
-                                    <ArrowLeftRight className="w-4 h-4" />
-                                    <span>ראש בראש</span>
-                                </div>
-                            </Button>
+                            {/* Head-to-Head - ONLY for Full Coverage requests */}
+                            {!isPartial && (
+                                <Button 
+                                    onClick={() => { onClose(); onHeadToHead(shift); }} 
+                                    className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white h-12 text-md rounded-xl shadow-md border-0"
+                                >
+                                    <div className="flex items-center justify-center gap-2">
+                                        <ArrowLeftRight className="w-4 h-4" />
+                                        <span>ראש בראש</span>
+                                    </div>
+                                </Button>
+                            )}
                         </div>
 
-                        {/* כפתור הוסף ליומן (משני, למטה) */}
                         <Button 
                             onClick={handleAddToCalendar}
                             variant="outline"
@@ -229,7 +227,6 @@ export default function ShiftDetailsModal({
                     </div>
                 )}
 
-                {/* כפתור ביטול לבעל המשמרת */}
                 {needsCoverage && isOwnShift && (
                     <Button 
                         variant="destructive"
@@ -243,7 +240,7 @@ export default function ShiftDetailsModal({
           </div>
         </motion.div>
 
-        {/* מודל אישור מחיקה */}
+        {/* Delete Modal */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <DialogContent>
             <DialogHeader>
