@@ -109,11 +109,11 @@ export default function CalendarHeader({
             {/* ----------------------------- */}
             {/* 1. פס עליון סטיקי (User + Logo + Icons) */}
             {/* ----------------------------- */}
-            <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm px-6 py-3 rounded-b-2xl -mx-4 -mt-6 mb-8 flex items-center justify-between transition-all">
+            <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm px-4 md:px-6 py-3 rounded-b-2xl -mx-4 -mt-6 mb-8 flex items-center justify-between transition-all">
                 
                 {/* צד ימין: לוגו + ברכה + שם משתמש */}
-                <div className="flex items-center gap-4">
-                    {/* LOGO AREA - MOVED HERE */}
+                <div className="flex items-center gap-3 md:gap-4 flex-shrink-0">
+                    {/* LOGO AREA - Compact for Mobile */}
                     <div className="relative group">
                         {isAdmin && (
                             <input
@@ -126,7 +126,7 @@ export default function CalendarHeader({
                         )}
                         <div 
                             onClick={isAdmin ? handleLogoClick : undefined}
-                            className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-full shadow-md flex items-center justify-center overflow-hidden relative ${isAdmin ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
+                            className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-[#E57373] to-[#EF5350] rounded-full shadow-md flex items-center justify-center overflow-hidden relative flex-shrink-0 ${isAdmin ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
                         >
                             {logoUrl ? (
                                 <img src={logoUrl} alt="לוגו" className="w-full h-full object-cover" />
@@ -143,16 +143,16 @@ export default function CalendarHeader({
                     </div>
 
                     {/* TEXT AREA */}
-                    <div className="flex flex-col items-start">
-                        <span className="text-gray-500 text-xs font-medium">{getTimeBasedGreeting()},</span>
-                        <span className="text-gray-900 font-bold text-lg leading-tight">
+                    <div className="flex flex-col items-start justify-center">
+                        <span className="text-gray-500 text-[10px] md:text-xs font-medium leading-none mb-0.5">{getTimeBasedGreeting()},</span>
+                        <span className="text-gray-900 font-bold text-base md:text-lg leading-tight truncate max-w-[140px] md:max-w-none">
                             {currentUser?.assigned_role || currentUser?.full_name || 'אורח'}
                         </span>
                     </div>
                 </div>
 
                 {/* צד שמאל: שורת האייקונים */}
-                <div className="flex items-center gap-2 md:gap-3">
+                <div className="flex items-center gap-1 md:gap-3">
                     
                     {/* 1. היכל התהילה */}
                     <button 
@@ -190,14 +190,14 @@ export default function CalendarHeader({
             {/* 2. אזור המיתוג (כותרת ראשית בלבד - לוגו הועבר למעלה) */}
             {/* ----------------------------- */}
             <div className="flex flex-col items-center justify-center mb-8 px-2 text-center">
-                <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.1em' }}>
+                <h1 className="text-3xl md:text-5xl font-extrabold text-gray-800 tracking-wider mb-2" style={{ letterSpacing: '0.1em' }}>
                     Razarto
                 </h1>
                 <div className="flex flex-col items-center gap-1">
-                    <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
+                    <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs md:text-sm font-medium">
                         מערכת לניהול משמרות
                     </span>
-                    <p className="text-gray-400 text-xs mt-1">
+                    <p className="text-gray-400 text-[10px] md:text-xs mt-1">
                         צפייה במשמרות | ביצוע החלפות מסודרות
                     </p>
                 </div>
@@ -209,15 +209,15 @@ export default function CalendarHeader({
       {/* 3. סרגל ניווט תחתון (ממורכז) */}
       {/* ----------------------------- */}
       {!hideNavigation && (
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 p-3 md:p-4">
         {/* שיניתי את הסדר כאן כדי למרכז */}
-        <div className="flex flex-col md:flex-row-reverse items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row-reverse items-center justify-between gap-3 md:gap-4">
           
           {/* כפתורי תצוגה (ימין ב-RTL, שמאל במסך) */}
-          <div className="flex items-center bg-gray-100 rounded-xl p-1 order-2 md:order-1">
+          <div className="flex items-center bg-gray-100 rounded-xl p-1 order-2 md:order-1 w-full md:w-auto justify-center">
             <button
               onClick={() => setViewMode('month')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'month' 
                   ? 'bg-white text-gray-800 shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
@@ -228,7 +228,7 @@ export default function CalendarHeader({
             </button>
             <button
               onClick={() => setViewMode('week')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'week' 
                   ? 'bg-white text-gray-800 shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
@@ -240,7 +240,7 @@ export default function CalendarHeader({
           </div>
 
           {/* חיצים וכותרת תאריך (מרכז) */}
-          <div className="flex items-center gap-4 flex-1 justify-center order-1 md:order-2">
+          <div className="flex items-center gap-2 md:gap-4 flex-1 justify-center order-1 md:order-2 w-full md:w-auto">
             <Button
               variant="ghost"
               size="icon"
@@ -250,7 +250,7 @@ export default function CalendarHeader({
               <ChevronRight className="w-5 h-5" />
             </Button>
             
-            <h2 className="text-lg md:text-xl font-semibold text-gray-800 min-w-[200px] text-center">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-800 min-w-[150px] md:min-w-[200px] text-center">
               {formatTitle()}
             </h2>
             
@@ -264,7 +264,7 @@ export default function CalendarHeader({
             </Button>
           </div>
 
-          {/* אלמנט דמי לאיזון (שמאל ב-RTL) */}
+          {/* אלמנט דמי לאיזון (שמאל ב-RTL) - מוסתר במובייל */}
           <div className="hidden md:block w-[180px] order-3"></div>
         </div>
       </div>
