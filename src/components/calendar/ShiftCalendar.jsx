@@ -79,7 +79,7 @@ export default function ShiftCalendar() {
     fetchUser();
   }, []);
 
-  // 2. URL Listener for Head-to-Head Link (Receiver Logic)
+  // 2. URL Listener for Head-to-Head Link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode');
@@ -92,30 +92,20 @@ export default function ShiftCalendar() {
             setH2hTargetId(targetId);
             setH2hOfferId(offerId);
             setShowHeadToHeadApproval(true);
-            
-            // Clean the URL so refresh doesn't trigger it again
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     }
   }, []);
 
-  // --- NEW FETCH LOGIC: Fetch Shifts + Assignments and Merge ---
+  // --- FETCH LOGIC ---
   const { data: shifts = [], isLoading } = useQuery({
     queryKey: ['shifts-composite'],
     queryFn: async () => {
-      // 1. Fetch raw shifts (The "Slots")
       const rawShifts = await base44.entities.Shifts.list();
-      
-      // 2. Fetch all assignments
       const allAssignments = await base44.entities.ShiftAssignments.list();
-      
-      // 3. Fetch all users (to map user_id to names/roles)
       const allUsers = await base44.entities.Users.list(); 
 
-      // 4. Merge Logic
       const mergedShifts = rawShifts.map(shiftSlot => {
-          // Find the active assignment for this shift
-          // We assume one active assignment represents the "Main" owner.
           const assignment = allAssignments.find(a => a.shift_id === shiftSlot.id && a.status === 'מאושר');
           
           let assignedUser = null;
@@ -123,23 +113,20 @@ export default function ShiftCalendar() {
               assignedUser = allUsers.find(u => u.id === assignment.user_id);
           }
 
-          // Return a structure compatible with the frontend components
           return {
-              id: shiftSlot.id, // The Shift ID
+              id: shiftSlot.id,
               date: shiftSlot.date,
               start_time: shiftSlot.start_time,
               end_time: shiftSlot.end_time,
-              status: mapStatusToLegacy(shiftSlot.status), // Map Hebrew status to legacy English codes
+              status: mapStatusToLegacy(shiftSlot.status),
               
-              // Flattened User Info for ease of use in existing components
               assigned_person: assignedUser ? assignedUser.full_name : 'לא משובץ',
-              assigned_role: assignedUser ? assignedUser.assigned_role : 'לא משובץ', // The important display name
+              assigned_role: assignedUser ? assignedUser.assigned_role : 'לא משובץ',
               assigned_email: assignedUser ? assignedUser.email : null,
               
-              department: 'כללי', // Or fetch from role definition if needed
-              role: 'תורן', // Generic label or from shift type
+              department: 'כללי', 
+              role: 'תורן',
               
-              // Keep original objects for advanced logic if needed
               _rawAssignment: assignment,
               _rawShift: shiftSlot
           };
@@ -149,7 +136,6 @@ export default function ShiftCalendar() {
     },
   });
 
-  // Helper to map new Hebrew statuses to old English logic
   const mapStatusToLegacy = (hebrewStatus) => {
       const map = {
           'רגילה': 'regular',
@@ -169,10 +155,9 @@ export default function ShiftCalendar() {
         throw new Error('רק מנהלים יכולים ליצור משמרות');
       }
 
-      // 1. Find the User ID based on the selected Role Name
-      // We assume shiftData.role holds the 'assigned_role' string.
+      // UPDATED LOGIC: Find user by custom_id
       const users = await base44.entities.Users.list();
-      const targetUser = users.find(u => u.assigned_role === shiftData.role);
+      const targetUser = users.find(u => u.custom_id === shiftData.userId);
 
       if (!targetUser) throw new Error('משתמש לא נמצא');
 
@@ -185,9 +170,10 @@ export default function ShiftCalendar() {
       });
 
       // 3. Create the Assignment (The Person)
+      // Note: We use targetUser.id (the system UUID) for the relationship link
       await base44.entities.ShiftAssignments.create({
         shift_id: newShift.id,
-        user_id: targetUser.id,
+        user_id: targetUser.id, 
         status: 'מאושר',
         cover_start_date: format(date, 'yyyy-MM-dd'),
         cover_start_time: '09:00',
@@ -200,7 +186,7 @@ export default function ShiftCalendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts-composite'] });
       setShowAddModal(false);
-      toast.success('המשמרת נוספה בהצלחה (במבנה החדש)');
+      toast.success('המשמרת נוספה בהצלחה');
     },
     onError: (error) => {
       console.error(error);
@@ -213,21 +199,11 @@ export default function ShiftCalendar() {
       const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
 
       if (existingShift) {
-        // We need to update the SHIFT status in the new table 'Shifts'
-        // Logic remains mostly same, but targeting the new table structure if fully migrated.
-        // For hybrid approach (using legacy logic on new structure wrapper):
-        
         const isPartial = swapData.swapType === 'partial';
-        // Map legacy status to Hebrew status for DB
         const newStatusHebrew = isPartial ? 'מכוסה חלקית' : 'בקשת החלפה'; 
 
-        // Update the PARENT shift record
         const updatedShift = await base44.entities.Shifts.update(existingShift.id, {
           status: newStatusHebrew,
-          // Note: In new structure, request details should ideally go to 'SwapRequests' table.
-          // If we stick to 'Shifts' table for requests temporarily:
-          // We need custom fields there or a separate table. 
-          // Assuming for now we just change status to signal the UI.
         });
         return updatedShift;
       }
@@ -237,7 +213,6 @@ export default function ShiftCalendar() {
       queryClient.invalidateQueries({ queryKey: ['shifts-composite'] });
       setShowSwapModal(false);
       if (updatedShift) {
-        // Mocking the return object to satisfy legacy modal needs
         setLastUpdatedShift({ ...updatedShift, status: 'swap_requested' }); 
         setShowSuccessModal(true);
       } else {
@@ -249,50 +224,40 @@ export default function ShiftCalendar() {
     }
   });
 
-  // --- CANCEL SWAP REQUEST ---
   const cancelSwapMutation = useMutation({
     mutationFn: async (shiftId) => {
-        // Reset shift to regular state in new 'Shifts' table
         return base44.entities.Shifts.update(shiftId, {
             status: 'רגילה',
-            // Clear other request fields if they exist in the new table schema
         });
     },
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['shifts-composite'] });
         queryClient.invalidateQueries({ queryKey: ['shift-coverages'] }); 
         setShowDetailsModal(false);
-        toast.success('הבקשה בוטלה בהצלחה, המשמרת חזרה למצב רגיל');
+        toast.success('הבקשה בוטלה בהצלחה');
     },
     onError: () => {
         toast.error('שגיאה בביטול הבקשה');
     }
   });
 
-  // --- THE FIXED COVER LOGIC (Adapted for New Tables) ---
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
-      // In new structure, covering means creating a NEW Assignment
-      // 1. Find User ID
       const users = await base44.entities.Users.list();
-      // Assuming currentUser has email available
       const coverUser = users.find(u => u.email === currentUser?.email);
       
       if (!coverUser) throw new Error('משתמש לא נמצא');
 
-      // 2. Create Assignment
       await base44.entities.ShiftAssignments.create({
         shift_id: shift.id,
         user_id: coverUser.id,
-        status: 'מאושר', // Or pending
+        status: 'מאושר',
         cover_start_date: coverData.startDate,
         cover_start_time: coverData.startTime,
         cover_end_date: coverData.endDate,
         cover_end_time: coverData.endTime
       });
 
-      // 3. Update Parent Shift Status if needed (e.g. check if full)
-      // (Simplified logic: if someone covers, we mark as approved for now)
       return base44.entities.Shifts.update(shift.id, { status: 'אושרה' });
     },
     onSuccess: () => {
@@ -307,33 +272,28 @@ export default function ShiftCalendar() {
     }
   });
 
-  // --- NEW: HEAD-TO-HEAD SWAP EXECUTION (Adapted) ---
   const headToHeadSwapMutation = useMutation({
     mutationFn: async () => {
-        // Logic needs to swap USER_IDs in the ShiftAssignments table
         const allAssignments = await base44.entities.ShiftAssignments.list();
         
-        // Find main assignment for target and offer shifts
         const targetAssign = allAssignments.find(a => a.shift_id === h2hTargetId && a.status === 'מאושר');
         const offerAssign = allAssignments.find(a => a.shift_id === h2hOfferId && a.status === 'מאושר');
 
         if (!targetAssign || !offerAssign) throw new Error('שיבוצים לא נמצאו');
 
-        // Swap User IDs
         const targetUserId = targetAssign.user_id;
         const offerUserId = offerAssign.user_id;
 
         await base44.entities.ShiftAssignments.update(targetAssign.id, { user_id: offerUserId });
         await base44.entities.ShiftAssignments.update(offerAssign.id, { user_id: targetUserId });
         
-        // Reset status of parent shifts to Regular/Approved
         await base44.entities.Shifts.update(h2hTargetId, { status: 'אושרה' });
         await base44.entities.Shifts.update(h2hOfferId, { status: 'אושרה' });
     },
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['shifts-composite'] });
         setShowHeadToHeadApproval(false);
-        toast.success('ההחלפה ראש-בראש בוצעה בהצלחה! הלוח עודכן.');
+        toast.success('ההחלפה ראש-בראש בוצעה בהצלחה!');
     },
     onError: () => {
         toast.error('שגיאה בביצוע ההחלפה');
@@ -342,7 +302,6 @@ export default function ShiftCalendar() {
 
   const approveSwapMutation = useMutation({
     mutationFn: async (shift) => {
-        // Logic to approve swap in new DB
         return base44.entities.Shifts.update(shift.id, { status: 'אושרה' });
     },
     onSuccess: () => {
@@ -373,10 +332,7 @@ export default function ShiftCalendar() {
 
   const editRoleMutation = useMutation({
     mutationFn: async ({ shift, roleData }) => {
-      // In new structure, 'Role' is derived from User. To change role, we change User in Assignment.
-      // Or if 'Role' is a property of Shift, we update Shift.
-      // Assuming we just update metadata if needed.
-      return null; 
+      return null; // Placeholder
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts-composite'] });
@@ -387,8 +343,6 @@ export default function ShiftCalendar() {
       toast.error('שגיאה בעדכון התפקיד');
     }
   });
-
-  // --- Handlers ---
 
   const handleCellClick = (date, shift) => {
     const validDate = new Date(date);
@@ -520,7 +474,7 @@ export default function ShiftCalendar() {
           onHeadToHead={(shift) => { setSelectedShift(shift); setShowHeadToHeadSelector(true); }}
           onCancelRequest={(shift) => { cancelSwapMutation.mutate(shift.id); }}
           onDelete={deleteShiftMutation.mutate}
-          onApprove={() => {}}
+          onApprove={() => approveSwapMutation.mutate(selectedShift)}
           currentUserEmail={currentUser?.email}
           isAdmin={isAdmin}
         />
