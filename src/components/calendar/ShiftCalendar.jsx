@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { format, addDays, parseISO, differenceInMinutes } from 'date-fns'; // Added differenceInMinutes
+import { format, addDays, parseISO, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 
 // Components
@@ -168,6 +168,33 @@ export default function ShiftCalendar() {
     }
   });
 
+  // --- NEW MUTATION: CANCEL SWAP REQUEST ---
+  const cancelSwapMutation = useMutation({
+    mutationFn: async (shiftId) => {
+        // Reset shift to regular state
+        return base44.entities.Shift.update(shiftId, {
+            status: 'regular',
+            swap_request_by: null,
+            swap_type: null,
+            swap_start_time: null,
+            swap_end_time: null,
+            remaining_hours: null,
+            // Note: We are keeping the original assigned_person/email as they were never changed during the request phase
+        });
+        // Note: If coverages exist (partial), ideally we should delete them too or handle them.
+        // For simplicity, we assume 'Cancel Request' implies reverting everything.
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['shift-coverages'] }); // Clear associated coverages if any logic connected
+        setShowDetailsModal(false);
+        toast.success('הבקשה בוטלה בהצלחה, המשמרת חזרה למצב רגיל');
+    },
+    onError: () => {
+        toast.error('שגיאה בביטול הבקשה');
+    }
+  });
+
   // --- THE FIXED COVER LOGIC ---
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
@@ -188,8 +215,6 @@ export default function ShiftCalendar() {
       // 2. Fetch all coverages to recalculate
       const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
       
-      // Calculate Requested Duration (in minutes)
-      // Default to 24h if null (09:00 to 09:00 next day)
       const reqStartStr = shift.swap_start_time || '09:00';
       const reqEndStr = shift.swap_end_time || '09:00';
       
@@ -197,17 +222,14 @@ export default function ShiftCalendar() {
       const reqStart = new Date(`${format(shiftDate, 'yyyy-MM-dd')}T${reqStartStr}`);
       let reqEnd = new Date(`${format(shiftDate, 'yyyy-MM-dd')}T${reqEndStr}`);
       
-      // Handle overnight or full 24h
       if (reqEnd <= reqStart || (reqStartStr === '09:00' && reqEndStr === '09:00')) {
           reqEnd = addDays(reqEnd, 1);
       }
       
       const requestedMinutes = differenceInMinutes(reqEnd, reqStart);
 
-      // Calculate Total Covered Duration
       let totalCoveredMinutes = 0;
       
-      // We assume coverages don't overlap for simplicity, or we just sum them up
       allCoverages.forEach(cov => {
           const cStart = new Date(`${cov.start_date}T${cov.start_time}`);
           const cEnd = new Date(`${cov.end_date}T${cov.end_time}`);
@@ -215,25 +237,15 @@ export default function ShiftCalendar() {
           totalCoveredMinutes += diff;
       });
 
-      // Check if fully covered (allow 5 min buffer)
       const isFullyCovered = totalCoveredMinutes >= (requestedMinutes - 5);
 
       const updateData = {};
 
       if (isFullyCovered) {
-          // GREEN STATUS
           updateData.status = 'approved'; 
           updateData.remaining_hours = null;
-          
-          // Update main assignment to reflect the swap
-          // If multiple coverers, we might want to keep the original owner but mark as approved
-          // OR update assigned_person to the main coverer. 
-          // For now, let's mark it approved so it turns Green.
-          // Optionally, list coverers in a specific field if needed.
       } else {
-          // YELLOW STATUS
           updateData.status = 'partially_covered';
-          
           const remaining = requestedMinutes - totalCoveredMinutes;
           const h = Math.floor(remaining / 60);
           const m = remaining % 60;
@@ -258,26 +270,23 @@ export default function ShiftCalendar() {
   // --- NEW: HEAD-TO-HEAD SWAP EXECUTION ---
   const headToHeadSwapMutation = useMutation({
     mutationFn: async () => {
-        // Fetch fresh data for both shifts to avoid conflicts
         const allShifts = await base44.entities.Shift.list();
         const targetShift = allShifts.find(s => s.id === h2hTargetId);
         const offerShift = allShifts.find(s => s.id === h2hOfferId);
 
         if (!targetShift || !offerShift) throw new Error('אחת המשמרות לא נמצאה');
 
-        // Swap Logic:
-        // Target Shift gets Offer User
+        // Swap Logic
         await base44.entities.Shift.update(targetShift.id, {
             assigned_person: offerShift.assigned_person,
             assigned_email: offerShift.assigned_email,
-            status: 'approved', // Clear swap request status
+            status: 'approved',
             swap_request_by: null,
             swap_start_time: null,
             swap_end_time: null,
-            original_assigned_person: targetShift.assigned_person // Keep history
+            original_assigned_person: targetShift.assigned_person
         });
 
-        // Offer Shift gets Target User
         await base44.entities.Shift.update(offerShift.id, {
             assigned_person: targetShift.assigned_person,
             assigned_email: targetShift.assigned_email,
@@ -377,17 +386,21 @@ export default function ShiftCalendar() {
     const isMyShift = shift.role && currentUser?.assigned_role && 
                       typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role);
 
-    // FIX: Include all active swap statuses
     const isSwapActive = [
         'swap_requested', 
         'REQUIRES_FULL_COVERAGE', 
         'REQUIRES_PARTIAL_COVERAGE', 
         'partially_covered',
-        'approved' // Also open details for approved shifts to see history
+        'approved'
     ].includes(shift.status);
 
     if (isMyShift) {
-      setShowActionModal(true);
+        // If it's my shift AND it is already in swap process, show details modal to allow Cancel
+        if (isSwapActive) {
+            setShowDetailsModal(true);
+        } else {
+            setShowActionModal(true);
+        }
     } else if (isSwapActive) {
       setShowDetailsModal(true);
     }
@@ -550,7 +563,7 @@ export default function ShiftCalendar() {
           isSubmitting={editRoleMutation.isPending}
         />
 
-        {/* --- SHIFT DETAILS WITH H2H BUTTON --- */}
+        {/* --- SHIFT DETAILS WITH H2H & CANCEL BUTTONS --- */}
         <ShiftDetailsModal
           isOpen={showDetailsModal}
           onClose={() => setShowDetailsModal(false)}
@@ -563,6 +576,9 @@ export default function ShiftCalendar() {
           onHeadToHead={(shift) => {
              setSelectedShift(shift);
              setShowHeadToHeadSelector(true);
+          }}
+          onCancelRequest={(shift) => { // New Prop
+             cancelSwapMutation.mutate(shift.id);
           }}
           onDelete={deleteShiftMutation.mutate}
           onApprove={() => approveSwapMutation.mutate(selectedShift)}
