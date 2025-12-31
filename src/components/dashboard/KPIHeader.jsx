@@ -67,8 +67,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
                      typeof s.role === 'string' && 
                      s.role.includes(currentUser.assigned_role);
     
-    const isAssignedDirectly = s.assigned_user_id === currentUser?.id || 
-                               s.email === currentUser?.email;
+    const isAssignedDirectly = s.assigned_email === currentUser?.email;
 
     const isCoveringPartially = myCoverages.some(coverage => coverage.shift_id === s.id);
 
