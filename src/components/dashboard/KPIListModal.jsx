@@ -133,11 +133,11 @@ export default function KPIListModal({ isOpen, onClose, type, shifts, currentUse
           const shiftDate = new Date(s.date);
           shiftDate.setHours(0, 0, 0, 0);
           if (shiftDate < today) return false;
-          
+
           const isMyRole = currentUser?.assigned_role && s.role && typeof s.role === 'string' && s.role.includes(currentUser.assigned_role);
-          const isAssignedDirectly = s.assigned_user_id === currentUser?.id || s.email === currentUser?.email;
-          const isCoveringPartially = allCoverages.some(c => c.shift_id === s.id);
-          
+          const isAssignedDirectly = s.assigned_email === currentUser?.email;
+          const isCoveringPartially = allCoverages.some(c => c.shift_id === s.id && c.covering_email === currentUser?.email);
+
           return isMyRole || isAssignedDirectly || isCoveringPartially;
         }).sort((a, b) => new Date(a.date) - new Date(b.date));
       default: return [];
