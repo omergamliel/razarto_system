@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parseISO, differenceInMinutes } from 'date-fns'; // Added differenceInMinutes
 import { toast } from 'sonner';
 
 // Components
@@ -136,12 +136,18 @@ export default function ShiftCalendar() {
       const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
 
       if (existingShift) {
+        // CORRECT STATUS LOGIC: 
+        // If partial times selected -> REQUIRES_PARTIAL_COVERAGE (Yellow)
+        // If full day (default) -> REQUIRES_FULL_COVERAGE (Red)
+        const isPartial = swapData.swapType === 'partial';
+        const newStatus = isPartial ? 'REQUIRES_PARTIAL_COVERAGE' : 'REQUIRES_FULL_COVERAGE';
+
         const updatedShift = await base44.entities.Shift.update(existingShift.id, {
-          status: swapData.status || 'swap_requested',
+          status: newStatus,
           swap_request_by: currentUser?.email,
           swap_type: swapData.swapType,
-          swap_start_time: swapData.swapType === 'partial' ? swapData.startTime : '09:00',
-          swap_end_time: swapData.swapType === 'partial' ? swapData.endTime : '09:00'
+          swap_start_time: isPartial ? swapData.startTime : '09:00',
+          swap_end_time: isPartial ? swapData.endTime : '09:00'
         });
         return updatedShift;
       }
@@ -162,6 +168,7 @@ export default function ShiftCalendar() {
     }
   });
 
+  // --- THE FIXED COVER LOGIC ---
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
       // 1. Create coverage
@@ -178,9 +185,62 @@ export default function ShiftCalendar() {
         status: 'approved'
       });
 
-      return base44.entities.Shift.update(shift.id, {
-          status: 'partially_covered'
+      // 2. Fetch all coverages to recalculate
+      const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
+      
+      // Calculate Requested Duration (in minutes)
+      // Default to 24h if null (09:00 to 09:00 next day)
+      const reqStartStr = shift.swap_start_time || '09:00';
+      const reqEndStr = shift.swap_end_time || '09:00';
+      
+      const shiftDate = parseISO(shift.date);
+      const reqStart = new Date(`${format(shiftDate, 'yyyy-MM-dd')}T${reqStartStr}`);
+      let reqEnd = new Date(`${format(shiftDate, 'yyyy-MM-dd')}T${reqEndStr}`);
+      
+      // Handle overnight or full 24h
+      if (reqEnd <= reqStart || (reqStartStr === '09:00' && reqEndStr === '09:00')) {
+          reqEnd = addDays(reqEnd, 1);
+      }
+      
+      const requestedMinutes = differenceInMinutes(reqEnd, reqStart);
+
+      // Calculate Total Covered Duration
+      let totalCoveredMinutes = 0;
+      
+      // We assume coverages don't overlap for simplicity, or we just sum them up
+      allCoverages.forEach(cov => {
+          const cStart = new Date(`${cov.start_date}T${cov.start_time}`);
+          const cEnd = new Date(`${cov.end_date}T${cov.end_time}`);
+          const diff = differenceInMinutes(cEnd, cStart);
+          totalCoveredMinutes += diff;
       });
+
+      // Check if fully covered (allow 5 min buffer)
+      const isFullyCovered = totalCoveredMinutes >= (requestedMinutes - 5);
+
+      const updateData = {};
+
+      if (isFullyCovered) {
+          // GREEN STATUS
+          updateData.status = 'approved'; 
+          updateData.remaining_hours = null;
+          
+          // Update main assignment to reflect the swap
+          // If multiple coverers, we might want to keep the original owner but mark as approved
+          // OR update assigned_person to the main coverer. 
+          // For now, let's mark it approved so it turns Green.
+          // Optionally, list coverers in a specific field if needed.
+      } else {
+          // YELLOW STATUS
+          updateData.status = 'partially_covered';
+          
+          const remaining = requestedMinutes - totalCoveredMinutes;
+          const h = Math.floor(remaining / 60);
+          const m = remaining % 60;
+          updateData.remaining_hours = `${h}:${m.toString().padStart(2, '0')}`;
+      }
+
+      return base44.entities.Shift.update(shift.id, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
@@ -317,7 +377,14 @@ export default function ShiftCalendar() {
     const isMyShift = shift.role && currentUser?.assigned_role && 
                       typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role);
 
-    const isSwapActive = ['swap_requested', 'partially_covered', 'REQUIRES_FULL_COVERAGE', 'REQUIRES_PARTIAL_COVERAGE'].includes(shift.status);
+    // FIX: Include all active swap statuses
+    const isSwapActive = [
+        'swap_requested', 
+        'REQUIRES_FULL_COVERAGE', 
+        'REQUIRES_PARTIAL_COVERAGE', 
+        'partially_covered',
+        'approved' // Also open details for approved shifts to see history
+    ].includes(shift.status);
 
     if (isMyShift) {
       setShowActionModal(true);
@@ -355,7 +422,7 @@ export default function ShiftCalendar() {
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 md:py-8">
         
-        {/* --- HEADER WITH NEW ICONS --- */}
+        {/* --- HEADER --- */}
         <CalendarHeader
           currentDate={currentDate}
           setCurrentDate={setCurrentDate}
@@ -363,8 +430,8 @@ export default function ShiftCalendar() {
           setViewMode={setViewMode}
           isAdmin={isAdmin}
           onOpenAdminSettings={() => setShowAdminSettings(true)}
-          onOpenHallOfFame={() => setShowHallOfFame(true)} // Connected
-          onOpenHelp={() => setShowHelpSupport(true)}      // Connected
+          onOpenHallOfFame={() => setShowHallOfFame(true)}
+          onOpenHelp={() => setShowHelpSupport(true)}
           currentUser={currentUser}
           hideNavigation
         />
@@ -395,7 +462,7 @@ export default function ShiftCalendar() {
           isAdmin={isAdmin}
         />
 
-        {/* --- MODALS SECTION --- */}
+        {/* --- MODALS --- */}
 
         <OnboardingModal
           isOpen={showOnboarding}
@@ -494,7 +561,6 @@ export default function ShiftCalendar() {
           }}
           onOfferCover={handleOfferCover}
           onHeadToHead={(shift) => {
-             // Open the selector for the current user to choose THEIR shift
              setSelectedShift(shift);
              setShowHeadToHeadSelector(true);
           }}
