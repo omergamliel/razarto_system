@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Trash2, CheckCircle, AlertCircle, CalendarPlus, ArrowLeftRight } from 'lucide-react';
+import { X, Calendar, Clock, User, Trash2, CheckCircle, AlertCircle, CalendarPlus, ArrowLeftRight, XCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ export default function ShiftDetailsModal({
   date,
   onOfferCover,
   onHeadToHead,
+  onCancelRequest, // New prop
   onDelete,
   onApprove,
   currentUserEmail,
@@ -77,16 +78,20 @@ export default function ShiftDetailsModal({
   
   const needsCoverage = isFullRequest || isPartial;
 
+  // RTL Fix: Ensure time range is displayed LTR
   const formatShiftRange = (startStr, endStr, baseDate) => {
-      if (!startStr || !endStr) return '09:00 - 09:00 (למחרת)';
+      if (!startStr || !endStr) return <span dir="ltr">09:00 - 09:00 (למחרת)</span>;
       const startHour = parseInt(startStr.split(':')[0]);
       const endHour = parseInt(endStr.split(':')[0]);
       const shiftDate = new Date(baseDate);
       const isNextDay = endHour <= startHour; 
       const endDate = isNextDay ? addDays(shiftDate, 1) : shiftDate;
       return (
-          <span className="font-bold text-lg dir-ltr">
-              {format(shiftDate, 'd/M')} {startStr} - {format(endDate, 'd/M')} {endStr}
+          <span className="font-bold text-lg" dir="ltr">
+              {startStr} - {endStr}
+              <span className="text-gray-500 text-xs mr-2 font-normal">
+                  ({format(shiftDate, 'd/M')} {isNextDay ? `- ${format(endDate, 'd/M')}` : ''})
+              </span>
           </span>
       );
   };
@@ -160,10 +165,12 @@ export default function ShiftDetailsModal({
                                 shift.swap_end_time || '09:00', 
                                 shift.date
                             )}
-                             {shift.remaining_hours && (
-                                <span className="text-xs font-medium mt-1 text-gray-500">
-                                    (נותרו: {shift.remaining_hours})
-                                </span>
+                             {/* REMAINING HOURS DISPLAY */}
+                             {shift.remaining_hours && isPartial && (
+                                <div className="mt-2 bg-white/60 px-3 py-1 rounded-full border border-yellow-200 text-yellow-800 text-sm font-bold flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    נותרו {shift.remaining_hours} שעות לכיסוי
+                                </div>
                             )}
                         </div>
                     </div>
@@ -215,24 +222,32 @@ export default function ShiftDetailsModal({
                                 </Button>
                             )}
                         </div>
-
-                        <Button 
-                            onClick={handleAddToCalendar}
-                            variant="outline"
-                            className="w-full h-10 rounded-xl border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center justify-center text-sm"
-                        >
-                            <CalendarPlus className="w-4 h-4 mr-2" />
-                            הוסף תזכורת ליומן
-                        </Button>
                     </div>
                 )}
 
+                {/* ADD TO CALENDAR - ONLY FOR OWN SHIFT */}
+                {isOwnShift && (
+                    <Button 
+                        onClick={handleAddToCalendar}
+                        variant="outline"
+                        className="w-full h-10 rounded-xl border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center justify-center text-sm"
+                    >
+                        <CalendarPlus className="w-4 h-4 mr-2" />
+                        הוסף תזכורת ליומן
+                    </Button>
+                )}
+
+                {/* CANCEL REQUEST - FOR OWN SHIFT WITH ACTIVE REQUEST */}
                 {needsCoverage && isOwnShift && (
                     <Button 
+                        onClick={() => { onClose(); onCancelRequest(shift); }}
                         variant="destructive"
                         className="w-full h-14 text-lg rounded-xl shadow-lg bg-red-500 hover:bg-red-600"
                     >
-                        בטל בקשה
+                        <div className="flex items-center justify-center gap-2">
+                            <XCircle className="w-5 h-5" />
+                            <span>בטל בקשה (החזר לרגיל)</span>
+                        </div>
                     </Button>
                 )}
             </div>
