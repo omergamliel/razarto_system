@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Plus, Users, Briefcase } from 'lucide-react';
+import { X, Calendar, Plus, Users } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,13 +14,11 @@ export default function AddShiftModal({
   onClose, 
   date,
   onSubmit,
-  isSubmitting,
-  currentUser
+  isSubmitting
 }) {
-  const [department, setDepartment] = useState('');
-  const [role, setRole] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
 
-  // UPDATED: Fetch Users from the new Users table instead of RoleDefinition
+  // שליפת כל המשתמשים מהטבלה
   const { data: users = [] } = useQuery({
     queryKey: ['users-list'],
     queryFn: () => base44.entities.Users.list(),
@@ -29,33 +27,16 @@ export default function AddShiftModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!department || !role) return;
+    if (!selectedUserId) return;
     
-    // We send back the selected 'assigned_role' (name) and 'department'
-    // The parent component (ShiftCalendar) will use this to find the User ID.
+    // אנו שולחים את ה-ID הייחודי (custom_id)
+    // המרה למספר כדי לוודא תאימות אם זה מגיע כסטרינג מה-Select
     onSubmit({
-      department,
-      role // This holds the user's name/assigned_role
+      userId: Number(selectedUserId)
     });
   };
 
-  const handleDepartmentChange = (value) => {
-    setDepartment(value);
-    setRole(''); // Reset role/name when department changes
-  };
-
   if (!isOpen) return null;
-
-  // Extract unique departments from Users table
-  const departments = [...new Set(users.map(u => u.department).filter(Boolean))].sort();
-  
-  // Filter users based on selected department to show in the dropdown
-  // We map 'assigned_role' as the display name
-  const roles = department 
-    ? users
-        .filter(u => u.department === department && u.assigned_role)
-        .map(u => u.assigned_role)
-    : [];
 
   return (
     <AnimatePresence>
@@ -74,7 +55,7 @@ export default function AddShiftModal({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] p-6 text-white">
@@ -99,60 +80,37 @@ export default function AddShiftModal({
           </div>
 
           {/* Content */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Department Selection */}
-            <div className="space-y-2">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            
+            <div className="space-y-3">
               <Label className="text-gray-700 font-medium flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#64B5F6]" />
-                בחר מחלקה
+                בחר מי יהיה במשמרת
               </Label>
-              <Select value={department} onValueChange={handleDepartmentChange}>
-                <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
-                  <SelectValue placeholder="בחר מחלקה..." />
+              
+              <Select value={selectedUserId ? String(selectedUserId) : ''} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="h-14 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6] text-lg">
+                  <SelectValue placeholder="בחר משתמש מהרשימה..." />
                 </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
+                <SelectContent className="max-h-[300px]">
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={String(user.custom_id)}>
+                      <div className="flex flex-col text-right">
+                        <span className="font-bold">{user.assigned_role || user.Name}</span>
+                        {user.department && (
+                           <span className="text-xs text-gray-400">{user.department}</span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Role/Name Selection */}
-            <AnimatePresence>
-              {department && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-2 overflow-hidden"
-                >
-                  <Label className="text-gray-700 font-medium flex items-center gap-2">
-                    <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                    בחר שם מלא
-                  </Label>
-                  <Select value={role} onValueChange={setRole}>
-                    <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
-                      <SelectValue placeholder="בחר שם..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={isSubmitting || !department || !role}
+              disabled={isSubmitting || !selectedUserId}
               className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
             >
               {isSubmitting ? (
