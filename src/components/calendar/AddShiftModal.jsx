@@ -22,7 +22,7 @@ export default function AddShiftModal({
   const { data: users = [] } = useQuery({
     queryKey: ['users-list-all'],
     queryFn: async () => {
-      const res = await base44.entities.Users.list();
+      const res = await base44.entities.User.list();
       return res; 
     },
     enabled: isOpen
