@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, addDays, parseISO, differenceInMinutes, addMinutes, startOfDay } from 'date-fns';
+import { format, addDays, parseISO, differenceInMinutes, addMinutes } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, Calendar, AlertCircle, Send, CheckCircle2, ArrowLeftRight, CalendarDays } from 'lucide-react';
+import { X, Clock, Calendar, AlertCircle, Send, CheckCircle2, ArrowLeftRight, CalendarDays, Timer } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,17 +22,17 @@ export default function SwapRequestModal({
   const shiftStartStr = shift?.start_time || '09:00';
   const shiftEndStr = shift?.end_time || '09:00';
   
+  // State for raw values (ISO for logic)
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
 
-  // Slider State (Minutes from start of shift)
-  // range[0] = start minutes, range[1] = end minutes
+  // Slider State
   const [range, setRange] = useState([0, 0]); 
   const sliderRef = useRef(null);
 
-  // Derived Full Dates and Total Duration
+  // Derived Values
   const totalDurationRef = useRef(0);
   const shiftStartObjRef = useRef(null);
   const shiftEndObjRef = useRef(null);
@@ -45,9 +45,8 @@ export default function SwapRequestModal({
       const eH = parseInt(shiftEndStr.split(':')[0]);
       
       const startObj = new Date(format(sDate, 'yyyy-MM-dd') + 'T' + shiftStartStr);
-      
       let endObj = new Date(format(sDate, 'yyyy-MM-dd') + 'T' + shiftEndStr);
-      // Handle overnight logic
+      
       if (endObj <= startObj || (sH === 9 && eH === 9)) {
           endObj = addDays(endObj, 1);
       }
@@ -57,7 +56,6 @@ export default function SwapRequestModal({
       const duration = differenceInMinutes(endObj, startObj);
       totalDurationRef.current = duration;
 
-      // Set initial values (Full Shift)
       setStartDate(format(startObj, 'yyyy-MM-dd'));
       setStartTime(shiftStartStr);
       setEndDate(format(endObj, 'yyyy-MM-dd'));
@@ -67,20 +65,16 @@ export default function SwapRequestModal({
     }
   }, [isOpen, date, shift]);
 
-  // --- SLIDER LOGIC (RTL & TOUCH OPTIMIZED) ---
+  // --- SLIDER LOGIC ---
   const handleSliderDrag = (e, handleIndex) => {
       if (!sliderRef.current || totalDurationRef.current === 0) return;
       
       const rect = sliderRef.current.getBoundingClientRect();
       const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
       
-      // RTL Calculation: 
-      // In RTL, 0% is on the right, 100% is on the left.
-      // So we calculate distance from RIGHT edge.
+      // RTL Calculation
       const distanceFromRight = rect.right - clientX;
       let percentage = (distanceFromRight / rect.width);
-      
-      // Clamp percentage
       percentage = Math.max(0, Math.min(1, percentage));
 
       let minutes = Math.round(percentage * totalDurationRef.current);
@@ -92,7 +86,6 @@ export default function SwapRequestModal({
       const newRange = [...range];
       newRange[handleIndex] = minutes;
 
-      // Prevent crossover (min 30 min duration)
       if (handleIndex === 0) { // Moving Start
           if (newRange[0] >= newRange[1]) newRange[0] = newRange[1] - 30;
       } else { // Moving End
@@ -116,19 +109,11 @@ export default function SwapRequestModal({
   };
 
   const handleManualInputChange = (type, val) => {
-      // Update state first
       if (type === 'startTime') setStartTime(val);
       if (type === 'endTime') setEndTime(val);
-      if (type === 'startDate') setStartDate(val);
-      if (type === 'endDate') setEndDate(val);
-
-      // Try to sync slider
-      // This part is complex and requires combining Date+Time from inputs, diffing from shiftStart, clamping, and updating range.
-      // For now, to keep it simple and avoid bugs, we'll rely on the slider as the main source of truth, and inputs as read-only displays when using slider.
-      // A full sync implementation would go here.
+      // For simplicity, date inputs are read-only when using slider in this advanced mode
   };
 
-  // --- SUBMIT ---
   const handleSubmit = (e) => {
     e.preventDefault();
     const status = swapType === 'full' ? 'REQUIRES_FULL_COVERAGE' : 'REQUIRES_PARTIAL_COVERAGE';
@@ -145,10 +130,20 @@ export default function SwapRequestModal({
   
   if (!isOpen || !shift) return null;
 
-  // Calculate percentages for CSS (RTL aware)
   const startPercent = (range[0] / totalDurationRef.current) * 100;
   const endPercent = (range[1] / totalDurationRef.current) * 100;
   const widthPercent = endPercent - startPercent;
+
+  // Calculate selected duration for display
+  const selectedDurationMinutes = range[1] - range[0];
+  const selectedDurationHours = selectedDurationMinutes / 60;
+  const isFullDuration = selectedDurationMinutes === totalDurationRef.current;
+
+  // Format date helper for display (dd/MM/yyyy)
+  const formatDisplayDate = (isoDateStr) => {
+      if (!isoDateStr) return '';
+      return format(new Date(isoDateStr), 'dd/MM/yyyy');
+  };
 
   return (
     <AnimatePresence>
@@ -175,7 +170,7 @@ export default function SwapRequestModal({
 
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             
-            {/* Current Assignment Card (Improved Design) */}
+            {/* Current Assignment Card */}
             <div className="text-center space-y-4">
                 <div>
                     <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע לתפקיד</p>
@@ -198,7 +193,6 @@ export default function SwapRequestModal({
                         </p>
                     </div>
 
-                    {/* Divider with Arrow */}
                     <div className="flex flex-col items-center justify-center px-2">
                         <div className="h-6 w-px bg-gray-200 mb-1"></div>
                         <ArrowLeftRight className="w-4 h-4 text-gray-300" />
@@ -220,7 +214,6 @@ export default function SwapRequestModal({
                 </div>
             </div>
 
-            {/* Separator */}
             <div className="relative flex items-center justify-center my-5">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
                 <div className="relative bg-white px-4 text-sm font-medium text-gray-500">יש לבחור את סוג ההחלפה</div>
@@ -252,31 +245,38 @@ export default function SwapRequestModal({
                     <p className="text-xs text-gray-500">ניתן לבחור באמצעות הזזת הסליידר או הזנה ידנית במלבן שמתחת</p>
                   </div>
 
-                  {/* --- PROFESSIONAL RANGE SLIDER (RTL & TOUCH) --- */}
-                  <div className="px-4 py-8 select-none touch-none bg-gray-50 rounded-2xl border border-gray-100">
+                  {/* --- PROFESSIONAL RANGE SLIDER --- */}
+                  <div className="px-4 py-8 select-none touch-none bg-gray-50 rounded-2xl border border-gray-100 shadow-sm relative">
+                      
                       {/* Top Labels */}
-                      <div className="flex justify-between text-xs font-semibold text-gray-500 mb-2 px-1">
-                          <span>התחלה</span>
-                          <span>סיום</span>
+                      <div className="flex justify-between text-xs font-bold text-gray-600 mb-3 px-1">
+                          <div className="text-center">
+                              <span>התחלה</span>
+                              <div className="text-[10px] font-normal text-gray-400 mt-0.5">{startDate && formatDisplayDate(startDate)}</div>
+                          </div>
+                          <div className="text-center">
+                              <span>סיום</span>
+                              <div className="text-[10px] font-normal text-gray-400 mt-0.5">{endDate && formatDisplayDate(endDate)}</div>
+                          </div>
                       </div>
 
                       <div 
                         ref={sliderRef}
                         className="relative h-3 bg-gray-200 rounded-full cursor-pointer"
                       >
-                          {/* Selected Range Bar (Orange) */}
+                          {/* Selected Range Bar */}
                           <div 
                               className="absolute h-full bg-[#EF5350] rounded-full opacity-90 shadow-sm"
                               style={{ 
-                                  right: `${startPercent}%`, // RTL: Start from right
+                                  right: `${startPercent}%`, 
                                   width: `${widthPercent}%` 
                               }}
                           />
 
-                          {/* Start Handle (Right side in RTL) */}
+                          {/* Start Handle */}
                           <div 
                               className="absolute w-7 h-7 bg-white border-[3px] border-[#EF5350] rounded-full -top-2 shadow-md cursor-grab active:cursor-grabbing flex items-center justify-center z-10 hover:scale-110 transition-transform outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF5350]"
-                              style={{ right: `${startPercent}%`, transform: 'translateX(50%)' }} // RTL translate positive
+                              style={{ right: `${startPercent}%`, transform: 'translateX(50%)' }}
                               tabIndex={0}
                               onMouseDown={(e) => {
                                   const moveHandler = (moveEvent) => handleSliderDrag(moveEvent, 0);
@@ -297,13 +297,12 @@ export default function SwapRequestModal({
                                   window.addEventListener('touchend', upHandler);
                               }}
                           >
-                              {/* Time Tooltip */}
                               <div className="absolute -top-9 bg-[#EF5350] text-white text-xs font-bold py-1 px-2 rounded-md shadow-sm whitespace-nowrap after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-[#EF5350]">
                                   {startTime}
                               </div>
                           </div>
 
-                          {/* End Handle (Left side in RTL) */}
+                          {/* End Handle */}
                           <div 
                               className="absolute w-7 h-7 bg-white border-[3px] border-[#EF5350] rounded-full -top-2 shadow-md cursor-grab active:cursor-grabbing flex items-center justify-center z-10 hover:scale-110 transition-transform outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF5350]"
                               style={{ right: `${endPercent}%`, transform: 'translateX(50%)' }}
@@ -327,21 +326,28 @@ export default function SwapRequestModal({
                                   window.addEventListener('touchend', upHandler);
                               }}
                           >
-                              {/* Time Tooltip */}
                               <div className="absolute -top-9 bg-[#EF5350] text-white text-xs font-bold py-1 px-2 rounded-md shadow-sm whitespace-nowrap after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-[#EF5350]">
                                   {endTime}
                               </div>
                           </div>
                       </div>
-                      
-                      {/* Bottom Dates */}
-                      <div className="flex justify-between text-[11px] text-gray-400 mt-4 px-1">
-                          <span>{shiftStartObjRef.current && format(shiftStartObjRef.current, 'dd/MM/yyyy')}</span>
-                          <span>{shiftEndObjRef.current && format(shiftEndObjRef.current, 'dd/MM/yyyy')}</span>
-                      </div>
                   </div>
 
-                  {/* Manual Inputs (Synced Display) */}
+                  {/* Dynamic Duration Label */}
+                  {!isFullDuration && (
+                      <div className="flex justify-center -mt-3">
+                          <motion.div 
+                            initial={{ opacity: 0, y: -10 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            className="bg-orange-100 text-orange-700 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 shadow-sm border border-orange-200"
+                          >
+                              <Timer className="w-4 h-4" />
+                              הטווח הנבחר: {selectedDurationHours} שעות במצטבר
+                          </motion.div>
+                      </div>
+                  )}
+
+                  {/* Manual Inputs */}
                   <div className="bg-white rounded-2xl p-5 grid grid-cols-2 gap-6 border border-gray-100 shadow-sm">
                     <div className="space-y-2">
                         <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -350,10 +356,16 @@ export default function SwapRequestModal({
                         </Label>
                         <div className="relative">
                             <Input type="time" value={startTime} onChange={(e) => handleManualInputChange('startTime', e.target.value)} className="pl-10 text-center h-12 font-mono text-lg border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
-                            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
+                                <span className="text-gray-400 text-xs">🕒</span>
+                            </div>
                         </div>
-                        <div className="text-xs text-center font-medium text-gray-500 mt-1">{startDate}</div>
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1 rounded-md">
+                            <CalendarDays className="w-3 h-3" />
+                            {startDate && formatDisplayDate(startDate)}
+                        </div>
                     </div>
+                    
                     <div className="space-y-2">
                         <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                             <Clock className="w-4 h-4 text-gray-400" />
@@ -361,9 +373,14 @@ export default function SwapRequestModal({
                         </Label>
                         <div className="relative">
                             <Input type="time" value={endTime} onChange={(e) => handleManualInputChange('endTime', e.target.value)} className="pl-10 text-center h-12 font-mono text-lg border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
-                            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
+                                <span className="text-gray-400 text-xs">🕒</span>
+                            </div>
                         </div>
-                        <div className="text-xs text-center font-medium text-gray-500 mt-1">{endDate}</div>
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1 rounded-md">
+                            <CalendarDays className="w-3 h-3" />
+                            {endDate && formatDisplayDate(endDate)}
+                        </div>
                     </div>
                   </div>
 
@@ -374,10 +391,10 @@ export default function SwapRequestModal({
 
           <div className="p-6 pt-0 border-t border-gray-50 mt-auto bg-white">
             <div className="flex gap-3 mt-4">
-                <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
                 <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]">
                     {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
                 </Button>
+                <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
             </div>
           </div>
         </motion.div>
