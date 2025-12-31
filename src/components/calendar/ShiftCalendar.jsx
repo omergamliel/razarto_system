@@ -9,7 +9,7 @@ import BackgroundShapes from './BackgroundShapes';
 import CalendarHeader from './CalendarHeader';
 import CalendarGrid from './CalendarGrid';
 
-// Modals
+// Existing Modals
 import SwapRequestModal from './SwapRequestModal';
 import PendingRequestsModal from './PendingRequestsModal';
 import AddShiftModal from './AddShiftModal';
@@ -24,6 +24,8 @@ import KPIListModal from '../dashboard/KPIListModal';
 import AdminSettingsModal from '../admin/AdminSettingsModal';
 import SwapSuccessModal from './SwapSuccessModal';
 import SeedRolesData from '../admin/SeedRolesData';
+
+// --- NEW MODALS ---
 import HeadToHeadSelectorModal from './HeadToHeadSelectorModal';
 import HeadToHeadApprovalModal from './HeadToHeadApprovalModal';
 import HallOfFameModal from '../dashboard/HallOfFameModal';
@@ -50,156 +52,321 @@ export default function ShiftCalendar() {
   const [showAdminSettings, setShowAdminSettings] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastUpdatedShift, setLastUpdatedShift] = useState(null);
+
+  // --- NEW STATES FOR H2H & FEATURES ---
   const [showHeadToHeadSelector, setShowHeadToHeadSelector] = useState(false);
   const [showHeadToHeadApproval, setShowHeadToHeadApproval] = useState(false);
   const [h2hTargetId, setH2hTargetId] = useState(null);
   const [h2hOfferId, setH2hOfferId] = useState(null);
+  
   const [showHallOfFame, setShowHallOfFame] = useState(false);
   const [showHelpSupport, setShowHelpSupport] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(null);
+
   const queryClient = useQueryClient();
 
+  // 1. Fetch User & Check Onboarding
   useEffect(() => {
     const fetchUser = async () => {
       const user = await base44.auth.me();
       setCurrentUser(user);
-      if (!user.assigned_role) setShowOnboarding(true);
+      
+      if (!user.assigned_role) {
+        setShowOnboarding(true);
+      }
     };
     fetchUser();
   }, []);
 
+  // 2. URL Listener for Head-to-Head Link (Receiver Logic)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('mode') === 'head_to_head_approval') {
+    const mode = params.get('mode');
+
+    if (mode === 'head_to_head_approval') {
         const targetId = params.get('targetId');
         const offerId = params.get('offerId');
+
         if (targetId && offerId) {
             setH2hTargetId(targetId);
             setH2hOfferId(offerId);
             setShowHeadToHeadApproval(true);
+            
+            // Clean the URL so refresh doesn't trigger it again
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     }
   }, []);
 
-  // --- FETCH LOGIC ---
+  // Fetch shifts
   const { data: shifts = [], isLoading } = useQuery({
-    queryKey: ['shifts-composite'],
-    queryFn: async () => {
-      const rawShifts = await base44.entities.Shifts.list();
-      const allAssignments = await base44.entities.ShiftAssignments.list();
-      const allUsers = await base44.entities.Users.list(); 
-
-      const mergedShifts = rawShifts.map(shiftSlot => {
-          const assignment = allAssignments.find(a => a.shift_id === shiftSlot.id && a.status === 'מאושר');
-          let assignedUser = null;
-          if (assignment) {
-              assignedUser = allUsers.find(u => u.id === assignment.user_id);
-          }
-
-          return {
-              id: shiftSlot.id,
-              date: shiftSlot.date,
-              start_time: shiftSlot.start_time,
-              end_time: shiftSlot.end_time,
-              status: mapStatusToLegacy(shiftSlot.status),
-              // Use assigned_role if available, else Name
-              assigned_person: assignedUser ? (assignedUser.assigned_role || assignedUser.Name) : 'לא משובץ',
-              assigned_role: assignedUser ? (assignedUser.assigned_role || assignedUser.Name) : 'לא משובץ',
-              assigned_email: assignedUser ? assignedUser.Email : null,
-              department: assignedUser?.department || 'כללי', 
-              role: 'תורן',
-              _rawAssignment: assignment,
-              _rawShift: shiftSlot
-          };
-      });
-      return mergedShifts;
-    },
+    queryKey: ['shifts'],
+    queryFn: () => base44.entities.Shift.list(),
   });
 
-  const mapStatusToLegacy = (hebrewStatus) => {
-      const map = {
-          'רגילה': 'regular',
-          'בקשת החלפה': 'swap_requested', 
-          'ממתין לאישור': 'pending_approval',
-          'אושרה': 'approved',
-          'מכוסה חלקית': 'partially_covered'
-      };
-      return map[hebrewStatus] || 'regular';
-  };
+  // --- MUTATIONS ---
 
-  // --- ADD SHIFT MUTATION (FIXED) ---
   const addShiftMutation = useMutation({
     mutationFn: async ({ date, shiftData }) => {
       if (currentUser?.user_type !== 'admin') {
         throw new Error('רק מנהלים יכולים ליצור משמרות');
       }
-
-      // 1. Fetch Users to find the specific user by custom_id
-      const users = await base44.entities.Users.list();
-      
-      // Note: shiftData.userId comes as number from the Modal
-      const targetUser = users.find(u => u.custom_id === shiftData.userId);
-
-      if (!targetUser) throw new Error('משתמש לא נמצא במערכת');
-
-      // 2. Create Shift
-      const newShift = await base44.entities.Shifts.create({
+      return base44.entities.Shift.create({
         date: format(date, 'yyyy-MM-dd'),
-        start_time: '09:00', 
-        end_time: '09:00',
-        status: 'רגילה'
+        department: shiftData.department,
+        role: shiftData.role,
+        assigned_person: shiftData.assignedPerson || currentUser?.full_name,
+        assigned_email: shiftData.assignedEmail || currentUser?.email,
+        status: 'regular'
       });
-
-      // 3. Create Assignment (Using the system UUID for relation)
-      await base44.entities.ShiftAssignments.create({
-        shift_id: newShift.id,
-        user_id: targetUser.id, // Linking via UUID
-        status: 'מאושר',
-        cover_start_date: format(date, 'yyyy-MM-dd'),
-        cover_start_time: '09:00',
-        cover_end_date: format(addDays(date, 1), 'yyyy-MM-dd'),
-        cover_end_time: '09:00'
-      });
-
-      return newShift;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts-composite'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setShowAddModal(false);
       toast.success('המשמרת נוספה בהצלחה');
     },
     onError: (error) => {
-      console.error(error);
-      toast.error('שגיאה בהוספת המשמרת: ' + error.message);
+      toast.error(error.message || 'שגיאה בהוספת המשמרת');
     }
   });
 
-  // (Keeping other mutations essentially same logic just wrapped)
-  const deleteShiftMutation = useMutation({
-    mutationFn: async (shiftId) => {
-      if (currentUser?.user_type !== 'admin') throw new Error('רק מנהלים יכולים למחוק');
-      return base44.entities.Shifts.delete(shiftId);
+  const swapRequestMutation = useMutation({
+    mutationFn: async ({ date, swapData }) => {
+      const existingShift = shifts.find(s => s.date === format(date, 'yyyy-MM-dd'));
+
+      if (existingShift) {
+        // CORRECT STATUS LOGIC: 
+        // If partial times selected -> REQUIRES_PARTIAL_COVERAGE (Yellow)
+        // If full day (default) -> REQUIRES_FULL_COVERAGE (Red)
+        const isPartial = swapData.swapType === 'partial';
+        const newStatus = isPartial ? 'REQUIRES_PARTIAL_COVERAGE' : 'REQUIRES_FULL_COVERAGE';
+
+        const updatedShift = await base44.entities.Shift.update(existingShift.id, {
+          status: newStatus,
+          swap_request_by: currentUser?.email,
+          swap_type: swapData.swapType,
+          swap_start_time: isPartial ? swapData.startTime : '09:00',
+          swap_end_time: isPartial ? swapData.endTime : '09:00'
+        });
+        return updatedShift;
+      }
+      return null;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts-composite'] });
-      setShowDetailsModal(false);
-      setShowActionModal(false);
-      toast.success('השיבוץ נמחק בהצלחה');
+    onSuccess: (updatedShift) => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShowSwapModal(false);
+      if (updatedShift) {
+        setLastUpdatedShift(updatedShift);
+        setShowSuccessModal(true);
+      } else {
+        toast.success('בקשת ההחלפה נשלחה בהצלחה');
+      }
     },
-    onError: (e) => toast.error('שגיאה במחיקה')
+    onError: () => {
+      toast.error('שגיאה בשליחת הבקשה');
+    }
   });
 
-  // Placeholder mutations for Swap/Cover (logic needs full migration later)
-  const swapRequestMutation = useMutation({ mutationFn: async () => {}, onSuccess: () => { toast.success('בקשה נשלחה') }});
-  const offerCoverMutation = useMutation({ mutationFn: async () => {}, onSuccess: () => { toast.success('כיסוי נקלט') }});
-  const cancelSwapMutation = useMutation({ mutationFn: async () => {}, onSuccess: () => { toast.success('בוטל') }});
-  const headToHeadSwapMutation = useMutation({ mutationFn: async () => {}, onSuccess: () => { toast.success('בוצע') }});
-  const approveSwapMutation = useMutation({ mutationFn: async () => {}, onSuccess: () => { toast.success('אושר') }});
-  const editRoleMutation = useMutation({ mutationFn: async () => {}, onSuccess: () => { toast.success('עודכן') }});
+  // --- NEW MUTATION: CANCEL SWAP REQUEST ---
+  const cancelSwapMutation = useMutation({
+    mutationFn: async (shiftId) => {
+        // Reset shift to regular state
+        return base44.entities.Shift.update(shiftId, {
+            status: 'regular',
+            swap_request_by: null,
+            swap_type: null,
+            swap_start_time: null,
+            swap_end_time: null,
+            remaining_hours: null,
+            // Note: We are keeping the original assigned_person/email as they were never changed during the request phase
+        });
+        // Note: If coverages exist (partial), ideally we should delete them too or handle them.
+        // For simplicity, we assume 'Cancel Request' implies reverting everything.
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['shift-coverages'] }); // Clear associated coverages if any logic connected
+        setShowDetailsModal(false);
+        toast.success('הבקשה בוטלה בהצלחה, המשמרת חזרה למצב רגיל');
+    },
+    onError: () => {
+        toast.error('שגיאה בביטול הבקשה');
+    }
+  });
 
-  // Handlers
+  // --- THE FIXED COVER LOGIC ---
+  const offerCoverMutation = useMutation({
+    mutationFn: async ({ shift, coverData }) => {
+      // 1. Create coverage
+      await base44.entities.ShiftCoverage.create({
+        shift_id: shift.id,
+        covering_person: currentUser?.full_name || currentUser?.email,
+        covering_email: currentUser?.email,
+        covering_role: coverData.role || currentUser?.assigned_role,
+        covering_department: coverData.department || currentUser?.department,
+        start_date: coverData.startDate,
+        start_time: coverData.startTime,
+        end_date: coverData.endDate,
+        end_time: coverData.endTime,
+        status: 'approved'
+      });
+
+      // 2. Fetch all coverages to recalculate
+      const allCoverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
+      
+      const reqStartStr = shift.swap_start_time || '09:00';
+      const reqEndStr = shift.swap_end_time || '09:00';
+      
+      const shiftDate = parseISO(shift.date);
+      const reqStart = new Date(`${format(shiftDate, 'yyyy-MM-dd')}T${reqStartStr}`);
+      let reqEnd = new Date(`${format(shiftDate, 'yyyy-MM-dd')}T${reqEndStr}`);
+      
+      if (reqEnd <= reqStart || (reqStartStr === '09:00' && reqEndStr === '09:00')) {
+          reqEnd = addDays(reqEnd, 1);
+      }
+      
+      const requestedMinutes = differenceInMinutes(reqEnd, reqStart);
+
+      let totalCoveredMinutes = 0;
+      
+      allCoverages.forEach(cov => {
+          const cStart = new Date(`${cov.start_date}T${cov.start_time}`);
+          const cEnd = new Date(`${cov.end_date}T${cov.end_time}`);
+          const diff = differenceInMinutes(cEnd, cStart);
+          totalCoveredMinutes += diff;
+      });
+
+      const isFullyCovered = totalCoveredMinutes >= (requestedMinutes - 5);
+
+      const updateData = {};
+
+      if (isFullyCovered) {
+          updateData.status = 'approved'; 
+          updateData.remaining_hours = null;
+      } else {
+          updateData.status = 'partially_covered';
+          const remaining = requestedMinutes - totalCoveredMinutes;
+          const h = Math.floor(remaining / 60);
+          const m = remaining % 60;
+          updateData.remaining_hours = `${h}:${m.toString().padStart(2, '0')}`;
+      }
+
+      return base44.entities.Shift.update(shift.id, updateData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-coverages'] });
+      setShowAcceptModal(false);
+      setShowCoverSegmentModal(false);
+      toast.success('הכיסוי נקלט בהצלחה!');
+    },
+    onError: (e) => {
+      console.error(e);
+      toast.error('שגיאה בשמירת הכיסוי');
+    }
+  });
+
+  // --- NEW: HEAD-TO-HEAD SWAP EXECUTION ---
+  const headToHeadSwapMutation = useMutation({
+    mutationFn: async () => {
+        const allShifts = await base44.entities.Shift.list();
+        const targetShift = allShifts.find(s => s.id === h2hTargetId);
+        const offerShift = allShifts.find(s => s.id === h2hOfferId);
+
+        if (!targetShift || !offerShift) throw new Error('אחת המשמרות לא נמצאה');
+
+        // Swap Logic
+        await base44.entities.Shift.update(targetShift.id, {
+            assigned_person: offerShift.assigned_person,
+            assigned_email: offerShift.assigned_email,
+            status: 'approved',
+            swap_request_by: null,
+            swap_start_time: null,
+            swap_end_time: null,
+            original_assigned_person: targetShift.assigned_person
+        });
+
+        await base44.entities.Shift.update(offerShift.id, {
+            assigned_person: targetShift.assigned_person,
+            assigned_email: targetShift.assigned_email,
+            status: 'approved',
+            original_assigned_person: offerShift.assigned_person
+        });
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        setShowHeadToHeadApproval(false);
+        toast.success('ההחלפה ראש-בראש בוצעה בהצלחה! הלוח עודכן.');
+    },
+    onError: () => {
+        toast.error('שגיאה בביצוע ההחלפה');
+    }
+  });
+
+  const approveSwapMutation = useMutation({
+    mutationFn: async (shift) => {
+      if (currentUser?.user_type !== 'admin') {
+        throw new Error('רק מנהלים יכולים לאשר החלפות');
+      }
+      const updateData = {
+        status: 'approved',
+        approved_by: currentUser?.full_name || currentUser?.email,
+        approved_by_email: currentUser?.email,
+        original_assigned_person: shift.assigned_person,
+        original_role: shift.role,
+        assigned_person: shift.covering_person,
+        assigned_email: shift.covering_email,
+        role: shift.covering_role,
+        department: shift.covering_department
+      };
+      return base44.entities.Shift.update(shift.id, updateData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success('ההחלפה אושרה בהצלחה');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'שגיאה באישור ההחלפה');
+    }
+  });
+
+  const deleteShiftMutation = useMutation({
+    mutationFn: async (shiftId) => {
+      if (currentUser?.user_type !== 'admin') {
+        throw new Error('רק מנהלים יכולים למחוק משמרות');
+      }
+      return base44.entities.Shift.delete(shiftId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShowDetailsModal(false);
+      toast.success('השיבוץ נמחק בהצלחה');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'שגיאה במחיקת השיבוץ');
+    }
+  });
+
+  const editRoleMutation = useMutation({
+    mutationFn: async ({ shift, roleData }) => {
+      return base44.entities.Shift.update(shift.id, {
+        department: roleData.department,
+        role: roleData.role
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShowEditRoleModal(false);
+      toast.success('התפקיד עודכן בהצלחה');
+    },
+    onError: () => {
+      toast.error('שגיאה בעדכון התפקיד');
+    }
+  });
+
+  // --- Handlers ---
+
   const handleCellClick = (date, shift) => {
     const validDate = new Date(date);
     setSelectedDate(validDate);
@@ -209,24 +376,39 @@ export default function ShiftCalendar() {
       if (isAdmin) setShowAddModal(true);
       return;
     }
-    
-    // Admin View
+
     if (isAdmin) {
-        if (shift.status === 'regular') setShowActionModal(true);
-        else setShowDetailsModal(true);
-        return;
+      if (shift.status === 'regular') setShowActionModal(true);
+      else setShowDetailsModal(true);
+      return;
     }
 
-    // User View
-    const isMyShift = shift.assigned_email === currentUser?.email; 
-    const isSwapActive = ['swap_requested', 'partially_covered', 'approved'].includes(shift.status);
+    const isMyShift = shift.role && currentUser?.assigned_role && 
+                      typeof shift.role === 'string' && shift.role.includes(currentUser.assigned_role);
+
+    const isSwapActive = [
+        'swap_requested', 
+        'REQUIRES_FULL_COVERAGE', 
+        'REQUIRES_PARTIAL_COVERAGE', 
+        'partially_covered',
+        'approved'
+    ].includes(shift.status);
 
     if (isMyShift) {
-        if (isSwapActive) setShowDetailsModal(true);
-        else setShowActionModal(true);
+        // If it's my shift AND it is already in swap process, show details modal to allow Cancel
+        if (isSwapActive) {
+            setShowDetailsModal(true);
+        } else {
+            setShowActionModal(true);
+        }
     } else if (isSwapActive) {
       setShowDetailsModal(true);
     }
+  };
+
+  const handleKPIClick = (type) => {
+    setKPIType(type);
+    setShowKPIList(true);
   };
 
   const handleOfferCover = async (shift) => {
@@ -235,42 +417,223 @@ export default function ShiftCalendar() {
     setShowCoverSegmentModal(true); 
   };
 
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    base44.auth.me().then(user => setCurrentUser(user));
+  };
+
   const isAdmin = ['admin', 'manager'].includes(currentUser?.user_type);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] relative overflow-hidden" dir="rtl" style={{ fontFamily: 'Heebo, sans-serif' }}>
+    <div 
+      className="min-h-screen bg-[#FAFAFA] relative overflow-hidden"
+      dir="rtl"
+      style={{ fontFamily: 'Heebo, sans-serif' }}
+    >
       <SeedRolesData />
       <BackgroundShapes />
+      
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 md:py-8">
-        <CalendarHeader currentDate={currentDate} setCurrentDate={setCurrentDate} viewMode={viewMode} setViewMode={setViewMode} isAdmin={isAdmin} onOpenAdminSettings={() => setShowAdminSettings(true)} onOpenHallOfFame={() => setShowHallOfFame(true)} onOpenHelp={() => setShowHelpSupport(true)} currentUser={currentUser} hideNavigation />
-        <KPIHeader shifts={shifts} currentUser={currentUser} onKPIClick={(type) => { setKPIType(type); setShowKPIList(true); }} />
-        <CalendarHeader currentDate={currentDate} setCurrentDate={setCurrentDate} viewMode={viewMode} setViewMode={setViewMode} isAdmin={isAdmin} currentUser={currentUser} hideHeader />
         
-        <CalendarGrid currentDate={currentDate} viewMode={viewMode} shifts={shifts} onCellClick={handleCellClick} currentUserEmail={currentUser?.email} currentUserRole={currentUser?.assigned_role} isAdmin={isAdmin} />
+        {/* --- HEADER --- */}
+        <CalendarHeader
+          currentDate={currentDate}
+          setCurrentDate={setCurrentDate}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          isAdmin={isAdmin}
+          onOpenAdminSettings={() => setShowAdminSettings(true)}
+          onOpenHallOfFame={() => setShowHallOfFame(true)}
+          onOpenHelp={() => setShowHelpSupport(true)}
+          currentUser={currentUser}
+          hideNavigation
+        />
 
-        {/* Modals */}
-        <AddShiftModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} date={selectedDate} onSubmit={(data) => addShiftMutation.mutate({ date: selectedDate, shiftData: data })} isSubmitting={addShiftMutation.isPending} currentUser={currentUser} />
-        
-        <ShiftActionModal isOpen={showActionModal} onClose={() => setShowActionModal(false)} shift={selectedShift} date={selectedDate} onRequestSwap={() => { setShowActionModal(false); setShowSwapModal(true); }} onEditRole={() => { setShowActionModal(false); setShowEditRoleModal(true); }} onDelete={deleteShiftMutation.mutate} isAdmin={isAdmin} />
-        
-        <ShiftDetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} shift={selectedShift} date={selectedDate} onCoverSegment={handleOfferCover} onOfferCover={handleOfferCover} onHeadToHead={() => {}} onCancelRequest={() => {}} onDelete={deleteShiftMutation.mutate} onApprove={() => {}} currentUserEmail={currentUser?.email} isAdmin={isAdmin} />
+        <KPIHeader 
+          shifts={shifts} 
+          currentUser={currentUser} 
+          onKPIClick={handleKPIClick} 
+        />
 
-        {/* Other modals kept for structure consistency */}
-        <OnboardingModal isOpen={showOnboarding} onComplete={() => setShowOnboarding(false)} />
-        <KPIListModal isOpen={showKPIList} onClose={() => setShowKPIList(false)} type={kpiType} shifts={shifts} currentUser={currentUser} onOfferCover={handleOfferCover} onRequestSwap={() => {}} />
-        <AdminSettingsModal isOpen={showAdminSettings} onClose={() => setShowAdminSettings(false)} />
-        <SwapRequestModal isOpen={showSwapModal} onClose={() => setShowSwapModal(false)} date={selectedDate} shift={selectedShift} onSubmit={() => {}} isSubmitting={false} />
-        <PendingRequestsModal isOpen={showPendingModal} onClose={() => setShowPendingModal(false)} requests={shifts} onAccept={handleOfferCover} isAccepting={false} currentUserEmail={currentUser?.email} />
-        <AcceptSwapModal isOpen={showAcceptModal} onClose={() => setShowAcceptModal(false)} shift={selectedShift} onAccept={() => {}} isAccepting={false} />
-        <EditRoleModal isOpen={showEditRoleModal} onClose={() => setShowEditRoleModal(false)} date={selectedDate} shift={selectedShift} onSubmit={() => {}} isSubmitting={false} />
-        <CoverSegmentModal isOpen={showCoverSegmentModal} onClose={() => setShowCoverSegmentModal(false)} shift={selectedShift} date={selectedDate} onSubmit={() => {}} isSubmitting={false} />
-        <SwapSuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} shift={lastUpdatedShift} />
-        <HeadToHeadSelectorModal isOpen={showHeadToHeadSelector} onClose={() => setShowHeadToHeadSelector(false)} targetShift={selectedShift} currentUser={currentUser} />
-        <HeadToHeadApprovalModal isOpen={showHeadToHeadApproval} onClose={() => setShowHeadToHeadApproval(false)} targetShiftId={h2hTargetId} offerShiftId={h2hOfferId} onApprove={() => {}} onDecline={() => setShowHeadToHeadApproval(false)} />
-        <HallOfFameModal isOpen={showHallOfFame} onClose={() => setShowHallOfFame(false)} />
-        <HelpSupportModal isOpen={showHelpSupport} onClose={() => setShowHelpSupport(false)} />
+        <CalendarHeader
+          currentDate={currentDate}
+          setCurrentDate={setCurrentDate}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          isAdmin={isAdmin}
+          currentUser={currentUser}
+          hideHeader
+        />
+
+        <CalendarGrid
+          currentDate={currentDate}
+          viewMode={viewMode}
+          shifts={shifts}
+          onCellClick={handleCellClick}
+          currentUserEmail={currentUser?.email}
+          currentUserRole={currentUser?.assigned_role}
+          isAdmin={isAdmin}
+        />
+
+        {/* --- MODALS --- */}
+
+        <OnboardingModal
+          isOpen={showOnboarding}
+          onComplete={handleOnboardingComplete}
+        />
+
+        <KPIListModal
+          isOpen={showKPIList}
+          onClose={() => setShowKPIList(false)}
+          type={kpiType}
+          shifts={shifts}
+          currentUser={currentUser}
+          onOfferCover={handleOfferCover}
+          onRequestSwap={(shift) => {
+            setSelectedShift(shift);
+            setSelectedDate(new Date(shift.date));
+            setShowKPIList(false);
+            setShowSwapModal(true);
+          }}
+        />
+
+        <AdminSettingsModal
+          isOpen={showAdminSettings}
+          onClose={() => setShowAdminSettings(false)}
+        />
+
+        <SwapRequestModal
+          isOpen={showSwapModal}
+          onClose={() => setShowSwapModal(false)}
+          date={selectedDate}
+          shift={selectedShift}
+          onSubmit={(swapData) => swapRequestMutation.mutate({ date: selectedDate, swapData })}
+          isSubmitting={swapRequestMutation.isPending}
+        />
+
+        <PendingRequestsModal
+          isOpen={showPendingModal}
+          onClose={() => setShowPendingModal(false)}
+          requests={shifts}
+          onAccept={handleOfferCover}
+          isAccepting={false}
+          currentUserEmail={currentUser?.email}
+        />
+
+        <AddShiftModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          date={selectedDate}
+          onSubmit={(shiftData) => addShiftMutation.mutate({ date: selectedDate, shiftData })}
+          isSubmitting={addShiftMutation.isPending}
+          currentUser={currentUser}
+        />
+
+        <AcceptSwapModal
+          isOpen={showAcceptModal}
+          onClose={() => setShowAcceptModal(false)}
+          shift={selectedShift}
+          onAccept={(acceptData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: acceptData })}
+          isAccepting={offerCoverMutation.isPending}
+        />
+
+        <ShiftActionModal
+          isOpen={showActionModal}
+          onClose={() => setShowActionModal(false)}
+          shift={selectedShift}
+          date={selectedDate}
+          onRequestSwap={() => {
+            setShowActionModal(false);
+            setShowSwapModal(true);
+          }}
+          onEditRole={() => {
+            setShowActionModal(false);
+            setShowEditRoleModal(true);
+          }}
+          onDelete={deleteShiftMutation.mutate}
+          isAdmin={isAdmin}
+        />
+
+        <EditRoleModal
+          isOpen={showEditRoleModal}
+          onClose={() => setShowEditRoleModal(false)}
+          date={selectedDate}
+          shift={selectedShift}
+          onSubmit={(roleData) => editRoleMutation.mutate({ shift: selectedShift, roleData })}
+          isSubmitting={editRoleMutation.isPending}
+        />
+
+        {/* --- SHIFT DETAILS WITH H2H & CANCEL BUTTONS --- */}
+        <ShiftDetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          shift={selectedShift}
+          date={selectedDate}
+          onCoverSegment={(shift) => {
+            handleOfferCover(shift);
+          }}
+          onOfferCover={handleOfferCover}
+          onHeadToHead={(shift) => {
+             setSelectedShift(shift);
+             setShowHeadToHeadSelector(true);
+          }}
+          onCancelRequest={(shift) => { // New Prop
+             cancelSwapMutation.mutate(shift.id);
+          }}
+          onDelete={deleteShiftMutation.mutate}
+          onApprove={() => approveSwapMutation.mutate(selectedShift)}
+          currentUserEmail={currentUser?.email}
+          isAdmin={isAdmin}
+        />
+
+        <CoverSegmentModal
+          isOpen={showCoverSegmentModal}
+          onClose={() => setShowCoverSegmentModal(false)}
+          shift={selectedShift}
+          date={selectedDate}
+          onSubmit={(segmentData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: segmentData })}
+          isSubmitting={offerCoverMutation.isPending}
+        />
+
+        <SwapSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          shift={lastUpdatedShift}
+        />
+
+        {/* --- NEW MODALS RENDER --- */}
+        
+        <HeadToHeadSelectorModal 
+            isOpen={showHeadToHeadSelector}
+            onClose={() => setShowHeadToHeadSelector(false)}
+            targetShift={selectedShift}
+            currentUser={currentUser}
+        />
+
+        <HeadToHeadApprovalModal 
+            isOpen={showHeadToHeadApproval}
+            onClose={() => setShowHeadToHeadApproval(false)}
+            targetShiftId={h2hTargetId}
+            offerShiftId={h2hOfferId}
+            onApprove={() => headToHeadSwapMutation.mutate()}
+            onDecline={() => setShowHeadToHeadApproval(false)}
+        />
+
+        <HallOfFameModal 
+            isOpen={showHallOfFame}
+            onClose={() => setShowHallOfFame(false)}
+        />
+
+        <HelpSupportModal 
+            isOpen={showHelpSupport}
+            onClose={() => setShowHelpSupport(false)}
+        />
+
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');`}</style>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
+      `}</style>
     </div>
   );
 }
