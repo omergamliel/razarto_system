@@ -135,6 +135,19 @@ export default function CalendarHeader({
                         />
                     </button>
 
+                    {/* 2. הדרכה ועזרה - כרגע מוסתר בהערה */}
+                    {/* <button 
+                        onClick={onOpenHelp}
+                        className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+                        title="הדרכה ועזרה"
+                    >
+                        <img 
+                            src="https://cdn-icons-png.flaticon.com/128/189/189665.png" 
+                            alt="Help" 
+                            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform"
+                        />
+                    </button> 
+                    */}
 
                     {/* 3. לוח ניהול (רק למנהלים) */}
                     {isAdmin && (
@@ -158,10 +171,12 @@ export default function CalendarHeader({
             {/* ----------------------------- */}
             {/* 2. אזור המיתוג (לוגו + כותרת) */}
             {/* ----------------------------- */}
-            <div className="hidden md:flex flex-col md:flex-row items-center justify-between mb-8 px-2 relative">
+            {/* השינוי: הסרתי את ה-hidden כדי שיוצג גם במובייל */}
+            <div className="flex flex-col md:flex-row items-center justify-between mb-8 px-2 relative">
                 
                 {/* לוגו (צד ימין ב-RTL) */}
-                <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                {/* שינוי: הוספתי relative mb-4 עבור מובייל, והגבלת absolute למסכי md ומעלה */}
+                <div className="relative mb-4 md:mb-0 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2">
                      {isAdmin && (
                         <input
                         ref={fileInputRef}
@@ -207,8 +222,8 @@ export default function CalendarHeader({
                     </div>
                 </div>
 
-                {/* אלמנט מאזן ריק בצד שמאל */}
-                <div className="w-16"></div>
+                {/* אלמנט מאזן ריק בצד שמאל - מוסתר במובייל */}
+                <div className="hidden md:block w-16"></div>
             </div>
         </>
       )}
