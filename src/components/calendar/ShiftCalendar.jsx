@@ -93,22 +93,19 @@ export default function ShiftCalendar() {
       
       console.log("🔍 [DEBUG] Checking authorization for:", userEmail);
 
-      // Attempt 1: Exact Match
-      let people = await base44.entities.AuthorizedPerson.filter({ email: userEmail });
-      console.log("📄 [DEBUG] DB Attempt 1 (Exact):", people);
+      // Fetch all authorized people and search case-insensitive on client-side
+      const allPeople = await base44.entities.AuthorizedPerson.list();
+      console.log("📄 [DEBUG] All AuthorizedPerson records:", allPeople);
 
-      // Attempt 2: Lowercase Match (Fallback if user wrote User@ but DB has user@)
-      if (!people || people.length === 0) {
-          const lowerEmail = userEmail.toLowerCase();
-          console.log("⚠️ [DEBUG] Exact match failed. Trying lowercase:", lowerEmail);
-          people = await base44.entities.AuthorizedPerson.filter({ email: lowerEmail });
-          console.log("📄 [DEBUG] DB Attempt 2 (Lower):", people);
-      }
+      // Case-insensitive search
+      const normalizedUserEmail = userEmail.toLowerCase();
+      const match = allPeople.find(person => 
+        person.email && person.email.toLowerCase() === normalizedUserEmail
+      );
 
-      const result = people.length > 0 ? people[0] : null;
-      console.log("✅ [DEBUG] Final Authorization Result:", result);
+      console.log("✅ [DEBUG] Final Authorization Result:", match || null);
       
-      return result; 
+      return match || null; 
     },
     enabled: !!userEmail
   });
