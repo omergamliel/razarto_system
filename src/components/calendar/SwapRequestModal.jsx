@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, addDays, parseISO, differenceInMinutes, addMinutes, startOfDay } from 'date-fns';
+import { format, addDays, differenceInMinutes, addMinutes } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Calendar, AlertCircle, Send, CheckCircle2, ArrowLeftRight, CalendarDays, Timer } from 'lucide-react';
@@ -22,7 +22,7 @@ export default function SwapRequestModal({
   const shiftStartStr = shift?.start_time || '09:00';
   const shiftEndStr = shift?.end_time || '09:00';
   
-  // State for raw values (ISO for logic)
+  // State for raw values
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -40,21 +40,23 @@ export default function SwapRequestModal({
   // Initialize
   useEffect(() => {
     if (isOpen && date && shift) {
-      // Use DB dates if available, fallback to clicked date
-      const sDateStr = shift.start_date || format(date, 'yyyy-MM-dd');
-      const sDate = new Date(sDateStr);
+      // 1. קביעת תאריך התחלה וסיום לפי ה-DB
+      const sDateStr = shift.start_date || format(new Date(date), 'yyyy-MM-dd');
       
       const sH = parseInt(shiftStartStr.split(':')[0]);
       const eH = parseInt(shiftEndStr.split(':')[0]);
       
       const startObj = new Date(sDateStr + 'T' + shiftStartStr);
-      let endObj = shift.end_date 
-          ? new Date(shift.end_date + 'T' + shiftEndStr)
-          : new Date(sDateStr + 'T' + shiftEndStr);
       
-      // Fix end date logic if not explicitly provided
-      if (!shift.end_date && (endObj <= startObj || (sH === 9 && eH === 9))) {
-          endObj = addDays(endObj, 1);
+      // חישוב תאריך סיום (אם לא קיים, מחשבים לפי השעות)
+      let endObj;
+      if (shift.end_date) {
+           endObj = new Date(shift.end_date + 'T' + shiftEndStr);
+      } else {
+           // אם סיום קטן מהתחלה או שזה 09:00-09:00, זה יום למחרת
+           const isNextDay = eH < sH || (sH === 9 && eH === 9);
+           const eDateStr = isNextDay ? format(addDays(new Date(sDateStr), 1), 'yyyy-MM-dd') : sDateStr;
+           endObj = new Date(eDateStr + 'T' + shiftEndStr);
       }
 
       shiftStartObjRef.current = startObj;
@@ -117,22 +119,31 @@ export default function SwapRequestModal({
   const handleManualInputChange = (type, val) => {
       if (type === 'startTime') setStartTime(val);
       if (type === 'endTime') setEndTime(val);
-      // For simplicity, date inputs are read-only when using slider in this advanced mode
   };
 
+  // --- SUBMISSION LOGIC ---
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Construct the payload for ShiftCalendar's requestSwapMutation
-    // Important: For full swap, use original shift times/dates to ensure correctness
+    // בניה מחדש של האובייקט כדי לוודא שכל השדות קיימים
+    // אם נבחר "Full", אנחנו דורסים את הנתונים הידניים עם נתוני המשמרת המקוריים ליתר ביטחון
+    
+    const finalStartDate = swapType === 'partial' ? startDate : (shift.start_date || startDate);
+    const finalStartTime = swapType === 'partial' ? startTime : (shift.start_time || '09:00');
+    
+    // חישוב תאריך סיום למקרה של Full אם חסר
+    let finalEndDate = swapType === 'partial' ? endDate : (shift.end_date || endDate);
+    const finalEndTime = swapType === 'partial' ? endTime : (shift.end_time || '09:00');
+
     const payload = {
       type: swapType, // 'full' or 'partial'
-      startDate: swapType === 'partial' ? startDate : (shift.start_date || startDate),
-      startTime: swapType === 'partial' ? startTime : (shift.start_time || '09:00'),
-      endDate: swapType === 'partial' ? endDate : (shift.end_date || endDate),
-      endTime: swapType === 'partial' ? endTime : (shift.end_time || '09:00')
+      startDate: finalStartDate,
+      startTime: finalStartTime,
+      endDate: finalEndDate,
+      endTime: finalEndTime
     };
 
+    console.log("Submitting Request:", payload); // לוג לבדיקה
     onSubmit(payload);
   };
   
@@ -142,12 +153,10 @@ export default function SwapRequestModal({
   const endPercent = (range[1] / totalDurationRef.current) * 100;
   const widthPercent = endPercent - startPercent;
 
-  // Calculate selected duration for display
   const selectedDurationMinutes = range[1] - range[0];
   const selectedDurationHours = selectedDurationMinutes / 60;
   const isFullDuration = selectedDurationMinutes === totalDurationRef.current;
 
-  // Format date helper for display (dd/MM/yyyy)
   const formatDisplayDate = (isoDateStr) => {
       if (!isoDateStr) return '';
       return format(new Date(isoDateStr), 'dd/MM/yyyy');
@@ -395,11 +404,19 @@ export default function SwapRequestModal({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Hidden submit for form enter key */}
+            <button type="submit" className="hidden" />
           </form>
 
+          {/* Footer with Actions */}
           <div className="p-6 pt-0 border-t border-gray-50 mt-auto bg-white">
             <div className="flex gap-3 mt-4">
-                <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]">
+                <Button 
+                   onClick={handleSubmit} 
+                   disabled={isSubmitting} 
+                   className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
                     {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
                 </Button>
                 <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
