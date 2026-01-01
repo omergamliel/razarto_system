@@ -210,10 +210,8 @@ export default function ShiftCalendar() {
 
       console.log('📨 [ShiftCalendar] Creating SwapRequest with payload:', payload);
 
-      // Create SwapRequest
       await base44.entities.SwapRequest.create(payload);
 
-      // Update Shift status
       return await base44.entities.Shift.update(shiftId, {
         status: 'Swap_Requested'
       });
@@ -221,10 +219,15 @@ export default function ShiftCalendar() {
     onSuccess: (data) => {
       queryClient.invalidateQueries(['shifts']);
       queryClient.invalidateQueries(['swap-requests']);
+      toast.success('בקשת ההחלפה נשלחה בהצלחה!');
       setLastUpdatedShift(data);
       setShowSwapRequestModal(false);
       setShowActionModal(false);
       setShowSuccessModal(true);
+    },
+    onError: (error) => {
+      console.error('❌ [ShiftCalendar] Swap request failed:', error);
+      toast.error('שליחת בקשת ההחלפה נכשלה. נסו שוב.');
     }
   });
 
@@ -433,6 +436,8 @@ export default function ShiftCalendar() {
       console.error('❌ [ShiftCalendar] No shift selected for swap request submission');
       return;
     }
+
+    console.log('📤 [ShiftCalendar] Submitting swap request from modal:', data);
 
     requestSwapMutation.mutate({
       shiftId: selectedShift.id,
