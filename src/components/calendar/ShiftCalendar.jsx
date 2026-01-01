@@ -666,7 +666,7 @@ export default function ShiftCalendar() {
         onCancelRequest={(shift) => cancelSwapMutation.mutate(shift.id)}
         onDelete={deleteShiftMutation.mutate}
         onApprove={() => approveSwapMutation.mutate(selectedShift)}
-        currentUserEmail={authorizedPerson.email}
+        currentUser={authorizedPerson}
         isAdmin={isAdmin}
       />
 
@@ -759,3 +759,4 @@ export default function ShiftCalendar() {
     </div>
   );
 }
+
