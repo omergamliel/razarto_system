@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
+import {
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
   endOfWeek,
   eachDayOfInterval,
   format,
@@ -11,6 +11,8 @@ import {
 import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import ShiftCell from './ShiftCell';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 const HEBREW_DAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 const HEBREW_DAYS_FULL = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -21,9 +23,32 @@ export default function CalendarGrid({
   shifts, 
   onCellClick,
   currentUserEmail,
-  currentUserRole,
   isAdmin = false
 }) {
+
+  // --- 1. Fetch Authorized People for Joining Data ---
+  const { data: authorizedPeople = [] } = useQuery({
+    queryKey: ['authorized-people-grid'],
+    queryFn: () => base44.entities.AuthorizedPerson.list(),
+  });
+
+  // --- 2. Helper: Enrich Shift Data ---
+  // מחבר בין המשמרת לבין פרטי המשתמש (שם, תפקיד)
+  const getEnrichedShift = (shift) => {
+    if (!shift) return null;
+    
+    const originalUser = authorizedPeople.find(u => u.serial_id === shift.original_user_id);
+    
+    return {
+      ...shift,
+      user_name: originalUser ? originalUser.full_name : 'לא משובץ',
+      department: originalUser ? originalUser.department : '',
+      // Role name can be fetched if we had a RoleDefinition table, 
+      // but for now we assume original_user_id represents the "role/slot" owner.
+      role_name: originalUser ? originalUser.full_name : 'פנוי' 
+    };
+  };
+
   const getDaysToDisplay = () => {
     if (viewMode === 'month') {
       const monthStart = startOfMonth(currentDate);
@@ -41,9 +66,10 @@ export default function CalendarGrid({
   const days = getDaysToDisplay();
 
   const getShiftForDate = (date) => {
-    return shifts.find(shift => 
-      isSameDay(new Date(shift.date), date)
+    const rawShift = shifts.find(shift => 
+      isSameDay(new Date(shift.start_date), date)
     );
+    return getEnrichedShift(rawShift);
   };
 
   return (
@@ -85,7 +111,6 @@ export default function CalendarGrid({
               currentMonth={currentDate}
               isWeekView={viewMode === 'week'}
               currentUserEmail={currentUserEmail}
-              currentUserRole={currentUserRole}
               isAdmin={isAdmin}
             />
           </motion.div>
