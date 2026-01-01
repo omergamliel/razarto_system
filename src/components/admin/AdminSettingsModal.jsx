@@ -1,593 +1,308 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings, Plus, Trash2, Users, Edit2, AlertCircle, Save, Shield } from 'lucide-react';
+import { 
+  X, Settings, Search, Filter, MoreVertical, 
+  CheckSquare, Square, Edit2, Trash2, Shield,
+  CheckCircle2, User, UserX
+} from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function AdminSettingsModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('users');
-  const [editMode, setEditMode] = useState(false);
-  const [newRoles, setNewRoles] = useState({});
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [editingRole, setEditingRole] = useState(null);
-  const [editedName, setEditedName] = useState('');
   
-  // New states for permissions
-  const [showAddPermission, setShowAddPermission] = useState(false);
-  const [selectedUser, setSelectedUser] = useState('');
-  const [selectedRole, setSelectedRole] = useState('');
+  // --- STATES FOR USERS TAB ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDepartments, setSelectedDepartments] = useState([]);
   
   const queryClient = useQueryClient();
 
-  // Fetch roles
-  const { data: roles = [] } = useQuery({
-    queryKey: ['role-definitions'],
-    queryFn: () => base44.entities.RoleDefinition.list(),
+  // --- QUERIES ---
+
+  // Fetch Authorized People (New Table)
+  const { data: authorizedPeople = [], isLoading: isLoadingPeople } = useQuery({
+    queryKey: ['authorized-people'],
+    queryFn: () => base44.entities.AuthorizedPerson.list(),
     enabled: isOpen && activeTab === 'users'
   });
 
-  // Fetch all users
+  // Fetch all users (Legacy/For permissions tab if needed later)
   const { data: allUsers = [] } = useQuery({
     queryKey: ['all-users'],
     queryFn: () => base44.entities.User.list(),
     enabled: isOpen && activeTab === 'permissions'
   });
 
-  // Filter privileged users (admin or manager)
-  const privilegedUsers = allUsers.filter(u => 
-    u.user_type === 'admin' || u.user_type === 'manager'
-  );
+  // --- HANDLERS ---
 
-  // Filter regular users (for adding permissions)
-  const regularUsers = allUsers.filter(u => 
-    !u.user_type || u.user_type === 'user'
-  );
+  const toggleDepartmentFilter = (dept) => {
+    setSelectedDepartments(prev => 
+      prev.includes(dept) 
+        ? prev.filter(d => d !== dept)
+        : [...prev, dept]
+    );
+  };
 
-  const addRoleMutation = useMutation({
-    mutationFn: ({ department, roleName }) => 
-      base44.entities.RoleDefinition.create({
-        department,
-        role_name: roleName
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
-      toast.success('התפקיד נוסף בהצלחה');
-    }
-  });
-
-  const updateRoleMutation = useMutation({
-    mutationFn: ({ id, roleName }) =>
-      base44.entities.RoleDefinition.update(id, { role_name: roleName }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
-      toast.success('התפקיד עודכן');
-      setEditingRole(null);
-    }
-  });
-
-  const deleteRoleMutation = useMutation({
-    mutationFn: (id) => base44.entities.RoleDefinition.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
-      toast.success('התפקיד נמחק');
-      setDeleteConfirm(null);
-    }
-  });
-
-  const removeUserMutation = useMutation({
-    mutationFn: async ({ id, userEmail }) => {
-      await base44.entities.RoleDefinition.update(id, {
-        assigned_user_name: null,
-        assigned_user_email: null
-      });
+  const getFilteredPeople = () => {
+    return authorizedPeople.filter(person => {
+      // 1. Search Filter
+      const searchMatch = person.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          person.email?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      if (userEmail) {
-        const users = await base44.entities.User.filter({ email: userEmail });
-        if (users.length > 0) {
-          await base44.entities.User.update(users[0].id, {
-            assigned_role: null,
-            department: null
-          });
-        }
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['role-definitions'] });
-      toast.success('המשתמש הוסר מהתפקיד');
-      setDeleteConfirm(null);
-    }
-  });
+      // 2. Department Filter
+      const deptMatch = selectedDepartments.length === 0 || selectedDepartments.includes(person.department);
 
-  // Change user permission level
-  const changePermissionMutation = useMutation({
-    mutationFn: async ({ userId, newRole }) => {
-      return base44.entities.User.update(userId, { user_type: newRole });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-users'] });
-      toast.success('ההרשאה עודכנה בהצלחה');
-    }
-  });
-
-  // Add permission to a user
-  const addPermissionMutation = useMutation({
-    mutationFn: async () => {
-      const user = allUsers.find(u => u.id === selectedUser);
-      if (!user) throw new Error('משתמש לא נמצא');
-      
-      return base44.entities.User.update(user.id, { 
-        user_type: selectedRole 
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-users'] });
-      toast.success('ההרשאה נוספה בהצלחה');
-      setShowAddPermission(false);
-      setSelectedUser('');
-      setSelectedRole('');
-    }
-  });
-
-  const departments = [...new Set(roles.map(r => r.department))];
-
-  const handleAddRole = (department) => {
-    const roleName = newRoles[department];
-    if (!roleName) return;
-    addRoleMutation.mutate({ department, roleName });
-    setNewRoles({ ...newRoles, [department]: '' });
+      return searchMatch && deptMatch;
+    });
   };
 
-  const handleDelete = (item) => {
-    if (item.type === 'role') {
-      deleteRoleMutation.mutate(item.id);
-    } else if (item.type === 'user') {
-      removeUserMutation.mutate({ id: item.id, userEmail: item.email });
-    }
-  };
-
-  const handleEditStart = (role) => {
-    setEditingRole(role.id);
-    setEditedName(role.role_name);
-  };
-
-  const handleEditSave = (id) => {
-    if (!editedName) return;
-    updateRoleMutation.mutate({ id, roleName: editedName });
-  };
-
-  const handleRoleChange = (userId, newRole) => {
-    changePermissionMutation.mutate({ userId, newRole });
-  };
-
-  const handleAddPermission = () => {
-    if (!selectedUser || !selectedRole) {
-      toast.error('נא לבחור משתמש ותפקיד');
-      return;
-    }
-    addPermissionMutation.mutate();
-  };
+  const filteredPeople = getFilteredPeople();
 
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        />
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm z-40"
+      />
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-right"
-        >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-5 md:p-6 text-white flex-shrink-0 rounded-t-3xl">
-            <button
-              onClick={onClose}
-              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors z-10"
+      {/* Modal Container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="fixed inset-0 m-auto z-50 bg-[#F9FAFB] rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col text-right overflow-hidden"
+      >
+        {/* Header */}
+        <div className="bg-white px-8 py-6 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">ניהול מערכת</h2>
+            <p className="text-gray-500 text-sm mt-1">ניהול משתמשים, הרשאות והגדרות</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <X className="w-6 h-6 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Tabs Navigation */}
+        <div className="bg-white px-8 flex gap-8 border-b border-gray-100 shrink-0">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`pb-4 px-2 text-sm font-medium transition-all relative ${
+              activeTab === 'users' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            משתמשים
+            {activeTab === 'users' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+            )}
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('permissions')}
+            className={`pb-4 px-2 text-sm font-medium transition-all relative ${
+              activeTab === 'permissions' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            הרשאות מתקדמות
+            {activeTab === 'permissions' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+            )}
+          </button>
+        </div>
+
+        {/* --- MAIN CONTENT AREA --- */}
+        <div className="flex-1 overflow-hidden bg-[#F9FAFB] p-8">
+          
+          {/* USERS TAB CONTENT */}
+          {activeTab === 'users' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="h-full flex flex-col gap-6"
             >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3">
-              <Settings className="w-7 h-7 md:w-8 md:h-8" />
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold">ניהול מערכת</h2>
-                <p className="text-white/80 text-xs md:text-sm">משתמשים והרשאות</p>
+              {/* Toolbar: Search & Filters */}
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                
+                {/* Search */}
+                <div className="relative w-full md:w-96">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input 
+                    placeholder="חיפוש לפי שם או מייל..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pr-10 h-11 bg-gray-50 border-gray-200 focus:bg-white rounded-xl"
+                  />
+                </div>
+
+                {/* Filters */}
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                  <span className="text-sm text-gray-500 ml-2 whitespace-nowrap flex items-center gap-1">
+                    <Filter className="w-4 h-4" /> סינון:
+                  </span>
+                  {['ש', 'מ', 'ת'].map(dept => (
+                    <button
+                      key={dept}
+                      onClick={() => toggleDepartmentFilter(dept)}
+                      className={`
+                        px-4 py-2 rounded-lg text-sm font-medium transition-all border
+                        ${selectedDepartments.includes(dept)
+                          ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      מחלקה {dept}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Tabs Navigation - Sticky */}
-          <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 flex-shrink-0">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`
-                  flex-1 flex items-center justify-center gap-2 py-4 px-4 font-semibold text-sm md:text-base
-                  transition-all relative
-                  ${activeTab === 'users' 
-                    ? 'text-blue-600' 
-                    : 'text-gray-500 hover:text-gray-700'
-                  }
-                `}
-              >
-                <img 
-                  src="https://cdn-icons-png.flaticon.com/128/1357/1357616.png" 
-                  alt="Users" 
-                  className="w-5 h-5 md:w-6 md:h-6 object-contain opacity-80"
-                />
-                <span>משתמשים</span>
-                {activeTab === 'users' && (
-                  <motion.div 
-                    layoutId="activeTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"
-                  />
-                )}
-              </button>
-              
-              <button
-                onClick={() => setActiveTab('permissions')}
-                className={`
-                  flex-1 flex items-center justify-center gap-2 py-4 px-4 font-semibold text-sm md:text-base
-                  transition-all relative
-                  ${activeTab === 'permissions' 
-                    ? 'text-blue-600' 
-                    : 'text-gray-500 hover:text-gray-700'
-                  }
-                `}
-              >
-                <img 
-                  src="https://cdn-icons-png.flaticon.com/128/747/747211.png" 
-                  alt="Permissions" 
-                  className="w-5 h-5 md:w-6 md:h-6 object-contain opacity-80"
-                />
-                <span>הרשאות</span>
-                {activeTab === 'permissions' && (
-                  <motion.div 
-                    layoutId="activeTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"
-                  />
-                )}
-              </button>
-            </div>
-          </div>
+              {/* Data Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden flex flex-col">
+                
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <div className="col-span-3">שם מלא</div>
+                  <div className="col-span-2">מחלקה</div>
+                  <div className="col-span-3">אימייל</div>
+                  <div className="col-span-2">הרשאות</div>
+                  <div className="col-span-1 text-center">סטטוס</div>
+                  <div className="col-span-1 text-center">פעולות</div>
+                </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto">
-            <AnimatePresence mode="wait">
-              {/* TAB 1: USERS */}
-              {activeTab === 'users' && (
-                <motion.div
-                  key="users"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="p-4 md:p-6"
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-gray-800">ניהול תפקידים</h3>
-                    <Button
-                      onClick={() => setEditMode(!editMode)}
-                      size="sm"
-                      className={`${editMode ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-800'} rounded-xl`}
-                    >
-                      <Edit2 className="w-4 h-4 ml-2" />
-                      {editMode ? 'סיום עריכה' : 'מצב עריכה'}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {departments.map((dept) => (
-                      <Card key={dept} className="p-4 md:p-6 border-2">
-                        <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#64B5F6]" />
-                          {dept}
-                        </h3>
-
-                        <div className="space-y-2 mb-4">
-                          {roles
-                            .filter(r => r.department === dept)
-                            .map((role) => (
-                              <div
-                                key={role.id}
-                                className="bg-gray-50 rounded-xl p-3 md:p-4 flex items-center justify-between"
-                              >
-                                <div className="flex-1 min-w-0">
-                                  {editingRole === role.id ? (
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        value={editedName}
-                                        onChange={(e) => setEditedName(e.target.value)}
-                                        className="max-w-xs"
-                                      />
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleEditSave(role.id)}
-                                        className="bg-green-500 hover:bg-green-600"
-                                      >
-                                        <Save className="w-4 h-4" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => setEditingRole(null)}
-                                      >
-                                        ביטול
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <p className="font-semibold text-gray-800 text-sm md:text-base truncate">
-                                        {role.role_name}
-                                      </p>
-                                      {role.assigned_user_name && (
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <Users className="w-3 h-3 text-gray-500" />
-                                          <span className="text-xs md:text-sm text-gray-600">
-                                            {role.assigned_user_name}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                                {editMode && editingRole !== role.id && (
-                                  <div className="flex gap-1 md:gap-2 flex-shrink-0">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleEditStart(role)}
-                                      className="text-blue-500 hover:bg-blue-50 p-2"
-                                    >
-                                      <Edit2 className="w-4 h-4" />
-                                    </Button>
-                                    {role.assigned_user_email && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => setDeleteConfirm({ 
-                                          type: 'user', 
-                                          id: role.id, 
-                                          name: role.assigned_user_name, 
-                                          email: role.assigned_user_email 
-                                        })}
-                                        className="text-orange-500 hover:bg-orange-50 p-2 hidden md:flex"
-                                      >
-                                        הסר
-                                      </Button>
-                                    )}
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setDeleteConfirm({ 
-                                        type: 'role', 
-                                        id: role.id, 
-                                        name: role.role_name 
-                                      })}
-                                      className="text-red-500 hover:bg-red-50 p-2"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="הוסף תפקיד חדש..."
-                            value={newRoles[dept] || ''}
-                            onChange={(e) => setNewRoles({ ...newRoles, [dept]: e.target.value })}
-                            className="rounded-xl text-sm md:text-base"
-                          />
-                          <Button
-                            onClick={() => handleAddRole(dept)}
-                            disabled={!newRoles[dept]}
-                            className="bg-[#64B5F6] hover:bg-[#42A5F5] rounded-xl px-3 md:px-4"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* TAB 2: PERMISSIONS */}
-              {activeTab === 'permissions' && (
-                <motion.div
-                  key="permissions"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="p-4 md:p-6"
-                >
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-800">ניהול הרשאות</h3>
-                      <p className="text-xs text-gray-500">מנהלים ובעלי הרשאות</p>
+                {/* Table Body - Scrollable */}
+                <div className="overflow-y-auto flex-1 custom-scrollbar">
+                  {isLoadingPeople ? (
+                    <div className="flex items-center justify-center h-40 text-gray-400">
+                      טוען נתונים...
                     </div>
-                    <Button
-                      onClick={() => setShowAddPermission(!showAddPermission)}
-                      className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl w-full md:w-auto"
-                    >
-                      <img 
-                        src="https://cdn-icons-png.flaticon.com/128/753/753317.png" 
-                        alt="Add" 
-                        className="w-4 h-4 ml-2 brightness-0 invert"
-                      />
-                      נתינת הרשאות
-                    </Button>
-                  </div>
-
-                  {/* Add Permission Section */}
-                  <AnimatePresence>
-                    {showAddPermission && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="bg-blue-50 border border-blue-200 rounded-2xl p-4 md:p-5 mb-6"
+                  ) : filteredPeople.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-2">
+                      <UserX className="w-10 h-10 opacity-20" />
+                      <span>לא נמצאו משתמשים התואמים לחיפוש</span>
+                    </div>
+                  ) : (
+                    filteredPeople.map((person) => (
+                      <div 
+                        key={person.id} 
+                        className="grid grid-cols-12 gap-4 p-4 border-b border-gray-50 items-center hover:bg-blue-50/30 transition-colors group"
                       >
-                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                          <Shield className="w-5 h-5 text-blue-600" />
-                          הוספת הרשאה למשתמש
-                        </h4>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 block mb-2">
-                              בחר משתמש
-                            </label>
-                            <Select value={selectedUser} onValueChange={setSelectedUser}>
-                              <SelectTrigger className="w-full rounded-xl text-right" dir="rtl">
-                                <SelectValue placeholder="בחר משתמש מהרשימה" />
-                              </SelectTrigger>
-                              <SelectContent dir="rtl">
-                                {regularUsers.map(user => (
-                                  <SelectItem key={user.id} value={user.id}>
-                                    {/* כאן השינוי: מציג Assigned Role או שם מלא אם אין */}
-                                    {user.assigned_role || user.full_name} ({user.email})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                        {/* Name */}
+                        <div className="col-span-3 font-bold text-gray-800 text-sm truncate flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                            {person.full_name?.charAt(0)}
                           </div>
-
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 block mb-2">
-                              בחר רמת הרשאה
-                            </label>
-                            <Select value={selectedRole} onValueChange={setSelectedRole}>
-                              <SelectTrigger className="w-full rounded-xl text-right" dir="rtl">
-                                <SelectValue placeholder="בחר תפקיד" />
-                              </SelectTrigger>
-                              <SelectContent dir="rtl">
-                                <SelectItem value="manager">בעל הרשאות (Manager)</SelectItem>
-                                <SelectItem value="admin">מנהל (Admin)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="flex gap-2 pt-2">
-                            <Button
-                              onClick={() => setShowAddPermission(false)}
-                              variant="outline"
-                              className="flex-1 rounded-xl"
-                            >
-                              ביטול
-                            </Button>
-                            <Button
-                              onClick={handleAddPermission}
-                              disabled={!selectedUser || !selectedRole}
-                              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white rounded-xl"
-                            >
-                              הוסף הרשאה
-                            </Button>
-                          </div>
+                          {person.full_name}
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
-                  {/* Privileged Users List */}
-                  <div className="space-y-3">
-                    {privilegedUsers.length === 0 ? (
-                      <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-                        <Shield className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500 font-medium">אין משתמשים עם הרשאות מיוחדות</p>
-                        <p className="text-xs text-gray-400 mt-1">לחץ על "נתינת הרשאות" כדי להוסיף</p>
+                        {/* Department */}
+                        <div className="col-span-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            מחלקה {person.department}
+                          </span>
+                        </div>
+
+                        {/* Email */}
+                        <div className="col-span-3 text-sm text-gray-500 truncate font-mono">
+                          {person.email}
+                        </div>
+
+                        {/* Permissions */}
+                        <div className="col-span-2">
+                          <span className={`
+                            inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium border
+                            ${person.permissions === 'Admin' 
+                              ? 'bg-purple-50 text-purple-700 border-purple-100' 
+                              : person.permissions === 'Manager'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                              : 'bg-white text-gray-600 border-gray-200'}
+                          `}>
+                            {person.permissions || 'View'}
+                          </span>
+                        </div>
+
+                        {/* Status (Linked User) */}
+                        <div className="col-span-1 flex justify-center">
+                          {person.linked_user_id ? (
+                            <div className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center" title="משתמש רשום ומקושר">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gray-50 text-gray-300 flex items-center justify-center border border-gray-200 border-dashed" title="טרם נרשם">
+                              <User className="w-4 h-4" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="col-span-1 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-gray-200">
+                                <MoreVertical className="w-4 h-4 text-gray-500" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem className="gap-2 cursor-pointer">
+                                <Edit2 className="w-4 h-4" /> עריכה
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="gap-2 cursor-pointer">
+                                <Shield className="w-4 h-4" /> ניהול הרשאות
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="gap-2 cursor-pointer text-red-600 focus:text-red-600">
+                                <Trash2 className="w-4 h-4" /> מחיקה
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+
                       </div>
-                    ) : (
-                      privilegedUsers.map(user => (
-                        <Card key={user.id} className="p-4 border-2 hover:shadow-md transition-shadow">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Users className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                <p className="font-bold text-gray-800 truncate">
-                                  {/* כאן השינוי: מציג Assigned Role ברשימה */}
-                                  {user.assigned_role || user.full_name}
-                                </p>
-                              </div>
-                              <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <Select 
-                                value={user.user_type} 
-                                onValueChange={(value) => handleRoleChange(user.id, value)}
-                              >
-                                <SelectTrigger className="w-full md:w-48 h-10 rounded-xl text-right" dir="rtl">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  <SelectItem value="admin">מנהל (Admin)</SelectItem>
-                                  <SelectItem value="manager">בעל הרשאות (Manager)</SelectItem>
-                                  <SelectItem value="user">משתמש רגיל</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </Card>
-                      ))
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
+                    ))
+                  )}
+                </div>
+                
+                {/* Footer Count */}
+                <div className="p-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex justify-between px-6">
+                  <span>סה"כ רשומות: {filteredPeople.length}</span>
+                  <span>מציג {filteredPeople.length} מתוך {authorizedPeople.length}</span>
+                </div>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-          <DialogContent dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500" />
-                אישור מחיקה
-              </DialogTitle>
-              <DialogDescription>
-                {deleteConfirm?.type === 'role' 
-                  ? `האם אתה בטוח שברצונך למחוק את התפקיד "${deleteConfirm?.name}"?`
-                  : `האם אתה בטוח שברצונך להסיר את המשתמש "${deleteConfirm?.name}" מהתפקיד?`
-                }
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
-                ביטול
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => handleDelete(deleteConfirm)}
-              >
-                אישור מחיקה
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* PERMISSIONS TAB (Legacy Placeholder) */}
+          {activeTab === 'permissions' && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center h-full text-gray-400 gap-4"
+            >
+              <Shield className="w-16 h-16 opacity-20" />
+              <p>איזור ניהול הרשאות מתקדמות (בפיתוח)</p>
+            </motion.div>
+          )}
+
+        </div>
+      </motion.div>
     </AnimatePresence>
   );
 }
