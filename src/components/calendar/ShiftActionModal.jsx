@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Trash2, AlertCircle, ShieldAlert } from 'lucide-react';
+import { X, Trash2, ShieldAlert } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,12 +33,27 @@ export default function ShiftActionModal({
 
   if (!isOpen || !shift) return null;
 
-  // תיקון: שימוש בנתוני האמת מה-DB (תאריכים ושעות)
-  const startDateObj = shift.start_date ? new Date(shift.start_date) : new Date(date);
-  const endDateObj = shift.end_date ? new Date(shift.end_date) : new Date(date);
-  
+  // --- תיקון לוגיקת תאריכים ---
+  // אם יש תאריכים מה-DB נשתמש בהם, אחרת נחשב לפי השעות
   const startTime = shift.start_time || '09:00';
   const endTime = shift.end_time || '09:00';
+  
+  const startDateObj = shift.start_date ? new Date(shift.start_date) : new Date(date);
+  
+  // חישוב חכם לתאריך סיום: אם אין תאריך סיום ב-DB, והשעה של הסיום קטנה/שווה להתחלה -> סימן שזה יום למחרת
+  let endDateObj;
+  if (shift.end_date) {
+      endDateObj = new Date(shift.end_date);
+  } else {
+      const sH = parseInt(startTime.split(':')[0]);
+      const eH = parseInt(endTime.split(':')[0]);
+      // אם שעת סיום קטנה משעת התחלה, או שזה 09:00-09:00 (24 שעות) -> זה יום למחרת
+      if (eH < sH || (sH === 9 && eH === 9)) {
+          endDateObj = addDays(startDateObj, 1);
+      } else {
+          endDateObj = startDateObj;
+      }
+  }
 
   return (
     <AnimatePresence>
@@ -85,7 +100,7 @@ export default function ShiftActionModal({
                     <div className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold mb-3">
                         משמרת רגילה
                     </div>
-                    {/* תיקון פונט: font-sans והגדלה */}
+                    {/* תיקון פונט: הוספנו font-sans */}
                     <h3 className="text-2xl font-sans font-bold text-gray-900 leading-tight">
                         {shift.user_name || shift.role}
                     </h3>
@@ -120,9 +135,7 @@ export default function ShiftActionModal({
 
                 {/* Action Buttons - Swapped Order for RTL */}
                 <div className="flex gap-3 pt-2">
-                   {/* כפתור בקשת החלפה (עכשיו בצד ימין - ראשון בקוד ב-RTL, או שני ב-Flex Row רגיל. נסדר לפי הסדר הויזואלי הרצוי) */}
-                   {/* ב-RTL: אלמנט ראשון = ימין. אלמנט שני = שמאל. */}
-                   
+                   {/* כפתור בקשה - ראשון (ימין) */}
                    <Button 
                       onClick={onRequestSwap}
                       className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-base font-bold"
@@ -130,6 +143,7 @@ export default function ShiftActionModal({
                       בקש החלפה
                    </Button>
 
+                   {/* כפתור ביטול - שני (שמאל) */}
                    <Button 
                       onClick={onClose}
                       variant="outline"
