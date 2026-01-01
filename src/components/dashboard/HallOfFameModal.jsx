@@ -93,7 +93,7 @@ export default function HallOfFameModal({ isOpen, onClose }) {
                 <Trophy className="w-6 h-6 md:w-7 md:h-7" />
               </div>
               <div>
-                <h2 className="text-2xl md:text-3xl font-bold mb-0.5">היכל התהילה 🏆</h2>
+                <h2 className="text-2xl md:text-3xl font-bold mb-0.5">היכל התהילה</h2>
                 <p className="text-white/90 text-xs md:text-sm">המחליפים המובילים בכל הזמנים</p>
               </div>
             </div>
@@ -160,19 +160,11 @@ export default function HallOfFameModal({ isOpen, onClose }) {
                 </div>
             )}
 
-            {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-              <p className="text-xs md:text-sm text-blue-800">
-                <span className="font-bold">💡 טיפ:</span> ככל שתעזור יותר לאחרים בהחלפות, כך תעלה בדירוג! 
-                הנתונים מתעדכנים בזמן אמת.
-              </p>
-            </div>
-
             {/* Footer Button (Inside scrollable area, at bottom) */}
             <Button
               onClick={onClose}
               variant="outline"
-              className="w-full h-12 rounded-xl border-2"
+              className="mx-auto mt-2 flex w-full max-w-[180px] items-center justify-center rounded-xl border-2 px-4 py-3 text-base font-semibold"
             >
               סגור
             </Button>
@@ -182,3 +174,4 @@ export default function HallOfFameModal({ isOpen, onClose }) {
     </AnimatePresence>
   );
 }
+
