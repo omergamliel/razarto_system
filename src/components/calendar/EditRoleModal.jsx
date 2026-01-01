@@ -18,48 +18,54 @@ export default function EditRoleModal({
   isSubmitting
 }) {
   const [department, setDepartment] = useState('');
-  const [role, setRole] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
 
-  // Fetch role definitions from DB
-  const { data: roleDefinitions = [] } = useQuery({
-    queryKey: ['role-definitions'],
-    queryFn: () => base44.entities.RoleDefinition.list(),
+  // 1. Fetch authorized people instead of RoleDefinition
+  const { data: authorizedPeople = [] } = useQuery({
+    queryKey: ['authorized-people-edit'],
+    queryFn: () => base44.entities.AuthorizedPerson.list(),
     enabled: isOpen
   });
 
+  // 2. Pre-fill data from existing shift
   useEffect(() => {
-    if (shift) {
-      setDepartment(shift.department || '');
-      setRole(shift.role || '');
+    if (shift && authorizedPeople.length > 0) {
+      // Find the user based on the ID saved in the shift
+      const originalUser = authorizedPeople.find(u => u.serial_id === shift.original_user_id);
+      
+      if (originalUser) {
+        setDepartment(originalUser.department);
+        setSelectedUserId(originalUser.serial_id.toString());
+      } else {
+        // Fallback or empty if not found
+        setDepartment('');
+        setSelectedUserId('');
+      }
     }
-  }, [shift]);
+  }, [shift, authorizedPeople]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!department || !role) return;
+    if (!department || !selectedUserId) return;
     
+    // We send the ID of the new user to be the "original" owner of this shift
     onSubmit({
-      department,
-      role
+      original_user_id: parseInt(selectedUserId)
     });
   };
 
   const handleDepartmentChange = (value) => {
     setDepartment(value);
-    setRole(''); // Reset role when department changes
+    setSelectedUserId(''); // Reset user when department changes
   };
 
   if (!isOpen || !shift) return null;
 
-  // Get unique departments
-  const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
+  // Get unique departments from AuthorizedPerson list
+  const departments = ['ש', 'מ', 'ת']; // Hardcoded or derived from list
   
-  // Get roles (assigned_user_name) for selected department
-  const roles = department 
-    ? roleDefinitions
-        .filter(rd => rd.department === department && rd.assigned_user_name)
-        .map(rd => rd.assigned_user_name)
-    : [];
+  // Filter users by selected department
+  const departmentUsers = authorizedPeople.filter(u => u.department === department);
 
   return (
     <AnimatePresence>
@@ -96,7 +102,7 @@ export default function EditRoleModal({
               <div>
                 <h2 className="text-xl font-bold">שינוי משבץ</h2>
                 <p className="text-white/80 text-sm">
-                  {date && format(date, 'EEEE, d בMMMM yyyy', { locale: he })}
+                  {date && format(new Date(date), 'EEEE, d בMMMM yyyy', { locale: he })}
                 </p>
               </div>
             </div>
@@ -104,13 +110,10 @@ export default function EditRoleModal({
 
           {/* Content */}
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Current Assignment */}
+            {/* Current Assignment Display */}
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
-              <p className="text-sm text-gray-500 mb-1">משובץ</p>
-              <p className="font-semibold text-gray-800">{shift.assigned_person}</p>
-              {shift.role && (
-                <p className="text-sm text-[#E57373] mt-1">אדם נוכחי: {shift.role}</p>
-              )}
+              <p className="text-sm text-gray-500 mb-1">משובץ כרגע:</p>
+              <p className="font-semibold text-gray-800">{shift.user_name || 'לא ידוע'}</p>
             </div>
 
             {/* Department Selection */}
@@ -126,14 +129,14 @@ export default function EditRoleModal({
                 <SelectContent>
                   {departments.map((dept) => (
                     <SelectItem key={dept} value={dept}>
-                      {dept}
+                      מחלקה {dept}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Role Selection */}
+            {/* User Selection */}
             <AnimatePresence>
               {department && (
                 <motion.div
@@ -146,14 +149,14 @@ export default function EditRoleModal({
                     <Briefcase className="w-4 h-4 text-[#64B5F6]" />
                     בחר אדם חדש
                   </Label>
-                  <Select value={role} onValueChange={setRole}>
+                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                     <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
                       <SelectValue placeholder="בחר אדם..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
+                      {departmentUsers.map((u) => (
+                        <SelectItem key={u.serial_id} value={u.serial_id.toString()}>
+                          {u.full_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -165,7 +168,7 @@ export default function EditRoleModal({
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={isSubmitting || !department || !role}
+              disabled={isSubmitting || !department || !selectedUserId}
               className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
             >
               {isSubmitting ? (
