@@ -431,7 +431,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                 </SelectTrigger>
                 <SelectContent dir="rtl">
                   <SelectItem value="View">צפייה בלבד (View)</SelectItem>
-                  <SelectItem value="RR">רלוונטיות (RR)</SelectItem>
+                  <SelectItem value="RR">משתמש רגיל (RR)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
