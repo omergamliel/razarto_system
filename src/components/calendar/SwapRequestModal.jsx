@@ -123,34 +123,38 @@ export default function SwapRequestModal({
 
   // --- SUBMISSION LOGIC ---
   const handleSubmit = (e) => {
+    console.log('🔥 [SwapRequestModal] handleSubmit TRIGGERED');
+    
     if (e?.preventDefault) {
       e.preventDefault();
     }
 
     if (!onSubmit) {
-      console.error('❌ onSubmit prop is missing in SwapRequestModal');
+      console.error('❌ [SwapRequestModal] onSubmit prop is MISSING!');
+      toast.error('שגיאה: אין callback להגשת הבקשה');
       return;
     }
 
-    const fallbackStartDate = shift?.start_date || startDate;
-    const fallbackEndDate = shift?.end_date || endDate || fallbackStartDate;
+    if (!shift) {
+      console.error('❌ [SwapRequestModal] shift is missing!');
+      toast.error('שגיאה: חסרים נתוני משמרת');
+      return;
+    }
 
-    const finalStartDate = swapType === 'partial' ? startDate || fallbackStartDate : fallbackStartDate;
-    const finalStartTime = swapType === 'partial' ? startTime || shiftStartStr : shiftStartStr;
-    const finalEndDate = swapType === 'partial' ? endDate || fallbackEndDate : fallbackEndDate;
-    const finalEndTime = swapType === 'partial' ? endTime || shiftEndStr : shiftEndStr;
-
+    // Build CLEAN payload matching DB schema
+    const isFull = swapType === 'full';
+    
     const payload = {
-      type: swapType, // 'full' or 'partial'
-      range: [...range],
-      startDate: finalStartDate,
-      startTime: finalStartTime,
-      endDate: finalEndDate,
-      endTime: finalEndTime
+      type: swapType,
+      startDate: isFull ? (shift.start_date || format(new Date(), 'yyyy-MM-dd')) : (startDate || shift.start_date),
+      startTime: isFull ? (shift.start_time || '09:00') : (startTime || '09:00'),
+      endDate: isFull ? (shift.end_date || format(addDays(new Date(shift.start_date), 1), 'yyyy-MM-dd')) : (endDate || shift.end_date),
+      endTime: isFull ? (shift.end_time || '09:00') : (endTime || '09:00')
     };
 
-    console.log('Modal submitting payload:', payload);
-    console.log('📤 [SwapRequestModal] Submitting Request Payload:', payload);
+    console.log('✅ [SwapRequestModal] Final Payload:', payload);
+    console.log('✅ [SwapRequestModal] Calling onSubmit with payload...');
+    
     onSubmit(payload);
   };
   

@@ -188,14 +188,24 @@ export default function ShiftCalendar() {
 
   const requestSwapMutation = useMutation({
     mutationFn: async ({ shiftId, type, dates }) => {
+      console.log('🔵 [MUTATION] requestSwapMutation STARTED');
+      console.log('🔵 [MUTATION] Input params:', { shiftId, type, dates });
+      
       const shift = shifts.find(s => s.id === shiftId);
-      if (!shift) throw new Error('Shift not found');
+      if (!shift) {
+        console.error('❌ [MUTATION] Shift not found with ID:', shiftId);
+        throw new Error('Shift not found');
+      }
+
+      console.log('🔵 [MUTATION] Found shift:', shift);
 
       const isFull = type === 'full';
-      const req_start_date = isFull ? shift.start_date : (dates.startDate || shift.start_date);
-      const req_end_date = isFull ? (shift.end_date || shift.start_date) : (dates.endDate || shift.end_date || dates.startDate);
-      const req_start_time = isFull ? (shift.start_time || '09:00') : (dates.startTime || shift.start_time || '09:00');
-      const req_end_time = isFull ? (shift.end_time || req_start_time) : (dates.endTime || shift.end_time || req_start_time);
+      
+      // Build required fields for SwapRequest table
+      const req_start_date = dates.startDate || shift.start_date;
+      const req_end_date = dates.endDate || shift.end_date || format(addDays(new Date(req_start_date), 1), 'yyyy-MM-dd');
+      const req_start_time = dates.startTime || shift.start_time || '09:00';
+      const req_end_time = dates.endTime || shift.end_time || '09:00';
 
       const payload = {
         shift_id: shiftId,
@@ -208,15 +218,20 @@ export default function ShiftCalendar() {
         status: 'Open'
       };
 
-      console.log('📨 [ShiftCalendar] Creating SwapRequest with payload:', payload);
+      console.log('📨 [MUTATION] Creating SwapRequest with FINAL payload:', JSON.stringify(payload, null, 2));
 
-      await base44.entities.SwapRequest.create(payload);
+      const createdRequest = await base44.entities.SwapRequest.create(payload);
+      console.log('✅ [MUTATION] SwapRequest created successfully:', createdRequest);
 
-      return await base44.entities.Shift.update(shiftId, {
+      const updatedShift = await base44.entities.Shift.update(shiftId, {
         status: 'Swap_Requested'
       });
+      console.log('✅ [MUTATION] Shift status updated to Swap_Requested');
+
+      return updatedShift;
     },
     onSuccess: (data) => {
+      console.log('🎉 [MUTATION] Success! Invalidating queries...');
       queryClient.invalidateQueries(['shifts']);
       queryClient.invalidateQueries(['swap-requests']);
       toast.success('בקשת ההחלפה נשלחה בהצלחה!');
@@ -226,8 +241,9 @@ export default function ShiftCalendar() {
       setShowSuccessModal(true);
     },
     onError: (error) => {
-      console.error('❌ [ShiftCalendar] Swap request failed:', error);
-      toast.error('שליחת בקשת ההחלפה נכשלה. נסו שוב.');
+      console.error('❌ [MUTATION] Swap request FAILED with error:', error);
+      console.error('❌ [MUTATION] Error details:', error.message, error.stack);
+      toast.error(`שליחת בקשת ההחלפה נכשלה: ${error.message || 'נסו שוב'}`);
     }
   });
 
@@ -426,12 +442,23 @@ export default function ShiftCalendar() {
   };
 
   const handleSwapSubmit = (data) => {
+    console.log('🎯 [ShiftCalendar] handleSwapSubmit CALLED with data:', data);
+    
     if (!selectedShift) {
-      console.error('❌ [ShiftCalendar] No shift selected for swap request submission');
+      console.error('❌ [ShiftCalendar] No shift selected!');
+      toast.error('שגיאה: לא נבחרה משמרת');
       return;
     }
 
-    console.log('📤 [ShiftCalendar] Submitting swap request from modal:', data);
+    if (!authorizedPerson?.serial_id) {
+      console.error('❌ [ShiftCalendar] No authorized person serial_id!');
+      toast.error('שגיאה: חסרים נתוני משתמש');
+      return;
+    }
+
+    console.log('✅ [ShiftCalendar] Selected Shift:', selectedShift);
+    console.log('✅ [ShiftCalendar] Authorized Person:', authorizedPerson);
+    console.log('🚀 [ShiftCalendar] Triggering mutation...');
 
     requestSwapMutation.mutate({
       shiftId: selectedShift.id,
