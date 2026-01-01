@@ -192,7 +192,8 @@ export default function SwapRequestModal({
              </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
+            <div className="p-6 space-y-6 flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             
             {/* Current Assignment Card */}
             <div className="text-center space-y-4">
@@ -411,28 +412,24 @@ export default function SwapRequestModal({
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Hidden submit for form enter key */}
-            <button type="submit" className="hidden" />
-          </form>
-
-          {/* Footer with Actions */}
-          <div className="p-6 pt-0 border-t border-gray-50 mt-auto bg-white">
-            <div className="flex gap-3 mt-4">
-                <Button
-                   type="submit"
-                   onClick={handleSubmit}
-                   disabled={isSubmitting}
-                   className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                    {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
-                </Button>
-                <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
             </div>
-          </div>
+
+            {/* Footer with Actions - INSIDE FORM */}
+            <div className="p-6 pt-4 border-t border-gray-50 mt-auto bg-white">
+              <div className="flex gap-3">
+                  <Button
+                     type="submit"
+                     disabled={isSubmitting}
+                     className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                      {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
+                  </Button>
+                  <Button type="button" onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
+              </div>
+            </div>
+          </form>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 }
-
