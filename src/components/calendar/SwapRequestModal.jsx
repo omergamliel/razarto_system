@@ -123,7 +123,7 @@ export default function SwapRequestModal({
 
   // --- SUBMISSION LOGIC ---
   const handleSubmit = (e) => {
-    if (e) {
+    if (e?.preventDefault) {
       e.preventDefault();
     }
 
@@ -149,6 +149,7 @@ export default function SwapRequestModal({
       endTime: finalEndTime
     };
 
+    console.log('Modal submitting payload:', payload);
     console.log('📤 [SwapRequestModal] Submitting Request Payload:', payload);
     onSubmit(payload);
   };
@@ -418,9 +419,10 @@ export default function SwapRequestModal({
           {/* Footer with Actions */}
           <div className="p-6 pt-0 border-t border-gray-50 mt-auto bg-white">
             <div className="flex gap-3 mt-4">
-                <Button 
-                   onClick={handleSubmit} 
-                   disabled={isSubmitting} 
+                <Button
+                   type="submit"
+                   onClick={handleSubmit}
+                   disabled={isSubmitting}
                    className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
                     {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
