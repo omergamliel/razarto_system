@@ -187,21 +187,31 @@ export default function ShiftCalendar() {
   // --- MUTATIONS (Shift Operations) ---
 
   const requestSwapMutation = useMutation({
-    mutationFn: async ({ shiftId, type, range, dates }) => {
+    mutationFn: async ({ shiftId, type, dates }) => {
       const shift = shifts.find(s => s.id === shiftId);
       if (!shift) throw new Error('Shift not found');
 
-      // Create SwapRequest
-      await base44.entities.SwapRequest.create({
+      const isFull = type === 'full';
+      const req_start_date = isFull ? shift.start_date : (dates.startDate || shift.start_date);
+      const req_end_date = isFull ? (shift.end_date || shift.start_date) : (dates.endDate || shift.end_date || dates.startDate);
+      const req_start_time = isFull ? (shift.start_time || '09:00') : (dates.startTime || shift.start_time || '09:00');
+      const req_end_time = isFull ? (shift.end_time || req_start_time) : (dates.endTime || shift.end_time || req_start_time);
+
+      const payload = {
         shift_id: shiftId,
         requesting_user_id: authorizedPerson.serial_id,
-        request_type: type === 'full' ? 'Full' : 'Partial',
-        req_start_date: dates.startDate || shift.start_date,
-        req_end_date: dates.endDate || shift.end_date,
-        req_start_time: dates.startTime || '09:00',
-        req_end_time: dates.endTime || '09:00',
+        request_type: isFull ? 'Full' : 'Partial',
+        req_start_date,
+        req_end_date,
+        req_start_time,
+        req_end_time,
         status: 'Open'
-      });
+      };
+
+      console.log('📨 [ShiftCalendar] Creating SwapRequest with payload:', payload);
+
+      // Create SwapRequest
+      await base44.entities.SwapRequest.create(payload);
 
       // Update Shift status
       return await base44.entities.Shift.update(shiftId, {
@@ -418,6 +428,19 @@ export default function ShiftCalendar() {
     setShowCoverSegmentModal(true);
   };
 
+  const handleSwapSubmit = (data) => {
+    if (!selectedShift) {
+      console.error('❌ [ShiftCalendar] No shift selected for swap request submission');
+      return;
+    }
+
+    requestSwapMutation.mutate({
+      shiftId: selectedShift.id,
+      type: data.type,
+      dates: data
+    });
+  };
+
   // --- RENDER LOGIC ---
 
   // 1. Loading State
@@ -529,12 +552,7 @@ export default function ShiftCalendar() {
         onClose={() => setShowSwapRequestModal(false)}
         date={currentDate}
         shift={selectedShift}
-        onSubmit={(data) => requestSwapMutation.mutate({ 
-            shiftId: selectedShift.id, 
-            type: data.type, 
-            range: data.range, 
-            dates: data 
-        })}
+        onSubmit={handleSwapSubmit}
         isSubmitting={requestSwapMutation.isPending}
       />
 
@@ -629,3 +647,4 @@ export default function ShiftCalendar() {
     </div>
   );
 }
+
