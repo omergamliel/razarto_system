@@ -7,7 +7,7 @@ import { he } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
-export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover }) {
+export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, actionsDisabled = false }) {
   
   const [visibleCount, setVisibleCount] = useState(10);
   const [listData, setListData] = useState([]); // Unified state for the list items
@@ -87,6 +87,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
 
   // --- Handlers ---
   const handleAddToCalendar = (item) => {
+      if (actionsDisabled) return;
       // Logic for GCal
       const date = item.shift_date;
       const title = `משמרת - ${item.user_name}`;
@@ -95,6 +96,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   };
 
   const handleWhatsAppShare = (item) => {
+      if (actionsDisabled) return;
       const appLink = window.location.origin;
       const message = `היי, זקוק להחלפה למשמרת ב-${item.shift_date}. עזרה? ${appLink}`;
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
@@ -163,10 +165,15 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
 
                         {/* Action Buttons */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                             
+
                              {/* If it's a request from someone else, show "I'll cover" */}
                              {item.is_request_object && !isMyRequest && type !== 'approved' && (
-                                   <Button onClick={() => { onClose(); onOfferCover(item); }} size="sm" className="bg-blue-500 text-white hover:bg-blue-600 px-3 h-9">
+                                   <Button
+                                      onClick={() => { if (actionsDisabled) return; onClose(); onOfferCover(item); }}
+                                      size="sm"
+                                      disabled={actionsDisabled}
+                                      className={`bg-blue-500 text-white hover:bg-blue-600 px-3 h-9 ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
                                        אחליף <ArrowRight className="w-4 h-4 mr-1" />
                                    </Button>
                              )}
@@ -174,10 +181,21 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                              {/* If it's my shift/request */}
                              {(item.is_shift_object || isMyRequest) && (
                                 <>
-                                    <Button onClick={() => handleAddToCalendar(item)} size="icon" variant="outline" className="rounded-full w-10 h-10 border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors shadow-sm">
+                                    <Button
+                                      onClick={() => handleAddToCalendar(item)}
+                                      size="icon"
+                                      variant="outline"
+                                      disabled={actionsDisabled}
+                                      className={`rounded-full w-10 h-10 border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
-                                    <Button onClick={() => handleWhatsAppShare(item)} size="icon" className="rounded-full w-10 h-10 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm">
+                                    <Button
+                                      onClick={() => handleWhatsAppShare(item)}
+                                      size="icon"
+                                      disabled={actionsDisabled}
+                                      className={`rounded-full w-10 h-10 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
                                         <MessageCircle className="w-5 h-5" />
                                     </Button>
                                 </>
@@ -203,3 +221,4 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     </AnimatePresence>
   );
 }
+
