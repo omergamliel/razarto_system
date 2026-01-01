@@ -64,6 +64,19 @@ export default function ShiftCalendar() {
   const [h2hTargetId, setH2hTargetId] = useState(null);
   const [h2hOfferId, setH2hOfferId] = useState(null);
 
+  // --- DEBUG LOGS FOR SWAP REQUEST MODAL ---
+  const [swapRequestLogs, setSwapRequestLogs] = useState([]);
+
+  const appendSwapLog = (message, data) => {
+    const timestamp = new Date().toLocaleTimeString('he-IL', { hour12: false });
+    const payloadText = data ? ` | נתונים: ${JSON.stringify(data)}` : '';
+
+    setSwapRequestLogs(prev => {
+      const next = [...prev, `${timestamp} — ${message}${payloadText}`];
+      return next.slice(-12); // cap to last 12 entries to avoid overflow
+    });
+  };
+
   // --- AUTH & USER IDENTIFICATION LOGIC ---
 
   // 1. Get Current Base44 User
@@ -208,15 +221,21 @@ export default function ShiftCalendar() {
         status: 'Open'
       };
 
+      appendSwapLog('📨 שולח בקשה למסד', payload);
       console.log('📨 [ShiftCalendar] Creating SwapRequest with payload:', payload);
 
       await base44.entities.SwapRequest.create(payload);
 
+      appendSwapLog('🔄 מעדכן סטטוס משמרת ל-Swap_Requested', { shiftId });
       return await base44.entities.Shift.update(shiftId, {
         status: 'Swap_Requested'
       });
     },
+    onMutate: (variables) => {
+      appendSwapLog('🚀 התחלת שליחה', variables);
+    },
     onSuccess: (data) => {
+      appendSwapLog('✅ הבקשה נשמרה והמשמרת עודכנה');
       queryClient.invalidateQueries(['shifts']);
       queryClient.invalidateQueries(['swap-requests']);
       toast.success('בקשת ההחלפה נשלחה בהצלחה!');
@@ -226,6 +245,7 @@ export default function ShiftCalendar() {
       setShowSuccessModal(true);
     },
     onError: (error) => {
+      appendSwapLog('❌ שגיאה בשליחת הבקשה', { error: error?.message || String(error) });
       console.error('❌ [ShiftCalendar] Swap request failed:', error);
       toast.error('שליחת בקשת ההחלפה נכשלה. נסו שוב.');
     }
@@ -457,6 +477,7 @@ export default function ShiftCalendar() {
   };
 
   const handleOpenSwapRequest = (shift) => {
+    setSwapRequestLogs([]);
     setSelectedShift(shift);
     setShowSwapRequestModal(true);
   };
@@ -464,9 +485,11 @@ export default function ShiftCalendar() {
   const handleSwapSubmit = (data) => {
     if (!selectedShift) {
       console.error('❌ [ShiftCalendar] No shift selected for swap request submission');
+      appendSwapLog('❌ לא נבחרה משמרת לשליחה');
       return;
     }
 
+    appendSwapLog('📝 נתוני בקשה מהמודל', data);
     console.log('📤 [ShiftCalendar] Submitting swap request from modal:', data);
 
     requestSwapMutation.mutate({
@@ -591,6 +614,7 @@ export default function ShiftCalendar() {
         shift={selectedShift}
         onSubmit={handleSwapSubmit}
         isSubmitting={requestSwapMutation.isPending}
+        logMessages={swapRequestLogs}
       />
 
       <AddShiftModal
