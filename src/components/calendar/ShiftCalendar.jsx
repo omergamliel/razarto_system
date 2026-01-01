@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import BackgroundShapes from './BackgroundShapes';
 import CalendarHeader from './CalendarHeader';
 import CalendarGrid from './CalendarGrid';
-import UserNotRegisteredError from '../UserNotRegisteredError'; // מסך חסימה החדש
+import UserNotRegisteredError from './UserNotRegisteredError'; // מסך חסימה החדש
 
 // Modals
 import SwapRequestModal from './SwapRequestModal';
@@ -68,8 +68,15 @@ export default function ShiftCalendar() {
   // 1. Get Current Base44 User
   const { data: currentUser, isLoading: isUserLoading } = useQuery({
     queryKey: ['current-user'],
-    queryFn: () => base44.auth.me(),
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      console.log("👤 [DEBUG] Fetched Current User:", user);
+      return user;
+    },
   });
+
+  // *** FIX: Handle Case Sensitivity (Email vs email) ***
+  const userEmail = currentUser?.email || currentUser?.Email;
 
   // 2. Check Authorization against AuthorizedPerson table
   const { 
@@ -77,14 +84,33 @@ export default function ShiftCalendar() {
     isLoading: isAuthCheckLoading,
     refetch: refreshAuthCheck 
   } = useQuery({
-    queryKey: ['check-authorization', currentUser?.email],
+    queryKey: ['check-authorization', userEmail],
     queryFn: async () => {
-      if (!currentUser?.email) return null;
-      // Find person by email in the new table
-      const people = await base44.entities.AuthorizedPerson.filter({ email: currentUser.email });
-      return people.length > 0 ? people[0] : null; 
+      if (!userEmail) {
+        console.log("❌ [DEBUG] No email found to check authorization.");
+        return null;
+      }
+      
+      console.log("🔍 [DEBUG] Checking authorization for:", userEmail);
+
+      // Attempt 1: Exact Match
+      let people = await base44.entities.AuthorizedPerson.filter({ email: userEmail });
+      console.log("📄 [DEBUG] DB Attempt 1 (Exact):", people);
+
+      // Attempt 2: Lowercase Match (Fallback if user wrote User@ but DB has user@)
+      if (!people || people.length === 0) {
+          const lowerEmail = userEmail.toLowerCase();
+          console.log("⚠️ [DEBUG] Exact match failed. Trying lowercase:", lowerEmail);
+          people = await base44.entities.AuthorizedPerson.filter({ email: lowerEmail });
+          console.log("📄 [DEBUG] DB Attempt 2 (Lower):", people);
+      }
+
+      const result = people.length > 0 ? people[0] : null;
+      console.log("✅ [DEBUG] Final Authorization Result:", result);
+      
+      return result; 
     },
-    enabled: !!currentUser?.email
+    enabled: !!userEmail
   });
 
   // --- MUTATION: Link User (Onboarding Completion) ---
@@ -92,19 +118,12 @@ export default function ShiftCalendar() {
     mutationFn: async () => {
       if (!authorizedPerson || !currentUser) return;
 
+      console.log("🔗 [DEBUG] Linking user...", { authId: authorizedPerson.id, serialId: currentUser.serial_id });
+
       // 1. Update AuthorizedPerson with linked_user_id
-      // We use currentUser.serial_id which we added earlier to the User table
       await base44.entities.AuthorizedPerson.update(authorizedPerson.id, {
         linked_user_id: currentUser.serial_id 
       });
-
-      // 2. Sync User object with permissions/name/dept if needed (Optional but recommended)
-      // This keeps the legacy user object somewhat in sync just in case
-      /* await base44.user.updateMe({
-         name: authorizedPerson.full_name,
-         department: authorizedPerson.department
-      });
-      */
       
       return true;
     },
@@ -112,7 +131,8 @@ export default function ShiftCalendar() {
       queryClient.invalidateQueries(['check-authorization']);
       toast.success("החיבור בוצע בהצלחה! ברוכים הבאים.");
     },
-    onError: () => {
+    onError: (err) => {
+      console.error("❌ [DEBUG] Link Error:", err);
       toast.error("שגיאה בחיבור המשתמש.");
     }
   });
