@@ -40,14 +40,20 @@ export default function SwapRequestModal({
   // Initialize
   useEffect(() => {
     if (isOpen && date && shift) {
-      const sDate = new Date(date);
+      // Use DB dates if available, fallback to clicked date
+      const sDateStr = shift.start_date || format(date, 'yyyy-MM-dd');
+      const sDate = new Date(sDateStr);
+      
       const sH = parseInt(shiftStartStr.split(':')[0]);
       const eH = parseInt(shiftEndStr.split(':')[0]);
       
-      const startObj = new Date(format(sDate, 'yyyy-MM-dd') + 'T' + shiftStartStr);
-      let endObj = new Date(format(sDate, 'yyyy-MM-dd') + 'T' + shiftEndStr);
+      const startObj = new Date(sDateStr + 'T' + shiftStartStr);
+      let endObj = shift.end_date 
+          ? new Date(shift.end_date + 'T' + shiftEndStr)
+          : new Date(sDateStr + 'T' + shiftEndStr);
       
-      if (endObj <= startObj || (sH === 9 && eH === 9)) {
+      // Fix end date logic if not explicitly provided
+      if (!shift.end_date && (endObj <= startObj || (sH === 9 && eH === 9))) {
           endObj = addDays(endObj, 1);
       }
 
@@ -117,13 +123,17 @@ export default function SwapRequestModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    onSubmit({
-      type: swapType,
-      startDate: swapType === 'partial' ? startDate : shift?.start_date,
-      startTime: swapType === 'partial' ? startTime : '09:00',
-      endDate: swapType === 'partial' ? endDate : shift?.end_date,
-      endTime: swapType === 'partial' ? endTime : '09:00'
-    });
+    // Construct the payload for ShiftCalendar's requestSwapMutation
+    // Important: For full swap, use original shift times/dates to ensure correctness
+    const payload = {
+      type: swapType, // 'full' or 'partial'
+      startDate: swapType === 'partial' ? startDate : (shift.start_date || startDate),
+      startTime: swapType === 'partial' ? startTime : (shift.start_time || '09:00'),
+      endDate: swapType === 'partial' ? endDate : (shift.end_date || endDate),
+      endTime: swapType === 'partial' ? endTime : (shift.end_time || '09:00')
+    };
+
+    onSubmit(payload);
   };
   
   if (!isOpen || !shift) return null;
@@ -158,7 +168,7 @@ export default function SwapRequestModal({
                 </div>
                 <div>
                     <h2 className="text-xl font-bold tracking-wide">בקשת החלפה</h2>
-                    <p className="text-white/80 text-sm">{date && format(date, 'd בMMMM yyyy', { locale: he })}</p>
+                    <p className="text-white/80 text-sm">{date && format(new Date(date), 'd בMMMM yyyy', { locale: he })}</p>
                 </div>
              </div>
              <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20 transition-colors">
@@ -172,9 +182,8 @@ export default function SwapRequestModal({
             <div className="text-center space-y-4">
                 <div>
                     <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע לתפקיד</p>
-                    {/* FONT FIX: Changed font weight and removed tracking-tight */}
                     <h3 className="text-3xl font-extrabold text-gray-800 leading-none font-sans">
-                        {shift.assigned_role || shift.role}
+                        {shift.user_name || shift.role}
                     </h3>
                 </div>
 
@@ -354,7 +363,6 @@ export default function SwapRequestModal({
                             התחלה
                         </Label>
                         <div className="relative">
-                            {/* INPUT SIZE FIX: Increased height to h-14 and font to text-xl */}
                             <Input type="time" value={startTime} onChange={(e) => handleManualInputChange('startTime', e.target.value)} className="pl-10 text-center h-14 font-mono text-xl border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
                                 <span className="text-gray-400 text-xs">🕒</span>
@@ -372,7 +380,6 @@ export default function SwapRequestModal({
                             סיום
                         </Label>
                         <div className="relative">
-                            {/* INPUT SIZE FIX: Increased height to h-14 and font to text-xl */}
                             <Input type="time" value={endTime} onChange={(e) => handleManualInputChange('endTime', e.target.value)} className="pl-10 text-center h-14 font-mono text-xl border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
                                 <span className="text-gray-400 text-xs">🕒</span>
