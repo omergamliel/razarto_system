@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  X, Settings, Search, Filter, MoreVertical, 
-  CheckSquare, Square, Edit2, Trash2, Shield,
-  CheckCircle2, User, UserX
+  X, Search, Filter, MoreVertical, 
+  Edit2, Trash2, Shield, UserX
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,8 +22,6 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   
-  const queryClient = useQueryClient();
-
   // --- QUERIES ---
 
   // Fetch Authorized People (New Table)
@@ -33,13 +29,6 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     queryKey: ['authorized-people'],
     queryFn: () => base44.entities.AuthorizedPerson.list(),
     enabled: isOpen && activeTab === 'users'
-  });
-
-  // Fetch all users (Legacy/For permissions tab if needed later)
-  const { data: allUsers = [] } = useQuery({
-    queryKey: ['all-users'],
-    queryFn: () => base44.entities.User.list(),
-    enabled: isOpen && activeTab === 'permissions'
   });
 
   // --- HANDLERS ---
@@ -85,13 +74,13 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="fixed inset-0 m-auto z-50 bg-[#F9FAFB] rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col text-right overflow-hidden"
+        className="fixed inset-0 m-auto z-50 bg-[#F9FAFB] md:rounded-3xl shadow-2xl w-full max-w-5xl h-full md:h-[90vh] flex flex-col text-right overflow-hidden"
       >
         {/* Header */}
-        <div className="bg-white px-8 py-6 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <div className="bg-white px-6 py-4 md:px-8 md:py-6 border-b border-gray-100 flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">ניהול מערכת</h2>
-            <p className="text-gray-500 text-sm mt-1">ניהול משתמשים, הרשאות והגדרות</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800">ניהול מערכת</h2>
+            <p className="text-gray-500 text-xs md:text-sm mt-1">ניהול משתמשים, הרשאות והגדרות</p>
           </div>
           <button 
             onClick={onClose}
@@ -102,10 +91,10 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
         </div>
 
         {/* Tabs Navigation */}
-        <div className="bg-white px-8 flex gap-8 border-b border-gray-100 shrink-0">
+        <div className="bg-white px-4 md:px-8 flex gap-6 md:gap-8 border-b border-gray-100 shrink-0 overflow-x-auto hide-scrollbar">
           <button
             onClick={() => setActiveTab('users')}
-            className={`pb-4 px-2 text-sm font-medium transition-all relative ${
+            className={`pb-3 md:pb-4 px-2 text-sm font-medium transition-all relative whitespace-nowrap ${
               activeTab === 'users' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -117,7 +106,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
           
           <button
             onClick={() => setActiveTab('permissions')}
-            className={`pb-4 px-2 text-sm font-medium transition-all relative ${
+            className={`pb-3 md:pb-4 px-2 text-sm font-medium transition-all relative whitespace-nowrap ${
               activeTab === 'permissions' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -129,17 +118,17 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
         </div>
 
         {/* --- MAIN CONTENT AREA --- */}
-        <div className="flex-1 overflow-hidden bg-[#F9FAFB] p-8">
+        <div className="flex-1 overflow-hidden bg-[#F9FAFB] p-4 md:p-8">
           
           {/* USERS TAB CONTENT */}
           {activeTab === 'users' && (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="h-full flex flex-col gap-6"
+              className="h-full flex flex-col gap-4 md:gap-6"
             >
               {/* Toolbar: Search & Filters */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
                 
                 {/* Search */}
                 <div className="relative w-full md:w-96">
@@ -148,13 +137,13 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                     placeholder="חיפוש לפי שם או מייל..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pr-10 h-11 bg-gray-50 border-gray-200 focus:bg-white rounded-xl"
+                    className="pr-10 h-10 md:h-11 bg-gray-50 border-gray-200 focus:bg-white rounded-xl text-sm"
                   />
                 </div>
 
                 {/* Filters */}
-                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                  <span className="text-sm text-gray-500 ml-2 whitespace-nowrap flex items-center gap-1">
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
+                  <span className="text-sm text-gray-500 ml-2 whitespace-nowrap flex items-center gap-1 shrink-0">
                     <Filter className="w-4 h-4" /> סינון:
                   </span>
                   {['ש', 'מ', 'ת'].map(dept => (
@@ -162,7 +151,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                       key={dept}
                       onClick={() => toggleDepartmentFilter(dept)}
                       className={`
-                        px-4 py-2 rounded-lg text-sm font-medium transition-all border
+                        px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all border shrink-0
                         ${selectedDepartments.includes(dept)
                           ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
                           : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
@@ -178,13 +167,13 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
               {/* Data Table */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden flex flex-col">
                 
-                {/* Table Header */}
-                <div className="grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                {/* Table Header - Hidden on Mobile */}
+                <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   <div className="col-span-3">שם מלא</div>
                   <div className="col-span-2">מחלקה</div>
                   <div className="col-span-3">אימייל</div>
                   <div className="col-span-2">הרשאות</div>
-                  <div className="col-span-1 text-center">סטטוס</div>
+                  <div className="col-span-1 text-center">קישוריות</div>
                   <div className="col-span-1 text-center">פעולות</div>
                 </div>
 
@@ -203,30 +192,36 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                     filteredPeople.map((person) => (
                       <div 
                         key={person.id} 
-                        className="grid grid-cols-12 gap-4 p-4 border-b border-gray-50 items-center hover:bg-blue-50/30 transition-colors group"
+                        className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 border-b border-gray-50 items-center hover:bg-blue-50/30 transition-colors group relative"
                       >
-                        {/* Name */}
-                        <div className="col-span-3 font-bold text-gray-800 text-sm truncate flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center text-xs font-bold">
-                            {person.full_name?.charAt(0)}
+                        {/* Name (Mobile: Takes more space) */}
+                        <div className="col-span-7 md:col-span-3 flex flex-col justify-center">
+                          <div className="font-bold text-gray-800 text-sm truncate flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
+                              {person.full_name?.charAt(0)}
+                            </div>
+                            <span className="truncate">{person.full_name}</span>
                           </div>
-                          {person.full_name}
+                          {/* Mobile Only Subtitle */}
+                          <div className="md:hidden text-xs text-gray-400 mr-10 mt-0.5">
+                            מחלקה {person.department} • {person.permissions || 'View'}
+                          </div>
                         </div>
 
-                        {/* Department */}
-                        <div className="col-span-2">
+                        {/* Department (Hidden on Mobile) */}
+                        <div className="hidden md:block col-span-2">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                             מחלקה {person.department}
                           </span>
                         </div>
 
-                        {/* Email */}
-                        <div className="col-span-3 text-sm text-gray-500 truncate font-mono">
+                        {/* Email (Hidden on Mobile) */}
+                        <div className="hidden md:block col-span-3 text-sm text-gray-500 truncate font-mono">
                           {person.email}
                         </div>
 
-                        {/* Permissions */}
-                        <div className="col-span-2">
+                        {/* Permissions (Hidden on Mobile) */}
+                        <div className="hidden md:block col-span-2">
                           <span className={`
                             inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium border
                             ${person.permissions === 'Admin' 
@@ -239,36 +234,48 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                           </span>
                         </div>
 
-                        {/* Status (Linked User) */}
-                        <div className="col-span-1 flex justify-center">
+                        {/* Connectivity Icon (Updated) */}
+                        <div className="col-span-3 md:col-span-1 flex justify-center items-center">
                           {person.linked_user_id ? (
-                            <div className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center" title="משתמש רשום ומקושר">
-                              <CheckCircle2 className="w-5 h-5" />
-                            </div>
+                            <img 
+                              src="https://i.imagesup.co/images2/30a37d06678a9808e762570c63cede181682172e.png" 
+                              alt="Connected"
+                              className="w-6 h-6 object-contain"
+                              title="משתמש מחובר"
+                            />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-gray-50 text-gray-300 flex items-center justify-center border border-gray-200 border-dashed" title="טרם נרשם">
-                              <User className="w-4 h-4" />
-                            </div>
+                            <img 
+                              src="https://i.imagesup.co/images2/b4873b1a4a57971b9ab6294adda44a6a184efc66.png" 
+                              alt="Not Connected"
+                              className="w-6 h-6 object-contain"
+                              title="לא מחובר"
+                            />
                           )}
                         </div>
 
-                        {/* Actions */}
-                        <div className="col-span-1 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <DropdownMenu>
+                        {/* Actions (Always Visible) */}
+                        <div className="col-span-2 md:col-span-1 flex justify-end md:justify-center">
+                          <DropdownMenu dir="rtl">
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-gray-200">
                                 <MoreVertical className="w-4 h-4 text-gray-500" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem className="gap-2 cursor-pointer">
-                                <Edit2 className="w-4 h-4" /> עריכה
+                              {/* RTL Adjusted Items: Flex with cursor-pointer, justify-end to align right */}
+                              <DropdownMenuItem className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
+                                <span>עריכה</span>
+                                <Edit2 className="w-4 h-4" />
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="gap-2 cursor-pointer">
-                                <Shield className="w-4 h-4" /> ניהול הרשאות
+                              
+                              <DropdownMenuItem className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
+                                <span>ניהול הרשאות</span>
+                                <Shield className="w-4 h-4" />
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="gap-2 cursor-pointer text-red-600 focus:text-red-600">
-                                <Trash2 className="w-4 h-4" /> מחיקה
+                              
+                              <DropdownMenuItem className="flex items-center justify-end gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
+                                <span>מחיקה</span>
+                                <Trash2 className="w-4 h-4" />
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -280,9 +287,9 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                 </div>
                 
                 {/* Footer Count */}
-                <div className="p-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex justify-between px-6">
+                <div className="p-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex justify-between px-6 shrink-0">
                   <span>סה"כ רשומות: {filteredPeople.length}</span>
-                  <span>מציג {filteredPeople.length} מתוך {authorizedPeople.length}</span>
+                  <span className="hidden md:inline">מציג {filteredPeople.length} מתוך {authorizedPeople.length}</span>
                 </div>
 
               </div>
