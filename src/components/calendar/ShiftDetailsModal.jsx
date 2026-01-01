@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { format, addDays } from 'date-fns';
+import React, { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Trash2, CheckCircle, AlertCircle, CalendarPlus, ArrowLeftRight, XCircle, Share2, Send } from 'lucide-react';
+import { X, Calendar, User, Trash2, CheckCircle, AlertCircle, CalendarPlus, Send, UserRoundPen } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useQuery } from '@tanstack/react-query';
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
@@ -23,6 +25,11 @@ export default function ShiftDetailsModal({
   isAdmin
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
+
+  const queryClient = useQueryClient();
 
   // --- Fetch Active Request Info ---
   const { data: activeRequest } = useQuery({
@@ -44,6 +51,42 @@ export default function ShiftDetailsModal({
     },
     enabled: !!activeRequest?.id && isOpen
   });
+
+  const { data: authorizedUsers = [] } = useQuery({
+    queryKey: ['authorized-users'],
+    queryFn: () => base44.entities.AuthorizedPerson.list(),
+    enabled: showReassignModal
+  });
+
+  const reassignMutation = useMutation({
+    mutationFn: async (newUserId) => {
+      return base44.entities.Shift.update(shift.id, { original_user_id: parseInt(newUserId, 10) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['shifts']);
+      toast.success('המשמרת הועברה למשתמש החדש');
+      setShowReassignModal(false);
+      setSelectedUserId('');
+    },
+    onError: () => {
+      toast.error('אירעה שגיאה בעת עדכון המשמרת');
+    }
+  });
+
+  useEffect(() => {
+    if (isOpen && shift) {
+      setSelectedDepartment(shift.department || '');
+      setSelectedUserId('');
+    }
+  }, [isOpen, shift]);
+
+  const departments = useMemo(() => {
+    return [...new Set(authorizedUsers.map(u => u.department))].filter(Boolean).sort();
+  }, [authorizedUsers]);
+
+  const departmentUsers = useMemo(() => {
+    return selectedDepartment ? authorizedUsers.filter(u => u.department === selectedDepartment) : [];
+  }, [authorizedUsers, selectedDepartment]);
 
   // --- Fetch Covering Users Info (to show names) ---
   const { data: coveringUsers = [] } = useQuery({
@@ -100,9 +143,18 @@ export default function ShiftDetailsModal({
           <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-6 text-white flex-shrink-0 relative">
             <div className="absolute top-4 left-4 flex gap-2">
                 {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => setShowReassignModal(true)}
+                      className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                      aria-label="החלפת משתמש"
+                    >
+                      <UserRoundPen className="w-5 h-5 text-blue-200" />
+                    </button>
                     <button onClick={() => setShowDeleteConfirm(true)} className="p-2 rounded-full hover:bg-white/20 transition-colors">
                         <Trash2 className="w-5 h-5 text-red-400" />
                     </button>
+                  </>
                 )}
                 <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20">
                     <X className="w-5 h-5" />
@@ -169,17 +221,19 @@ export default function ShiftDetailsModal({
                      </Button>
                 )}
 
-                {!isSwapMode && (
+                {!isSwapMode && !isAdmin && (
                      <Button onClick={handleAddToCalendar} variant="outline" className="w-full">
                         <CalendarPlus className="w-4 h-4 ml-2" />
                         הוסף ליומן
                      </Button>
                 )}
-                
-                 <Button onClick={handleWhatsAppShare} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white">
-                    <Send className="w-4 h-4 ml-2" />
-                    שתף בווצאפ
-                 </Button>
+
+                 {!isAdmin && (
+                   <Button onClick={handleWhatsAppShare} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white">
+                      <Send className="w-4 h-4 ml-2" />
+                      שתף בווצאפ
+                   </Button>
+                 )}
             </div>
 
           </div>
@@ -199,7 +253,83 @@ export default function ShiftDetailsModal({
           </DialogContent>
         </Dialog>
 
+        {/* Reassign Modal */}
+        <Dialog open={showReassignModal} onOpenChange={setShowReassignModal}>
+          <DialogContent className="sm:max-w-lg">
+            <div className="rounded-2xl overflow-hidden shadow-lg">
+              <div className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] p-4 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-xl"><Calendar className="w-5 h-5" /></div>
+                  <div>
+                    <h3 className="text-lg font-bold">החלפת משתמש למשמרת</h3>
+                    <p className="text-white/80 text-xs">בחר מחלקה ואז את המשתמש החדש</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowReassignModal(false)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-700 font-medium flex items-center gap-2">
+                    <User className="w-4 h-4 text-[#64B5F6]" />
+                    בחר מחלקה
+                  </Label>
+                  <Select value={selectedDepartment} onValueChange={(val) => { setSelectedDepartment(val); setSelectedUserId(''); }}>
+                    <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
+                      <SelectValue placeholder="בחר מחלקה..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <AnimatePresence>
+                  {selectedDepartment && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-2 overflow-hidden"
+                    >
+                      <Label className="text-gray-700 font-medium flex items-center gap-2">
+                        <UserRoundPen className="w-4 h-4 text-[#64B5F6]" />
+                        בחר משתמש
+                      </Label>
+                      <Select value={selectedUserId?.toString()} onValueChange={(val) => setSelectedUserId(val)}>
+                        <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
+                          <SelectValue placeholder="בחר משתמש..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departmentUsers.map((user) => (
+                            <SelectItem key={user.serial_id} value={user.serial_id.toString()}>
+                              {user.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <Button
+                  onClick={() => reassignMutation.mutate(selectedUserId)}
+                  disabled={!selectedUserId || reassignMutation.isPending}
+                  className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-3 rounded-xl text-base font-semibold disabled:opacity-60"
+                >
+                  {reassignMutation.isPending ? 'מעדכן...' : 'שמור והחלף משתמש'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </AnimatePresence>
   );
 }
+
