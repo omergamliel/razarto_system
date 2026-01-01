@@ -152,15 +152,17 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   // --- Render ---
   const getTitleAndColor = () => {
     switch (type) {
-      case 'swap_requests': return { title: 'בקשות להחלפה', color: 'from-red-500 to-red-600' };
-      case 'partial_gaps': return { title: 'משמרות בפער חלקי', color: 'from-yellow-500 to-yellow-600' };
-      case 'approved': return { title: 'החלפות שבוצעו', color: 'from-green-500 to-green-600' };
-      case 'my_shifts': return { title: 'המשמרות העתידיות שלי', color: 'from-blue-500 to-blue-600' };
-      default: return { title: '', color: '' };
+      case 'swap_requests': return { title: 'בקשות להחלפה', color: 'from-red-500 to-red-600', textColor: 'text-white' };
+      case 'partial_gaps': return { title: 'משמרות בפער חלקי', color: 'from-yellow-500 to-yellow-600', textColor: 'text-white' };
+      case 'approved': return { title: 'החלפות שבוצעו', color: 'from-green-500 to-green-600', textColor: 'text-white' };
+      case 'my_shifts': return { title: 'המשמרות העתידיות שלי', color: 'from-[#a9def9] to-[#a9def9]', textColor: 'text-[#0b3a5e]' };
+      default: return { title: '', color: '', textColor: 'text-white' };
     }
   };
 
-  const { title, color } = getTitleAndColor();
+  const { title, color, textColor } = getTitleAndColor();
+  const secondaryHeaderText = type === 'my_shifts' ? 'text-[#0b3a5e]/80' : 'text-white/90';
+  const isFutureShiftsView = type === 'my_shifts';
   const displayedItems = rawData.slice(0, visibleCount);
   const hasMore = rawData.length > visibleCount;
 
@@ -172,10 +174,10 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
         <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           
-          <div className={`bg-gradient-to-r ${color} p-6 text-white`}>
-            <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors"><X className="w-5 h-5" /></button>
+          <div className={`bg-gradient-to-r ${color} p-6 ${textColor}`}>
+            <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors text-current"><X className="w-5 h-5" /></button>
             <h2 className="text-2xl font-bold">{title}</h2>
-            <p className="text-white/90 text-sm mt-1">{rawData.length} רשומות</p>
+            <p className={`${secondaryHeaderText} text-sm mt-1`}>{rawData.length} רשומות</p>
           </div>
 
           <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
@@ -230,9 +232,9 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                                     <Button
                                       onClick={() => handleAddToCalendar(item)}
                                       size="icon"
-                                      variant="outline"
+                                      variant={isFutureShiftsView ? 'default' : 'outline'}
                                       disabled={actionsDisabled}
-                                      className={`rounded-full w-10 h-10 border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                      className={`rounded-full w-10 h-10 ${isFutureShiftsView ? 'bg-[#a9def9] text-[#0b3a5e] hover:bg-[#8cd3f6]' : 'border-blue-200 text-blue-600 hover:bg-blue-50'} transition-colors shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                                     >
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
@@ -241,7 +243,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                                         onClick={() => handleRequestSwap(item)}
                                         size="icon"
                                         disabled={actionsDisabled}
-                                        className={`rounded-full w-10 h-10 bg-red-500 hover:bg-red-600 text-white shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        className={`rounded-full w-10 h-10 ${isFutureShiftsView ? 'bg-[#a9def9] text-[#0b3a5e] hover:bg-[#8cd3f6]' : 'bg-red-500 hover:bg-red-600 text-white'} shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                                       >
                                           <ArrowLeftRight className="w-5 h-5" />
                                       </Button>
@@ -269,4 +271,3 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     </AnimatePresence>
   );
 }
-
