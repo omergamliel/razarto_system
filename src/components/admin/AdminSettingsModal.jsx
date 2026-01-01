@@ -75,7 +75,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   // --- HELPER: WhatsApp Invite ---
   const handleSendInvite = (user) => {
     if (!user) return;
-    const message = `היי *${user.full_name}* 👋🏼\nהוזמנת להצטרף ל*מערכת Razarto*\nיש להיכנס לקישור ולהתחבר באמצעות המייל האישי.\nקישור: https://razar-toran-b555aef5.base44.app`;
+    const message = `היי *${user.full_name}* 👋\nהוזמנת להצטרף ל*מערכת Razarto*\nיש להיכנס לקישור ולהתחבר באמצעות המייל האישי.\nקישור: https://razar-toran-b555aef5.base44.app`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
