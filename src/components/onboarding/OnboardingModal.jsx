@@ -19,7 +19,7 @@ export default function OnboardingModal({ isOpen, authorizedData, onConfirm, isL
         className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md overflow-hidden relative border border-white/20"
       >
         {/* Decor Header */}
-        <div className="h-40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 relative overflow-hidden">
+        <div className="h-40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 relative overflow-visible">
           {/* Abstract Shapes */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl"></div>
@@ -28,8 +28,13 @@ export default function OnboardingModal({ isOpen, authorizedData, onConfirm, isL
           <div className="absolute -bottom-12 left-0 right-0 flex justify-center">
             <div className="relative">
               <div className="w-24 h-24 bg-white rounded-full p-1.5 shadow-xl">
-                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center text-4xl shadow-inner">
-                  👋🏼
+                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center text-4xl shadow-inner overflow-hidden">
+                  <img
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6937baec9ffc8bc9b555aef5/5878c0ac6_LOGO.png"
+                    alt="לוגו רזרטו"
+                    className="w-full h-full object-contain p-2"
+                    loading="lazy"
+                  />
                 </div>
               </div>
               <div className="absolute bottom-1 right-1 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>
@@ -46,10 +51,10 @@ export default function OnboardingModal({ isOpen, authorizedData, onConfirm, isL
             transition={{ delay: 0.2 }}
           >
             <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
-              היי, {firstName}!
+              היי, {firstName}! 👋🏼
             </h2>
             <p className="text-gray-500 text-sm md:text-base mb-8 leading-relaxed">
-              איזה כיף שהצטרפת אלינו.<br/>
+              איזה כיף שהצטרפת אלינו לרז"רתו<br/>
               המערכת זיהתה את הפרטים שלך באופן אוטומטי.
             </p>
           </motion.div>
@@ -130,3 +135,4 @@ export default function OnboardingModal({ isOpen, authorizedData, onConfirm, isL
     </div>
   );
 }
+
