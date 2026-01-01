@@ -24,6 +24,7 @@ import KPIListModal from '../dashboard/KPIListModal';
 import AdminSettingsModal from '../admin/AdminSettingsModal';
 import SwapSuccessModal from './SwapSuccessModal';
 import SeedRolesData from '../admin/SeedRolesData';
+import UpdateUserSerialIds from '../admin/UpdateUserSerialIds';
 
 // --- NEW MODALS ---
 import HeadToHeadSelectorModal from './HeadToHeadSelectorModal';
@@ -431,6 +432,7 @@ export default function ShiftCalendar() {
       style={{ fontFamily: 'Heebo, sans-serif' }}
     >
       <SeedRolesData />
+      <UpdateUserSerialIds />
       <BackgroundShapes />
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 md:py-8">
