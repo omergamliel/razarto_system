@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import BackgroundShapes from './BackgroundShapes';
 import CalendarHeader from './CalendarHeader';
 import CalendarGrid from './CalendarGrid';
-import UserNotRegisteredError from './UserNotRegisteredError'; // מסך חסימה החדש
+import UserNotRegisteredError from '../UserNotRegisteredError'; // מסך חסימה החדש
 
 // Modals
 import SwapRequestModal from './SwapRequestModal';
