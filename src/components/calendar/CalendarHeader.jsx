@@ -244,7 +244,7 @@ export default function CalendarHeader({
             <Button
               variant="ghost"
               size="icon"
-              onClick={navigateNext}
+              onClick={navigatePrev}
               className="rounded-xl hover:bg-gray-100"
             >
               <ChevronRight className="w-5 h-5" />
@@ -257,7 +257,7 @@ export default function CalendarHeader({
             <Button
               variant="ghost"
               size="icon"
-              onClick={navigatePrev}
+              onClick={navigateNext}
               className="rounded-xl hover:bg-gray-100"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -272,3 +272,4 @@ export default function CalendarHeader({
     </motion.div>
   );
 }
+
