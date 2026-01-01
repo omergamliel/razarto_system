@@ -35,6 +35,7 @@ export default function ShiftCalendar() {
   
   // --- STATES ---
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [clickedDate, setClickedDate] = useState(null); // Fix: Store specific clicked date
   const [viewMode, setViewMode] = useState('month');
   
   // Modal Visibilities
@@ -381,6 +382,7 @@ export default function ShiftCalendar() {
 
   const handleCellClick = (date, shift) => {
     setSelectedShift(shift);
+    setClickedDate(date); // Fix: Save the clicked date for Add Modal
     
     // Check Date Validity (Prevent editing past)
     const clickedDate = new Date(date);
@@ -539,7 +541,7 @@ export default function ShiftCalendar() {
       <AddShiftModal
         isOpen={showAddShiftModal}
         onClose={() => setShowAddShiftModal(false)}
-        date={currentDate} // Or specific clicked date if passed via state
+        date={clickedDate || currentDate}
         onSubmit={(data) => addShiftMutation.mutate({
             ...data,
             date: format(currentDate, 'yyyy-MM-dd') // Needs refinement if specific day clicked
