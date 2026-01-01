@@ -6,80 +6,86 @@ import { base44 } from '@/api/base44Client';
 
 export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
 
-  // --- Logic ---
-
-  const { data: myCoverages = [] } = useQuery({
-    queryKey: ['my-coverages', currentUser?.email],
+  // --- 1. Swap Requests Count (Red) ---
+  // Count ALL open SwapRequests that are of type 'Full'
+  const { data: fullRequestsCount = 0 } = useQuery({
+    queryKey: ['count-full-swap-requests'],
     queryFn: async () => {
-      if (!currentUser?.email) return [];
-      return await base44.entities.ShiftCoverage.filter({
-        covering_email: currentUser.email
-      });
-    },
-    enabled: !!currentUser?.email
+        const reqs = await base44.entities.SwapRequest.filter({ 
+            status: 'Open',
+            request_type: 'Full'
+        });
+        return reqs.length;
+    }
   });
 
-  const isFull24Hours = (s) => {
-    if (s.swap_start_time && s.swap_end_time) {
-        return s.swap_start_time.startsWith('09:00') && s.swap_end_time.startsWith('09:00');
+  // --- 2. Partial Gaps Count (Yellow) ---
+  // Count ALL open SwapRequests that are of type 'Partial'
+  const { data: partialRequestsCount = 0 } = useQuery({
+    queryKey: ['count-partial-swap-requests'],
+    queryFn: async () => {
+        const reqs = await base44.entities.SwapRequest.filter({ 
+            status: 'Open',
+            request_type: 'Partial'
+        });
+        // Also count Partially_Covered status as relevant
+        const partialStatusReqs = await base44.entities.SwapRequest.filter({ 
+            status: 'Partially_Covered'
+        });
+        
+        return reqs.length + partialStatusReqs.length;
     }
-    return true; 
-  };
+  });
 
-  // 1. Red KPI: Full Swap Requests
-  const swapRequestsCount = shifts.filter(s => {
-    const isSwapStatus = s.status === 'REQUIRES_FULL_COVERAGE' || 
-                         s.status === 'REQUIRES_SWAP' || 
-                         s.status === 'swap_requested';
-    return isSwapStatus && isFull24Hours(s);
-  }).length;
+  // --- 3. History / Approved (Green) ---
+  // Count Shifts with status 'Covered' (or similar logic from history)
+  // For simplicity, let's count closed requests
+  const { data: approvedCount = 0 } = useQuery({
+    queryKey: ['count-approved-swaps'],
+    queryFn: async () => {
+        const closedReqs = await base44.entities.SwapRequest.filter({ status: 'Closed' });
+        const completedReqs = await base44.entities.SwapRequest.filter({ status: 'Completed' });
+        return closedReqs.length + completedReqs.length;
+    }
+  });
 
-  // 2. Yellow KPI: Partial Gaps
-  const partialGapsCount = shifts.filter(s => {
-    const isOfficialPartial = s.status === 'REQUIRES_PARTIAL_COVERAGE' || 
-                              s.status === 'partially_covered' ||
-                              s.status === 'REQUIRES_PARTIAL';
+  // --- 4. My Future Shifts (Blue) ---
+  // Complex logic: Original assignment OR Approved coverage
+  const { data: myShiftsCount = 0 } = useQuery({
+    queryKey: ['count-my-future-shifts', currentUser?.serial_id],
+    queryFn: async () => {
+        if (!currentUser?.serial_id) return 0;
+        
+        const todayStr = new Date().toISOString().split('T')[0];
 
-    // A requested full swap that ISN'T 24 hours counts as partial for our logic
-    const isDegradedFullSwap = (s.status === 'REQUIRES_FULL_COVERAGE' || 
-                                s.status === 'REQUIRES_SWAP' || 
-                                s.status === 'swap_requested') && !isFull24Hours(s);
+        // A. Shifts where I am the original user (and no active swap request replacing me completely)
+        // Note: This logic can be refined. For now, simple count of future assignments.
+        // We filter locally because simple filter might not support date operator > directly in all adaptors
+        const myOriginalShifts = await base44.entities.Shift.filter({ 
+            original_user_id: currentUser.serial_id
+        });
+        
+        const futureOriginals = myOriginalShifts.filter(s => s.start_date >= todayStr);
 
-    return isOfficialPartial || isDegradedFullSwap;
-  }).length;
+        // B. Coverages where I am covering (Approved)
+        const myCoverages = await base44.entities.ShiftCoverage.filter({
+            covering_user_id: currentUser.serial_id,
+            status: 'Approved'
+        });
+        
+        const futureCoverages = myCoverages.filter(c => c.cover_start_date >= todayStr);
 
-  // 3. Green KPI: Approved / History
-  const approvedCount = shifts.filter(s => 
-    s.status === 'SWAPPED' || s.status === 'COVERED' || s.status === 'approved'
-  ).length;
-
-  // 4. Blue KPI: My Shifts
-  const myShiftsCount = shifts.filter(s => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const shiftDate = new Date(s.date);
-    shiftDate.setHours(0, 0, 0, 0);
-    
-    if (shiftDate < today) return false;
-
-    const isMyRole = currentUser?.assigned_role && 
-                     s.role && 
-                     typeof s.role === 'string' && 
-                     s.role.includes(currentUser.assigned_role);
-    
-    const isAssignedDirectly = s.assigned_email === currentUser?.email;
-
-    const isCoveringPartially = myCoverages.some(coverage => coverage.shift_id === s.id);
-
-    return isMyRole || isAssignedDirectly || isCoveringPartially;
-  }).length;
+        return futureOriginals.length + futureCoverages.length;
+    },
+    enabled: !!currentUser?.serial_id
+  });
 
   const kpis = [
     {
       id: 'swap_requests',
       mobileTitle: 'בקשות למלאה',
       desktopTitle: 'בקשות להחלפה מלאה',
-      count: swapRequestsCount,
+      count: fullRequestsCount,
       icon: AlertCircle,
       gradient: 'from-red-500 to-red-600',
       bgColor: 'bg-red-50',
@@ -90,7 +96,7 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
       id: 'partial_gaps',
       mobileTitle: 'בקשות לחלקית',
       desktopTitle: 'בקשות להחלפה חלקית',
-      count: partialGapsCount,
+      count: partialRequestsCount,
       icon: Clock,
       gradient: 'from-yellow-500 to-yellow-600',
       bgColor: 'bg-yellow-50',
