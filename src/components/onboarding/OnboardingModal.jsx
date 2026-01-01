@@ -1,168 +1,131 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { UserCircle, Building2, Briefcase } from 'lucide-react';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, UserCircle, Briefcase, CheckCircle2, Sparkles } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { base44 } from '@/api/base44Client';
-import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
 
-export default function OnboardingModal({ isOpen, onComplete }) {
-  const [department, setDepartment] = useState('');
-  const [role, setRole] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function OnboardingModal({ isOpen, authorizedData, onConfirm, isLoading }) {
+  if (!isOpen || !authorizedData) return null;
 
-  // Fetch role definitions from DB
-  const { data: roleDefinitions = [] } = useQuery({
-    queryKey: ['role-definitions'],
-    queryFn: () => base44.entities.RoleDefinition.list(),
-    enabled: isOpen
-  });
-
-  const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
-  const roles = department 
-    ? roleDefinitions
-        .filter(rd => rd.department === department && rd.role_name && !rd.assigned_user_email)
-        .map(rd => rd.role_name)
-    : [];
-
-  const handleDepartmentChange = (value) => {
-    setDepartment(value);
-    setRole('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!department || !role) {
-      toast.error('יש לבחור מחלקה ותפקיד');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const user = await base44.auth.me();
-      
-      // Find the RoleDefinition by role_name
-      const allRoleDefs = await base44.entities.RoleDefinition.list();
-      const roleDefMatch = allRoleDefs.find(rd => 
-        rd.department === department && rd.role_name === role
-      );
-
-      if (roleDefMatch) {
-        // Check if role is already assigned to another user
-        if (roleDefMatch.assigned_user_email && roleDefMatch.assigned_user_email !== user.email) {
-          toast.error('שם זה כבר קשור למשתמש אחר', {
-            description: 'אנא בחר שם אחר מהרשימה',
-            duration: 5000
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Update user with the role_name
-        await base44.auth.updateMe({
-          assigned_role: roleDefMatch.role_name,
-          department: department
-        });
-        
-        // Update RoleDefinition with user email
-        await base44.entities.RoleDefinition.update(roleDefMatch.id, {
-          assigned_user_email: user.email
-        });
-      }
-
-      toast.success('התפקיד נשמר בהצלחה!');
-      onComplete();
-    } catch (error) {
-      toast.error('שגיאה בשמירת התפקיד');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (!isOpen) return null;
+  // חילוץ השם הפרטי לברכה אישית
+  const firstName = authorizedData.full_name ? authorizedData.full_name.split(' ')[0] : 'חבר';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md" dir="rtl">
+      
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", duration: 0.6 }}
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md overflow-hidden relative border border-white/20"
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] p-8 text-white text-center">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring" }}
-            className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4"
-          >
-            <UserCircle className="w-12 h-12" />
-          </motion.div>
-          <h2 className="text-2xl font-bold mb-2">שלום וברוכים הבאים!</h2>
-          <p className="text-white/90 text-sm">
-            תגידו ביי לחפירות בווצאפ, מהיום הכל מסודר במקום אחד!
-          </p>
+        {/* Decor Header */}
+        <div className="h-40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 relative overflow-hidden">
+          {/* Abstract Shapes */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl"></div>
+          
+          {/* Centered Avatar Icon */}
+          <div className="absolute -bottom-12 left-0 right-0 flex justify-center">
+            <div className="relative">
+              <div className="w-24 h-24 bg-white rounded-full p-1.5 shadow-xl">
+                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center text-4xl shadow-inner">
+                  👋🏼
+                </div>
+              </div>
+              <div className="absolute bottom-1 right-1 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>
+            </div>
+          </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          {/* Department Selection */}
-          <div className="space-y-2">
-            <Label className="text-gray-700 font-medium flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-[#64B5F6]" />
-              שלב 1: בחר מחלקה
-            </Label>
-            <Select value={department} onValueChange={handleDepartmentChange}>
-              <SelectTrigger className="h-12 rounded-xl border-2">
-                <SelectValue placeholder="בחר מחלקה..." />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept} value={dept}>
-                    מחלקה {dept}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Role Selection */}
-          {department && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-2"
-            >
-              <Label className="text-gray-700 font-medium flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                שלב 2: בחר את השם המלא שלך
-              </Label>
-              <Select value={role} onValueChange={setRole} disabled={roles.length === 0}>
-                <SelectTrigger className="h-12 rounded-xl border-2">
-                  <SelectValue placeholder={roles.length > 0 ? "בחר שם..." : "אין שמות זמינים"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </motion.div>
-          )}
-
-          {/* Submit */}
-          <Button
-            type="submit"
-            disabled={isSubmitting || !department || !role}
-            className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
+        <div className="pt-16 pb-8 px-8 text-center">
+          
+          {/* Welcome Text */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
           >
-            {isSubmitting ? 'שומר...' : 'שמור והמשך'}
-          </Button>
-        </form>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+              היי, {firstName}!
+            </h2>
+            <p className="text-gray-500 text-sm md:text-base mb-8 leading-relaxed">
+              איזה כיף שהצטרפת אלינו.<br/>
+              המערכת זיהתה את הפרטים שלך באופן אוטומטי.
+            </p>
+          </motion.div>
+
+          {/* User Identification Card */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-b from-gray-50 to-white rounded-2xl p-5 border border-gray-100 shadow-sm mb-8 text-right relative overflow-hidden"
+          >
+            {/* Top Shine */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-purple-400"></div>
+
+            <div className="space-y-4">
+              {/* Name Row */}
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                  <UserCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">זיהינו אותך בתור</p>
+                  <p className="text-base font-bold text-gray-800">{authorizedData.full_name}</p>
+                </div>
+              </div>
+              
+              {/* Divider */}
+              <div className="h-px bg-gray-100 w-full"></div>
+
+              {/* Department Row */}
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 shadow-sm">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">המחלקה שלך</p>
+                  <p className="text-base font-bold text-gray-800">
+                    מחלקה {authorizedData.department}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Action Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Button 
+              onClick={onConfirm}
+              disabled={isLoading}
+              className="w-full h-14 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-lg shadow-blue-200 text-lg font-bold flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02]"
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-white rounded-full animate-bounce"></span>
+                  <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-75"></span>
+                  <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-150"></span>
+                  מתחבר למערכת...
+                </span>
+              ) : (
+                <>
+                  כניסה למערכת
+                  <ArrowRight className="w-6 h-6" />
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              לחיצה אחת ואתה בפנים
+            </p>
+          </motion.div>
+
+        </div>
       </motion.div>
     </div>
   );
