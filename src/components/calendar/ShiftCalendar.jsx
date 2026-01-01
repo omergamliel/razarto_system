@@ -456,6 +456,11 @@ export default function ShiftCalendar() {
     setShowCoverSegmentModal(true);
   };
 
+  const handleOpenSwapRequest = (shift) => {
+    setSelectedShift(shift);
+    setShowSwapRequestModal(true);
+  };
+
   const handleSwapSubmit = (data) => {
     if (!selectedShift) {
       console.error('❌ [ShiftCalendar] No shift selected for swap request submission');
@@ -673,6 +678,7 @@ export default function ShiftCalendar() {
         type={kpiListType}
         currentUser={authorizedPerson}
         onOfferCover={handleOfferCover}
+        onRequestSwap={handleOpenSwapRequest}
         actionsDisabled={isViewOnly}
       />
 
