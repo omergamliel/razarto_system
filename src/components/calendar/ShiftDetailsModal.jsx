@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, User, Trash2, CheckCircle, AlertCircle, CalendarPlus, Send, UserRoundPen } from 'lucide-react';
@@ -11,17 +11,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
-export default function ShiftDetailsModal({ 
-  isOpen, 
-  onClose, 
+export default function ShiftDetailsModal({
+  isOpen,
+  onClose,
   shift,
   date,
   onOfferCover,
   onHeadToHead,
-  onCancelRequest, 
+  onCancelRequest,
   onDelete,
   onApprove,
-  currentUserEmail,
+  currentUser,
   isAdmin
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -113,11 +113,30 @@ export default function ShiftDetailsModal({
   const isSwapMode = !!activeRequest;
   const isPartial = activeRequest?.request_type === 'Partial';
   const isFull = activeRequest?.request_type === 'Full';
-  
-  // Is this "My" shift? (Using email check as fallback, better to use ID if available)
-  // We assume 'shift.user_name' holds the name, but for ownership we need checking against AuthorizedPerson list or ID.
-  // For now let's assume if I can cancel it, it's mine.
-  const isOwnShift = false; // TODO: Connect real ownership logic using currentUser serial_id
+
+  const userEmail = currentUser?.email || currentUser?.Email;
+  const isOwnShift = Boolean(
+    (currentUser?.serial_id && shift?.original_user_id === currentUser.serial_id) ||
+    (userEmail && shift?.assigned_email === userEmail) ||
+    (currentUser?.full_name && shift?.user_name === currentUser.full_name)
+  );
+
+  const startTime = shift?.start_time || '09:00';
+  const endTime = shift?.end_time || '09:00';
+  const startDateObj = shift?.start_date ? new Date(shift.start_date) : new Date(date);
+
+  let endDateObj;
+  if (shift?.end_date) {
+    endDateObj = new Date(shift.end_date);
+  } else {
+    const sH = parseInt(startTime.split(':')[0]);
+    const eH = parseInt(endTime.split(':')[0]);
+    if (eH < sH || (sH === 9 && eH === 9)) {
+      endDateObj = addDays(startDateObj, 1);
+    } else {
+      endDateObj = startDateObj;
+    }
+  }
 
   const handleAddToCalendar = () => {
      // Google Calendar Logic... (Same as before)
@@ -172,23 +191,40 @@ export default function ShiftDetailsModal({
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
-            {/* Status Card */}
-            <div className={`border rounded-2xl p-6 text-center shadow-sm ${
-                isSwapMode ? (isPartial ? 'bg-yellow-50 border-yellow-100' : 'bg-red-50 border-red-100') : 'bg-gray-50 border-gray-100'
-            }`}>
-                <h2 className="text-3xl font-bold mb-2 text-gray-800">
-                    {shift.user_name}
-                </h2>
-                <div className="text-sm text-gray-500">
-                    {shift.department ? `מחלקה ${shift.department}` : ''}
-                </div>
-                
+            {/* Status Card + Timing */}
+            <div
+              className={`border rounded-2xl p-6 text-center shadow-sm space-y-4 ${
+                isSwapMode
+                  ? isPartial
+                    ? 'bg-yellow-50 border-yellow-100'
+                    : 'bg-red-50 border-red-100'
+                  : 'bg-gray-50 border-gray-100'
+              }`}
+            >
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold text-gray-800">{shift.user_name}</h2>
+                <div className="text-sm text-gray-500">{shift.department ? `מחלקה ${shift.department}` : ''}</div>
+
                 {isSwapMode && (
-                    <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-gray-200 text-sm font-medium">
-                        <AlertCircle className={`w-4 h-4 ${isPartial ? 'text-yellow-500' : 'text-red-500'}`} />
-                        {isPartial ? 'בקשה לכיסוי חלקי' : 'בקשה לכיסוי מלא'}
-                    </div>
+                  <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-gray-200 text-sm font-medium">
+                    <AlertCircle className={`w-4 h-4 ${isPartial ? 'text-yellow-500' : 'text-red-500'}`} />
+                    {isPartial ? 'בקשה לכיסוי חלקי' : 'בקשה לכיסוי מלא'}
+                  </div>
                 )}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 px-4 py-3 shadow-sm grid grid-cols-2 gap-4 text-center">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-gray-400">התחלה</p>
+                  <p className="text-lg font-bold text-gray-800">{startTime}</p>
+                  <p className="text-[11px] text-gray-500">{format(startDateObj, 'dd/MM')}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-gray-400">סיום</p>
+                  <p className="text-lg font-bold text-gray-800">{endTime}</p>
+                  <p className="text-[11px] text-gray-500">{format(endDateObj, 'dd/MM')}</p>
+                </div>
+              </div>
             </div>
 
             {/* Coverage List */}
@@ -210,30 +246,62 @@ export default function ShiftDetailsModal({
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-col gap-3">
-                {isSwapMode && !isOwnShift && (
-                     <Button 
-                        onClick={() => { onClose(); onOfferCover(activeRequest); }} // Pass the request, not just shift
-                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg"
-                     >
-                        <CheckCircle className="w-5 h-5 ml-2" />
-                        אני יכול/ה לכסות
-                     </Button>
-                )}
+            <div className="flex flex-wrap gap-3 justify-center">
+              {isSwapMode && isOwnShift && (
+                <Button
+                  onClick={() => onCancelRequest?.(shift)}
+                  className="min-w-[160px] flex-1 sm:flex-none h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg"
+                >
+                  <Trash2 className="w-5 h-5 ml-2" />
+                  ביטול בקשת החלפה
+                </Button>
+              )}
 
-                {!isSwapMode && !isAdmin && (
-                     <Button onClick={handleAddToCalendar} variant="outline" className="w-full">
-                        <CalendarPlus className="w-4 h-4 ml-2" />
-                        הוסף ליומן
-                     </Button>
-                )}
+              {isSwapMode && !isOwnShift && (
+                <Button
+                  onClick={() => {
+                    onClose();
+                    onOfferCover(shift);
+                  }}
+                  className="min-w-[160px] flex-1 sm:flex-none h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg"
+                >
+                  <CheckCircle className="w-5 h-5 ml-2" />
+                  אני יכול/ה לכסות
+                </Button>
+              )}
 
-                 {!isAdmin && (
-                   <Button onClick={handleWhatsAppShare} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white">
-                      <Send className="w-4 h-4 ml-2" />
-                      שתף בווצאפ
-                   </Button>
-                 )}
+              {isSwapMode && !isOwnShift && (
+                <Button
+                  onClick={() => {
+                    onClose();
+                    onHeadToHead?.(shift);
+                  }}
+                  className="min-w-[140px] flex-1 sm:flex-none h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg"
+                >
+                  ראש בראש
+                </Button>
+              )}
+
+              {!isSwapMode && !isAdmin && (
+                <Button
+                  onClick={handleAddToCalendar}
+                  variant="outline"
+                  className="min-w-[140px] flex-1 sm:flex-none h-12 rounded-xl"
+                >
+                  <CalendarPlus className="w-4 h-4 ml-2" />
+                  הוסף ליומן
+                </Button>
+              )}
+
+              {isOwnShift && !isAdmin && (
+                <Button
+                  onClick={handleWhatsAppShare}
+                  className="min-w-[140px] flex-1 sm:flex-none h-12 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-xl shadow-lg"
+                >
+                  <Send className="w-4 h-4 ml-2" />
+                  שתף בווצאפ
+                </Button>
+              )}
             </div>
 
           </div>
