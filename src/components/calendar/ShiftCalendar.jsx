@@ -188,24 +188,14 @@ export default function ShiftCalendar() {
 
   const requestSwapMutation = useMutation({
     mutationFn: async ({ shiftId, type, dates }) => {
-      console.log('🔵 [MUTATION] requestSwapMutation STARTED');
-      console.log('🔵 [MUTATION] Input params:', { shiftId, type, dates });
-      
       const shift = shifts.find(s => s.id === shiftId);
-      if (!shift) {
-        console.error('❌ [MUTATION] Shift not found with ID:', shiftId);
-        throw new Error('Shift not found');
-      }
-
-      console.log('🔵 [MUTATION] Found shift:', shift);
+      if (!shift) throw new Error('Shift not found');
 
       const isFull = type === 'full';
-      
-      // Build required fields for SwapRequest table
-      const req_start_date = dates.startDate || shift.start_date;
-      const req_end_date = dates.endDate || shift.end_date || format(addDays(new Date(req_start_date), 1), 'yyyy-MM-dd');
-      const req_start_time = dates.startTime || shift.start_time || '09:00';
-      const req_end_time = dates.endTime || shift.end_time || '09:00';
+      const req_start_date = isFull ? shift.start_date : (dates.startDate || shift.start_date);
+      const req_end_date = isFull ? (shift.end_date || shift.start_date) : (dates.endDate || shift.end_date || dates.startDate);
+      const req_start_time = isFull ? (shift.start_time || '09:00') : (dates.startTime || shift.start_time || '09:00');
+      const req_end_time = isFull ? (shift.end_time || req_start_time) : (dates.endTime || shift.end_time || req_start_time);
 
       const payload = {
         shift_id: shiftId,
@@ -218,20 +208,15 @@ export default function ShiftCalendar() {
         status: 'Open'
       };
 
-      console.log('📨 [MUTATION] Creating SwapRequest with FINAL payload:', JSON.stringify(payload, null, 2));
+      console.log('📨 [ShiftCalendar] Creating SwapRequest with payload:', payload);
 
-      const createdRequest = await base44.entities.SwapRequest.create(payload);
-      console.log('✅ [MUTATION] SwapRequest created successfully:', createdRequest);
+      await base44.entities.SwapRequest.create(payload);
 
-      const updatedShift = await base44.entities.Shift.update(shiftId, {
+      return await base44.entities.Shift.update(shiftId, {
         status: 'Swap_Requested'
       });
-      console.log('✅ [MUTATION] Shift status updated to Swap_Requested');
-
-      return updatedShift;
     },
     onSuccess: (data) => {
-      console.log('🎉 [MUTATION] Success! Invalidating queries...');
       queryClient.invalidateQueries(['shifts']);
       queryClient.invalidateQueries(['swap-requests']);
       toast.success('בקשת ההחלפה נשלחה בהצלחה!');
@@ -241,9 +226,8 @@ export default function ShiftCalendar() {
       setShowSuccessModal(true);
     },
     onError: (error) => {
-      console.error('❌ [MUTATION] Swap request FAILED with error:', error);
-      console.error('❌ [MUTATION] Error details:', error.message, error.stack);
-      toast.error(`שליחת בקשת ההחלפה נכשלה: ${error.message || 'נסו שוב'}`);
+      console.error('❌ [ShiftCalendar] Swap request failed:', error);
+      toast.error('שליחת בקשת ההחלפה נכשלה. נסו שוב.');
     }
   });
 
@@ -311,15 +295,21 @@ export default function ShiftCalendar() {
       const targetShift = shifts.find(s => s.id === h2hTargetId);
       const offerShift = shifts.find(s => s.id === h2hOfferId);
 
-      // 2. Swap original_user_id (the core assignment logic)
+      // 2. Swap Assignees
       await base44.entities.Shift.update(h2hTargetId, {
-        original_user_id: offerShift.original_user_id,
-        status: 'Active'
+        assigned_person: offerShift.assigned_person,
+        assigned_email: offerShift.assigned_email,
+        role: offerShift.role,
+        department: offerShift.department,
+        status: 'regular'
       });
 
       await base44.entities.Shift.update(h2hOfferId, {
-        original_user_id: targetShift.original_user_id,
-        status: 'Active'
+        assigned_person: targetShift.assigned_person,
+        assigned_email: targetShift.assigned_email,
+        role: targetShift.role,
+        department: targetShift.department,
+        status: 'regular'
       });
     },
     onSuccess: () => {
@@ -333,27 +323,27 @@ export default function ShiftCalendar() {
 
   const approveSwapMutation = useMutation({
     mutationFn: async (shift) => {
-      // Find the approved coverage
-      const shiftCoverages = coverages.filter(c => c.shift_id === shift.id && c.status === 'Approved');
-      if (shiftCoverages.length === 0) return;
+      // Find the pending coverage
+      const coverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
+      const pendingCoverage = coverages[0]; // Assuming one pending for simplicity
 
-      const coverage = shiftCoverages[0];
+      if (!pendingCoverage) return;
 
-      // Update Shift: Transfer ownership to the covering user
+      // Update Shift with new assignee
       await base44.entities.Shift.update(shift.id, {
-        original_user_id: coverage.covering_user_id,
-        status: 'Active'
+        assigned_person: pendingCoverage.covering_person,
+        assigned_email: pendingCoverage.covering_email,
+        role: pendingCoverage.covering_role, // Or keep original role name if preferred
+        status: 'regular',
+        swap_start_time: null,
+        swap_end_time: null
       });
-
-      // Close the swap request
-      const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
-      if (activeRequest) {
-        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
-      }
+      
+      // Update Coverage status (optional if you have status field on coverage)
+      // await base44.entities.ShiftCoverage.update(pendingCoverage.id, { status: 'approved' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
-      queryClient.invalidateQueries(['swap-requests']);
       toast.success('ההחלפה אושרה והלוח עודכן!');
       setShowDetailsModal(false);
     }
@@ -404,9 +394,8 @@ export default function ShiftCalendar() {
   // --- HANDLERS ---
 
   const handleCellClick = (date, shift) => {
-    setSelectedShift(shift);
     setClickedDate(date); // Fix: Save the clicked date for Add Modal
-    
+
     // Check Date Validity (Prevent editing past)
     const clickedDate = new Date(date);
     const today = new Date();
@@ -421,9 +410,35 @@ export default function ShiftCalendar() {
         return;
     }
 
-    // Determine if it's my shift (using ID comparison from enriched data)
-    const isMyShift = shift.original_user_id === authorizedPerson.serial_id;
+    // Permissions & ownership
+    const permissionLevel = authorizedPerson.permissions;
+    const isViewOnly = permissionLevel === 'View';
+    const isRR = permissionLevel === 'RR';
+    const isMyShift = shift.original_user_id === authorizedPerson.serial_id || shift.assigned_email === authorizedPerson.email;
+    const isCoveredShift = shift.status === 'approved' || shift.status === 'Covered';
+    const isCoveringUser = (shift.coverages || []).some(cov => cov.covering_user_id === authorizedPerson.serial_id);
 
+    // View-only users cannot open shifts at all
+    if (isViewOnly) {
+      return;
+    }
+
+    // Access rules for RR level
+    if (isRR && !isAdmin) {
+      if (shift.status === 'regular' && !isMyShift) {
+        return;
+      }
+
+      if (isCoveredShift && !(isMyShift || isCoveringUser)) {
+        return;
+      }
+
+      // Swap requests are always viewable for RR (covered by default fallthrough)
+    }
+
+    setSelectedShift(shift);
+
+    // Determine if it's my shift
     if (shift.status === 'regular') {
         if (isMyShift && !isPast) {
             setShowActionModal(true);
@@ -442,23 +457,12 @@ export default function ShiftCalendar() {
   };
 
   const handleSwapSubmit = (data) => {
-    console.log('🎯 [ShiftCalendar] handleSwapSubmit CALLED with data:', data);
-    
     if (!selectedShift) {
-      console.error('❌ [ShiftCalendar] No shift selected!');
-      toast.error('שגיאה: לא נבחרה משמרת');
+      console.error('❌ [ShiftCalendar] No shift selected for swap request submission');
       return;
     }
 
-    if (!authorizedPerson?.serial_id) {
-      console.error('❌ [ShiftCalendar] No authorized person serial_id!');
-      toast.error('שגיאה: חסרים נתוני משתמש');
-      return;
-    }
-
-    console.log('✅ [ShiftCalendar] Selected Shift:', selectedShift);
-    console.log('✅ [ShiftCalendar] Authorized Person:', authorizedPerson);
-    console.log('🚀 [ShiftCalendar] Triggering mutation...');
+    console.log('📤 [ShiftCalendar] Submitting swap request from modal:', data);
 
     requestSwapMutation.mutate({
       shiftId: selectedShift.id,
@@ -499,7 +503,9 @@ export default function ShiftCalendar() {
   }
 
   // 4. Main App (User authorized and linked)
-  const isAdmin = authorizedPerson.permissions === 'Admin' || authorizedPerson.permissions === 'Manager';
+  const permissionLevel = authorizedPerson.permissions;
+  const isAdmin = permissionLevel === 'Admin' || permissionLevel === 'Manager';
+  const isViewOnly = permissionLevel === 'View';
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans selection:bg-blue-100 overflow-x-hidden relative" dir="rtl">
@@ -586,7 +592,10 @@ export default function ShiftCalendar() {
         isOpen={showAddShiftModal}
         onClose={() => setShowAddShiftModal(false)}
         date={clickedDate || currentDate}
-        onSubmit={(data) => addShiftMutation.mutate(data)}
+        onSubmit={(data) => addShiftMutation.mutate({
+            ...data,
+            date: format(currentDate, 'yyyy-MM-dd') // Needs refinement if specific day clicked
+        })}
         isSubmitting={addShiftMutation.isPending}
       />
 
@@ -662,11 +671,13 @@ export default function ShiftCalendar() {
         isOpen={showKPIListModal}
         onClose={() => setShowKPIListModal(false)}
         type={kpiListType}
-        shifts={enrichedShifts}
         currentUser={authorizedPerson}
         onOfferCover={handleOfferCover}
+        actionsDisabled={isViewOnly}
       />
 
     </div>
   );
 }
+
+
