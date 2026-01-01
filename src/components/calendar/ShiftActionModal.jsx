@@ -75,18 +75,18 @@ export default function ShiftActionModal({
               className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col"
             >
               {/* Header Image/Gradient */}
-              <div className="h-32 bg-gradient-to-r from-blue-500 to-indigo-600 relative flex items-end p-4">
-                 <div className="absolute top-4 left-4 text-white/80 text-xs font-medium bg-black/20 px-2 py-1 rounded-full backdrop-blur-md border border-white/10">
+              <div className="h-32 bg-gradient-to-r from-[#a9def9] to-[#a9def9] relative flex items-end p-4 text-[#0b3a5e]">
+                 <div className="absolute top-4 left-4 text-[#0b3a5e] text-xs font-medium bg-white/50 px-2 py-1 rounded-full backdrop-blur-md border border-white/40">
                     פעולות על המשמרת
                  </div>
-                 <div className="text-white">
+                 <div className="text-[#0b3a5e]">
                     <h2 className="text-2xl font-bold">{format(startDateObj, 'd בMMMM', { locale: he })}</h2>
-                    <p className="text-blue-100 text-sm">{format(startDateObj, 'yyyy', { locale: he })}</p>
+                    <p className="text-sm opacity-80">{format(startDateObj, 'yyyy', { locale: he })}</p>
                  </div>
 
-                 <button 
+                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors text-white"
+                    className="absolute top-4 right-4 p-2 bg-white/60 rounded-full hover:bg-white/80 transition-colors text-[#0b3a5e]"
                   >
                     <X className="w-5 h-5" />
                   </button>
