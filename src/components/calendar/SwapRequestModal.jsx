@@ -123,27 +123,33 @@ export default function SwapRequestModal({
 
   // --- SUBMISSION LOGIC ---
   const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // בניה מחדש של האובייקט כדי לוודא שכל השדות קיימים
-    // אם נבחר "Full", אנחנו דורסים את הנתונים הידניים עם נתוני המשמרת המקוריים ליתר ביטחון
-    
-    const finalStartDate = swapType === 'partial' ? startDate : (shift.start_date || startDate);
-    const finalStartTime = swapType === 'partial' ? startTime : (shift.start_time || '09:00');
-    
-    // חישוב תאריך סיום למקרה של Full אם חסר
-    let finalEndDate = swapType === 'partial' ? endDate : (shift.end_date || endDate);
-    const finalEndTime = swapType === 'partial' ? endTime : (shift.end_time || '09:00');
+    if (e) {
+      e.preventDefault();
+    }
+
+    if (!onSubmit) {
+      console.error('❌ onSubmit prop is missing in SwapRequestModal');
+      return;
+    }
+
+    const fallbackStartDate = shift?.start_date || startDate;
+    const fallbackEndDate = shift?.end_date || endDate || fallbackStartDate;
+
+    const finalStartDate = swapType === 'partial' ? startDate || fallbackStartDate : fallbackStartDate;
+    const finalStartTime = swapType === 'partial' ? startTime || shiftStartStr : shiftStartStr;
+    const finalEndDate = swapType === 'partial' ? endDate || fallbackEndDate : fallbackEndDate;
+    const finalEndTime = swapType === 'partial' ? endTime || shiftEndStr : shiftEndStr;
 
     const payload = {
       type: swapType, // 'full' or 'partial'
+      range: [...range],
       startDate: finalStartDate,
       startTime: finalStartTime,
       endDate: finalEndDate,
       endTime: finalEndTime
     };
 
-    console.log("Submitting Request:", payload); // לוג לבדיקה
+    console.log('📤 [SwapRequestModal] Submitting Request Payload:', payload);
     onSubmit(payload);
   };
   
@@ -427,3 +433,4 @@ export default function SwapRequestModal({
     </AnimatePresence>
   );
 }
+
