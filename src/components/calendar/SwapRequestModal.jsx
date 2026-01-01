@@ -202,7 +202,7 @@ export default function SwapRequestModal({
             {/* Current Assignment Card */}
             <div className="text-center space-y-4">
                 <div>
-                    <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע לתפקיד</p>
+                                        <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע למשמרת</p>
                     <h3 className="text-3xl font-extrabold text-gray-800 leading-none font-sans">
                         {shift.user_name || shift.role}
                     </h3>
