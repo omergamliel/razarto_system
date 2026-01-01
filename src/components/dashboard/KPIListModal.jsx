@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, MessageCircle, ChevronDown } from 'lucide-react';
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, ArrowLeftRight, ChevronDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
-export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, actionsDisabled = false }) {
+export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onRequestSwap, actionsDisabled = false }) {
   
   const [visibleCount, setVisibleCount] = useState(10);
   const [listData, setListData] = useState([]); // Unified state for the list items
@@ -86,21 +86,67 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   };
 
   // --- Handlers ---
+  const formatDateTimeForDisplay = (dateStr, timeStr) => {
+      if (!dateStr) return null;
+      try {
+          const composed = new Date(`${dateStr}T${timeStr || '09:00'}`);
+          if (isNaN(composed)) return null;
+          return format(composed, 'dd/MM/yy HH:mm', { locale: he });
+      } catch (err) {
+          console.error('Failed to format date time for display', err);
+          return null;
+      }
+  };
+
+  const isFullShift = (shift) => {
+      const start = shift?.start_time || '09:00';
+      const end = shift?.end_time || '09:00';
+      return start === end;
+  };
+
+  const getShiftTimeDisplay = (shift) => {
+      if (!shift?.start_date) return 'זמן לא ידוע';
+      if (isFullShift(shift)) return 'משמרת מלאה';
+
+      const startText = formatDateTimeForDisplay(shift.start_date, shift.start_time);
+      const endText = formatDateTimeForDisplay(shift.end_date || shift.start_date, shift.end_time || shift.start_time);
+
+      if (startText && endText) return `${startText} - ${endText}`;
+      return startText || 'זמן לא ידוע';
+  };
+
   const handleAddToCalendar = (item) => {
       if (actionsDisabled) return;
-      // Logic for GCal
-      const date = item.shift_date;
-      const title = `משמרת - ${item.user_name}`;
-      const gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}`; // Simplified
+
+      const title = 'משמרת רז״ר תורן';
+      const description = 'משמרת נעימה 💪🏼';
+
+      const startDateStr = item.start_date || item.shift_date;
+      const endDateStr = item.end_date || startDateStr;
+      const startTime = item.start_time || item.req_start_time || '09:00';
+      const endTime = item.end_time || item.req_end_time || startTime;
+
+      const startDateTime = new Date(`${startDateStr}T${startTime}`);
+      const endDateTime = new Date(`${endDateStr}T${endTime}`);
+
+      const formatForCalendar = (dateObj, fallbackDateStr) => {
+          if (dateObj && !isNaN(dateObj)) return format(dateObj, "yyyyMMdd'T'HHmmss");
+          return fallbackDateStr ? fallbackDateStr.replace(/-/g, '') : '';
+      };
+
+      const startFormatted = formatForCalendar(startDateTime, startDateStr);
+      const endFormatted = formatForCalendar(endDateTime, endDateStr || startDateStr);
+
+      const gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&details=${encodeURIComponent(description)}&dates=${startFormatted}/${endFormatted}`;
       window.open(gCalUrl, '_blank');
   };
 
-  const handleWhatsAppShare = (item) => {
+  const handleRequestSwap = (item) => {
       if (actionsDisabled) return;
-      const appLink = window.location.origin;
-      const message = `היי, זקוק להחלפה למשמרת ב-${item.shift_date}. עזרה? ${appLink}`;
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      onClose();
+      if (onRequestSwap) {
+          onRequestSwap(item);
+      }
   };
 
   // --- Render ---
@@ -158,7 +204,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                              {item.is_request_object ? (
                                  <span>{item.req_start_time} - {item.req_end_time}</span>
                              ) : (
-                                 <span>09:00 - 09:00</span>
+                                 <span>{getShiftTimeDisplay(item)}</span>
                              )}
                           </div>
                         </div>
@@ -179,8 +225,8 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                              )}
 
                              {/* If it's my shift/request */}
-                             {(item.is_shift_object || isMyRequest) && (
-                                <>
+                            {(item.is_shift_object || isMyRequest) && (
+                               <>
                                     <Button
                                       onClick={() => handleAddToCalendar(item)}
                                       size="icon"
@@ -190,14 +236,16 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                                     >
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
-                                    <Button
-                                      onClick={() => handleWhatsAppShare(item)}
-                                      size="icon"
-                                      disabled={actionsDisabled}
-                                      className={`rounded-full w-10 h-10 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                    >
-                                        <MessageCircle className="w-5 h-5" />
-                                    </Button>
+                                    {item.is_shift_object && (
+                                      <Button
+                                        onClick={() => handleRequestSwap(item)}
+                                        size="icon"
+                                        disabled={actionsDisabled}
+                                        className={`rounded-full w-10 h-10 bg-red-500 hover:bg-red-600 text-white shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                      >
+                                          <ArrowLeftRight className="w-5 h-5" />
+                                      </Button>
+                                    )}
                                 </>
                              )}
                         </div>
