@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { format, addDays, parseISO, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
+import { Button } from "@/components/ui/button";
 
 // Components
 import BackgroundShapes from './BackgroundShapes';
@@ -51,6 +52,7 @@ export default function ShiftCalendar() {
   const [showAdminSettings, setShowAdminSettings] = useState(false);
   const [showHallOfFame, setShowHallOfFame] = useState(false);
   const [showHelpSupport, setShowHelpSupport] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
   // KPI & Success Modals
   const [showKPIListModal, setShowKPIListModal] = useState(false);
@@ -535,6 +537,18 @@ export default function ShiftCalendar() {
   const isAdmin = permissionLevel === 'Admin' || permissionLevel === 'Manager';
   const isViewOnly = permissionLevel === 'View';
 
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await base44.auth.logout();
+    },
+    onSuccess: () => {
+      window.location.href = '/';
+    },
+    onError: () => {
+      toast.error('אירעה שגיאה בעת ההתנתקות');
+    }
+  });
+
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans selection:bg-blue-100 overflow-x-hidden relative" dir="rtl">
       <BackgroundShapes />
@@ -554,7 +568,8 @@ export default function ShiftCalendar() {
           onOpenAdminSettings={() => setShowAdminSettings(true)}
           onOpenHallOfFame={() => setShowHallOfFame(true)}
           onOpenHelp={() => setShowHelpSupport(true)}
-          currentUser={authorizedPerson} 
+          onLogout={() => setShowLogoutConfirm(true)}
+          currentUser={authorizedPerson}
         />
 
         {/* KPI Header */}
@@ -695,6 +710,41 @@ export default function ShiftCalendar() {
         isOpen={showHelpSupport}
         onClose={() => setShowHelpSupport(false)}
       />
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" dir="rtl">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowLogoutConfirm(false)}
+          />
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-title"
+            aria-describedby="logout-desc"
+          >
+            <h3 id="logout-title" className="text-2xl font-bold text-center text-gray-900 mb-2">האם אתה בטוח שברצונך להתנתק?</h3>
+            <p id="logout-desc" className="text-center text-gray-600 text-sm">תוכל להתחבר שוב בכל רגע באמצעות פרטי הגישה שלך.</p>
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={() => setShowLogoutConfirm(false)}
+              >
+                לא
+              </Button>
+              <Button
+                className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 text-white"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+              >
+                כן
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <KPIListModal
         isOpen={showKPIListModal}
