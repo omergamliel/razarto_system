@@ -15,8 +15,9 @@ export default function CalendarHeader({
   setViewMode,
   isAdmin,
   onOpenAdminSettings,
-  onOpenHallOfFame, 
-  onOpenHelp, 
+  onOpenHallOfFame,
+  onOpenHelp,
+  onLogout,
   currentUser,
   hideHeader = false,
   hideNavigation = false
@@ -153,7 +154,7 @@ export default function CalendarHeader({
 
                 {/* צד שמאל: שורת האייקונים */}
                 <div className="flex items-center gap-1 md:gap-3">
-                    
+
                     {/* 1. היכל התהילה */}
                     <button 
                         onClick={onOpenHallOfFame}
@@ -167,9 +168,18 @@ export default function CalendarHeader({
                         />
                     </button>
 
+                    {/* 2. תמיכה ועזרה */}
+                    <button
+                        onClick={onOpenHelp}
+                        className="group relative p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+                        title="תמיכה ועזרה"
+                    >
+                        <HelpCircle className="w-6 h-6 md:w-7 md:h-7 text-gray-700 group-hover:text-gray-900" />
+                    </button>
+
                     {/* 3. לוח ניהול (רק למנהלים) */}
                     {isAdmin && (
-                        <button 
+                        <button
                             onClick={onOpenAdminSettings}
                             className="group relative p-2 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all duration-200"
                             title="לוח ניהול"
@@ -183,6 +193,19 @@ export default function CalendarHeader({
                             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                         </button>
                     )}
+
+                    {/* 4. התנתקות */}
+                    <button
+                        onClick={onLogout}
+                        className="group relative p-2 rounded-xl hover:bg-red-50 transition-all duration-200"
+                        title="התנתקות"
+                    >
+                        <img
+                            src="https://cdn-icons-png.flaticon.com/128/5509/5509597.png"
+                            alt="Logout"
+                            className="w-6 h-6 md:w-7 md:h-7 object-contain group-hover:scale-110 transition-transform"
+                        />
+                    </button>
                 </div>
             </div>
 
