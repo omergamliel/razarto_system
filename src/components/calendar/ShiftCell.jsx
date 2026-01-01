@@ -29,9 +29,8 @@ export default function ShiftCell({
   });
 
   // --- Logic Checks ---
-  const isMyShift = shift && currentUserEmail && shift.user_name === currentUserEmail; // Assuming user_name might be email in some contexts, or need to pass user ID. 
-  // Better logic: we need to check if the current user ID matches original_user_id
-  // But here we only have email. Let's rely on visual status for now.
+  // Check if this is "my" shift by comparing email
+  const isMyShift = shift && currentUserEmail && shift.assigned_email?.toLowerCase() === currentUserEmail.toLowerCase();
 
   const status = shift?.status || 'Active';
   const isSwapRequested = status === 'Swap_Requested';

@@ -295,21 +295,15 @@ export default function ShiftCalendar() {
       const targetShift = shifts.find(s => s.id === h2hTargetId);
       const offerShift = shifts.find(s => s.id === h2hOfferId);
 
-      // 2. Swap Assignees
+      // 2. Swap original_user_id (the core assignment logic)
       await base44.entities.Shift.update(h2hTargetId, {
-        assigned_person: offerShift.assigned_person,
-        assigned_email: offerShift.assigned_email,
-        role: offerShift.role,
-        department: offerShift.department,
-        status: 'regular'
+        original_user_id: offerShift.original_user_id,
+        status: 'Active'
       });
 
       await base44.entities.Shift.update(h2hOfferId, {
-        assigned_person: targetShift.assigned_person,
-        assigned_email: targetShift.assigned_email,
-        role: targetShift.role,
-        department: targetShift.department,
-        status: 'regular'
+        original_user_id: targetShift.original_user_id,
+        status: 'Active'
       });
     },
     onSuccess: () => {
@@ -323,27 +317,27 @@ export default function ShiftCalendar() {
 
   const approveSwapMutation = useMutation({
     mutationFn: async (shift) => {
-      // Find the pending coverage
-      const coverages = await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
-      const pendingCoverage = coverages[0]; // Assuming one pending for simplicity
+      // Find the approved coverage
+      const shiftCoverages = coverages.filter(c => c.shift_id === shift.id && c.status === 'Approved');
+      if (shiftCoverages.length === 0) return;
 
-      if (!pendingCoverage) return;
+      const coverage = shiftCoverages[0];
 
-      // Update Shift with new assignee
+      // Update Shift: Transfer ownership to the covering user
       await base44.entities.Shift.update(shift.id, {
-        assigned_person: pendingCoverage.covering_person,
-        assigned_email: pendingCoverage.covering_email,
-        role: pendingCoverage.covering_role, // Or keep original role name if preferred
-        status: 'regular',
-        swap_start_time: null,
-        swap_end_time: null
+        original_user_id: coverage.covering_user_id,
+        status: 'Active'
       });
-      
-      // Update Coverage status (optional if you have status field on coverage)
-      // await base44.entities.ShiftCoverage.update(pendingCoverage.id, { status: 'approved' });
+
+      // Close the swap request
+      const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
+      if (activeRequest) {
+        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
+      queryClient.invalidateQueries(['swap-requests']);
       toast.success('ההחלפה אושרה והלוח עודכן!');
       setShowDetailsModal(false);
     }
@@ -411,8 +405,8 @@ export default function ShiftCalendar() {
         return;
     }
 
-    // Determine if it's my shift
-    const isMyShift = shift.assigned_email === authorizedPerson.email;
+    // Determine if it's my shift (using ID comparison from enriched data)
+    const isMyShift = shift.original_user_id === authorizedPerson.serial_id;
 
     if (shift.status === 'regular') {
         if (isMyShift && !isPast) {
@@ -565,10 +559,7 @@ export default function ShiftCalendar() {
         isOpen={showAddShiftModal}
         onClose={() => setShowAddShiftModal(false)}
         date={clickedDate || currentDate}
-        onSubmit={(data) => addShiftMutation.mutate({
-            ...data,
-            date: format(currentDate, 'yyyy-MM-dd') // Needs refinement if specific day clicked
-        })}
+        onSubmit={(data) => addShiftMutation.mutate(data)}
         isSubmitting={addShiftMutation.isPending}
       />
 
@@ -652,4 +643,3 @@ export default function ShiftCalendar() {
     </div>
   );
 }
-
