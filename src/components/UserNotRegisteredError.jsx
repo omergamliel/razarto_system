@@ -6,16 +6,14 @@ import { Button } from "@/components/ui/button";
 const UserNotRegisteredError = ({ onRefresh }) => {
   
   const handleContactSupport = () => {
-    // המספר שהוגדר
-    const phoneNumber = "972536221840";
-    const message = "היי, אני מנסה להתחבר למערכת Razarto ומופיעה לי שגיאת הרשאות. אשמח לעזרה בסידור הגישה.";
-    // יצירת קישור לווטסאפ
+    const phoneNumber = "972546881831";
+    const message = "היי, אני מנסה להתחבר למערכת Razarto ומופיעה לי שגיאת הרשאות. אשמח לעזרה בהוספת ההרשאה המתאימה.";
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-4 relative overflow-hidden" dir="rtl">
+    <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden" dir="rtl">
       
       {/* Background Decorations */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
@@ -27,18 +25,18 @@ const UserNotRegisteredError = ({ onRefresh }) => {
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 text-center border border-gray-100"
+        className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 text-center border border-gray-100"
       >
         {/* Status Icon */}
         <div className="flex justify-center mb-6">
           <div className="relative">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center"
+              className="w-20 h-20 sm:w-24 sm:h-24 bg-red-50 rounded-full flex items-center justify-center"
             >
-              <ShieldAlert className="w-12 h-12 text-red-500" />
+              <ShieldAlert className="w-10 h-10 sm:w-12 sm:h-12 text-red-500" />
             </motion.div>
             <motion.div 
               initial={{ scale: 0 }}
@@ -72,12 +70,13 @@ const UserNotRegisteredError = ({ onRefresh }) => {
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-3">
-          <Button 
+          <Button
             onClick={handleContactSupport}
-            className="w-full h-14 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-2xl shadow-lg shadow-green-100 transition-all flex items-center justify-center gap-3 text-base font-bold transform hover:-translate-y-1"
+            aria-label="פנייה לקבלת הרשאה דרך ווטסאפ"
+            className="w-full h-14 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-2xl shadow-lg shadow-green-100 transition-all flex items-center justify-center gap-3 text-base font-bold transform hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-white"
           >
             <MessageCircle className="w-6 h-6" />
-            פנייה לקבלת תמיכה
+            פנייה בקבלת הרשאה
           </Button>
 
           <Button 
@@ -102,3 +101,4 @@ const UserNotRegisteredError = ({ onRefresh }) => {
 };
 
 export default UserNotRegisteredError;
+
