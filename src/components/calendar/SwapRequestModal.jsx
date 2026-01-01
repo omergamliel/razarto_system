@@ -8,13 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-export default function SwapRequestModal({ 
-  isOpen, 
-  onClose, 
-  date, 
+export default function SwapRequestModal({
+  isOpen,
+  onClose,
+  date,
   shift,
   onSubmit,
-  isSubmitting
+  isSubmitting,
+  logMessages = []
 }) {
   const [swapType, setSwapType] = useState('full');
   
@@ -123,38 +124,34 @@ export default function SwapRequestModal({
 
   // --- SUBMISSION LOGIC ---
   const handleSubmit = (e) => {
-    console.log('🔥 [SwapRequestModal] handleSubmit TRIGGERED');
-    
     if (e?.preventDefault) {
       e.preventDefault();
     }
 
     if (!onSubmit) {
-      console.error('❌ [SwapRequestModal] onSubmit prop is MISSING!');
-      toast.error('שגיאה: אין callback להגשת הבקשה');
+      console.error('❌ onSubmit prop is missing in SwapRequestModal');
       return;
     }
 
-    if (!shift) {
-      console.error('❌ [SwapRequestModal] shift is missing!');
-      toast.error('שגיאה: חסרים נתוני משמרת');
-      return;
-    }
+    const fallbackStartDate = shift?.start_date || startDate;
+    const fallbackEndDate = shift?.end_date || endDate || fallbackStartDate;
 
-    // Build CLEAN payload matching DB schema
-    const isFull = swapType === 'full';
-    
+    const finalStartDate = swapType === 'partial' ? startDate || fallbackStartDate : fallbackStartDate;
+    const finalStartTime = swapType === 'partial' ? startTime || shiftStartStr : shiftStartStr;
+    const finalEndDate = swapType === 'partial' ? endDate || fallbackEndDate : fallbackEndDate;
+    const finalEndTime = swapType === 'partial' ? endTime || shiftEndStr : shiftEndStr;
+
     const payload = {
-      type: swapType,
-      startDate: isFull ? (shift.start_date || format(new Date(), 'yyyy-MM-dd')) : (startDate || shift.start_date),
-      startTime: isFull ? (shift.start_time || '09:00') : (startTime || '09:00'),
-      endDate: isFull ? (shift.end_date || format(addDays(new Date(shift.start_date), 1), 'yyyy-MM-dd')) : (endDate || shift.end_date),
-      endTime: isFull ? (shift.end_time || '09:00') : (endTime || '09:00')
+      type: swapType, // 'full' or 'partial'
+      range: [...range],
+      startDate: finalStartDate,
+      startTime: finalStartTime,
+      endDate: finalEndDate,
+      endTime: finalEndTime
     };
 
-    console.log('✅ [SwapRequestModal] Final Payload:', payload);
-    console.log('✅ [SwapRequestModal] Calling onSubmit with payload...');
-    
+    console.log('Modal submitting payload:', payload);
+    console.log('📤 [SwapRequestModal] Submitting Request Payload:', payload);
     onSubmit(payload);
   };
   
@@ -196,13 +193,12 @@ export default function SwapRequestModal({
              </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
-            <div className="p-6 space-y-6 flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             
             {/* Current Assignment Card */}
             <div className="text-center space-y-4">
                 <div>
-                                        <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע למשמרת</p>
+                    <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע למשמרת</p>
                     <h3 className="text-3xl font-extrabold text-gray-800 leading-none font-sans">
                         {shift.user_name || shift.role}
                     </h3>
@@ -416,24 +412,41 @@ export default function SwapRequestModal({
                 </motion.div>
               )}
             </AnimatePresence>
-            </div>
 
-            {/* Footer with Actions - INSIDE FORM */}
-            <div className="p-6 pt-4 border-t border-gray-50 mt-auto bg-white">
-              <div className="flex gap-3">
-                  <Button
-                     type="submit"
-                     disabled={isSubmitting}
-                     className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                      {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
-                  </Button>
-                  <Button type="button" onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
-              </div>
-            </div>
+            {/* Hidden submit for form enter key */}
+            <button type="submit" className="hidden" />
           </form>
+
+          {/* Footer with Actions */}
+          <div className="p-6 pt-0 border-t border-gray-50 mt-auto bg-white space-y-3">
+            {logMessages.length > 0 && (
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs text-right space-y-2 max-h-32 overflow-y-auto">
+                <p className="text-gray-500 font-semibold">לוגים אחרונים:</p>
+                <ul className="space-y-1">
+                  {logMessages.map((log, idx) => (
+                    <li key={idx} className="font-mono text-[11px] text-gray-700 break-words leading-snug">
+                      {log}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="flex gap-3 mt-4">
+                <Button
+                   type="submit"
+                   onClick={handleSubmit}
+                   disabled={isSubmitting}
+                   className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    {isSubmitting ? 'שולח...' : <div className="flex items-center justify-center gap-2"><span>בקש החלפה</span><Send className="w-4 h-4 rotate-180" /></div>}
+                </Button>
+                <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">ביטול</Button>
+            </div>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 }
+
+
