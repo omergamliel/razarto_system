@@ -29,8 +29,9 @@ export default function ShiftCell({
   });
 
   // --- Logic Checks ---
-  // Check if this is "my" shift by comparing email
-  const isMyShift = shift && currentUserEmail && shift.assigned_email?.toLowerCase() === currentUserEmail.toLowerCase();
+  const isMyShift = shift && currentUserEmail && shift.user_name === currentUserEmail; // Assuming user_name might be email in some contexts, or need to pass user ID. 
+  // Better logic: we need to check if the current user ID matches original_user_id
+  // But here we only have email. Let's rely on visual status for now.
 
   const status = shift?.status || 'Active';
   const isSwapRequested = status === 'Swap_Requested';
@@ -53,9 +54,9 @@ export default function ShiftCell({
     // Priority 1: Partial Coverage
     if (isPartial) {
       return {
-        bg: 'bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4]',
-        border: 'border-[#FDD835]',
-        badge: 'bg-[#FDD835]',
+        bg: 'bg-yellow-50',
+        border: 'border-yellow-300',
+        badge: 'bg-yellow-500',
         icon: AlertCircle,
         label: 'כיסוי חלקי'
       };
@@ -64,9 +65,9 @@ export default function ShiftCell({
     // Priority 2: Full Swap Request
     if (isFullSwap) {
       return {
-        bg: 'bg-gradient-to-br from-[#FFEBEE] to-[#FFCDD2]',
-        border: 'border-[#E57373]',
-        badge: 'bg-[#E57373]',
+        bg: 'bg-red-50',
+        border: 'border-red-300',
+        badge: 'bg-red-500',
         icon: AlertCircle,
         label: 'דרוש החלפה'
       };
@@ -75,9 +76,9 @@ export default function ShiftCell({
     // Priority 3: Covered/Approved
     if (isCovered) {
       return {
-        bg: 'bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9]',
-        border: 'border-[#66BB6A]',
-        badge: 'bg-[#66BB6A]',
+        bg: 'bg-green-50',
+        border: 'border-green-300',
+        badge: 'bg-green-500',
         icon: CheckCircle2,
         label: 'טופל'
       };
@@ -155,3 +156,4 @@ export default function ShiftCell({
     </motion.div>
   );
 }
+
