@@ -132,7 +132,15 @@ export default function CoverSegmentModal({
         return;
     }
 
-    onSubmit({ startDate, startTime, endDate, endTime, role: '', department: '' });
+    onSubmit({ 
+      coverFull: coverageType === 'full',
+      startDate, 
+      startTime, 
+      endDate, 
+      endTime,
+      coverDate: startDate,
+      type: coverageType
+    });
   };
 
   if (!isOpen || !shift) return null;

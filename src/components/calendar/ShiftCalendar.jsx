@@ -134,27 +134,82 @@ export default function ShiftCalendar() {
     }
   });
 
-  // --- MAIN DATA QUERIES (Shifts) ---
+  // --- MAIN DATA QUERIES (Shifts, Users, Requests, Coverages) ---
   const { data: shifts = [], isLoading: isShiftsLoading } = useQuery({
     queryKey: ['shifts'],
     queryFn: () => base44.entities.Shift.list(),
-    enabled: !!authorizedPerson // Only fetch shifts if authorized
+    enabled: !!authorizedPerson
+  });
+
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['all-users'],
+    queryFn: () => base44.entities.AuthorizedPerson.list(),
+    enabled: !!authorizedPerson
+  });
+
+  const { data: swapRequests = [] } = useQuery({
+    queryKey: ['swap-requests'],
+    queryFn: () => base44.entities.SwapRequest.list(),
+    enabled: !!authorizedPerson
+  });
+
+  const { data: coverages = [] } = useQuery({
+    queryKey: ['coverages'],
+    queryFn: () => base44.entities.ShiftCoverage.list(),
+    enabled: !!authorizedPerson
+  });
+
+  // Enrich shifts with user data and swap status
+  const enrichedShifts = shifts.map(shift => {
+    const user = allUsers.find(u => u.serial_id === shift.original_user_id);
+    const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
+    const shiftCoverages = coverages.filter(c => c.shift_id === shift.id);
+    
+    return {
+      ...shift,
+      date: shift.start_date, // Map to old structure for compatibility
+      role: user?.full_name || 'לא שובץ',
+      department: user?.department || '',
+      assigned_email: user?.email || '',
+      assigned_person: user?.full_name || '',
+      // Swap status mapping
+      status: activeRequest 
+        ? (activeRequest.request_type === 'Full' ? 'REQUIRES_FULL_COVERAGE' : 'REQUIRES_PARTIAL_COVERAGE')
+        : shift.status === 'Covered' ? 'approved' : 'regular',
+      swap_start_time: activeRequest?.req_start_time,
+      swap_end_time: activeRequest?.req_end_time,
+      swap_type: activeRequest?.request_type?.toLowerCase(),
+      coverages: shiftCoverages
+    };
   });
 
   // --- MUTATIONS (Shift Operations) ---
 
   const requestSwapMutation = useMutation({
     mutationFn: async ({ shiftId, type, range, dates }) => {
-      const updateData = {
-        status: 'swap_requested',
-        swap_type: type, // 'full' or 'partial'
-        swap_start_time: dates.startTime,
-        swap_end_time: dates.endTime
-      };
-      return await base44.entities.Shift.update(shiftId, updateData);
+      const shift = shifts.find(s => s.id === shiftId);
+      if (!shift) throw new Error('Shift not found');
+
+      // Create SwapRequest
+      await base44.entities.SwapRequest.create({
+        shift_id: shiftId,
+        requesting_user_id: authorizedPerson.serial_id,
+        request_type: type === 'full' ? 'Full' : 'Partial',
+        req_start_date: dates.startDate || shift.start_date,
+        req_end_date: dates.endDate || shift.end_date,
+        req_start_time: dates.startTime || '09:00',
+        req_end_time: dates.endTime || '09:00',
+        status: 'Open'
+      });
+
+      // Update Shift status
+      return await base44.entities.Shift.update(shiftId, {
+        status: 'Swap_Requested'
+      });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries(['shifts']);
+      queryClient.invalidateQueries(['swap-requests']);
       setLastUpdatedShift(data);
       setShowSwapRequestModal(false);
       setShowActionModal(false);
@@ -164,15 +219,18 @@ export default function ShiftCalendar() {
 
   const cancelSwapMutation = useMutation({
     mutationFn: async (shiftId) => {
-      return await base44.entities.Shift.update(shiftId, {
-        status: 'regular',
-        swap_type: null,
-        swap_start_time: null,
-        swap_end_time: null
-      });
+      // Find and cancel the swap request
+      const activeRequest = swapRequests.find(sr => sr.shift_id === shiftId && sr.status === 'Open');
+      if (activeRequest) {
+        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Cancelled' });
+      }
+      
+      // Update shift status
+      return await base44.entities.Shift.update(shiftId, { status: 'Active' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
+      queryClient.invalidateQueries(['swap-requests']);
       toast.success('הבקשה בוטלה והמשמרת חזרה לסטטוס רגיל');
       setShowDetailsModal(false);
     }
@@ -180,26 +238,35 @@ export default function ShiftCalendar() {
 
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
-      // 1. Create Coverage Record
+      // Find active swap request
+      const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
+      if (!activeRequest) throw new Error('No active swap request found');
+
+      // Create Coverage Record
       await base44.entities.ShiftCoverage.create({
+        request_id: activeRequest.id,
         shift_id: shift.id,
-        covering_person: authorizedPerson.full_name,
-        covering_email: authorizedPerson.email,
-        covering_role: authorizedPerson.full_name, // Using name as role/identifier
-        covering_department: authorizedPerson.department,
-        start_time: coverData.startTime,
-        end_time: coverData.endTime,
-        coverage_type: coverData.type
+        covering_user_id: authorizedPerson.serial_id,
+        cover_start_date: coverData.startDate || coverData.coverDate,
+        cover_end_date: coverData.endDate || coverData.coverDate,
+        cover_start_time: coverData.startTime,
+        cover_end_time: coverData.endTime,
+        status: 'Approved'
       });
 
-      // 2. Update Shift Status
-      const isFullCover = coverData.type === 'full';
-      return await base44.entities.Shift.update(shift.id, {
-        status: isFullCover ? 'pending_approval' : 'partially_covered'
-      });
+      // Update SwapRequest status
+      const isFullCover = coverData.coverFull || coverData.type === 'full';
+      if (isFullCover) {
+        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
+        await base44.entities.Shift.update(shift.id, { status: 'Covered' });
+      } else {
+        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Partially_Covered' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
+      queryClient.invalidateQueries(['swap-requests']);
+      queryClient.invalidateQueries(['coverages']);
       toast.success('הצעת הכיסוי נשלחה בהצלחה!');
       setShowCoverSegmentModal(false);
       setShowDetailsModal(false);
@@ -271,8 +338,12 @@ export default function ShiftCalendar() {
   const addShiftMutation = useMutation({
     mutationFn: async (newShiftData) => {
       return await base44.entities.Shift.create({
-        ...newShiftData,
-        status: 'regular'
+        start_date: newShiftData.start_date,
+        end_date: newShiftData.end_date,
+        start_time: newShiftData.start_time || '09:00',
+        end_time: newShiftData.end_time || '09:00',
+        original_user_id: newShiftData.original_user_id,
+        status: 'Active'
       });
     },
     onSuccess: () => {
@@ -404,7 +475,7 @@ export default function ShiftCalendar() {
         {/* KPI Header */}
         <div className="mt-6 mb-2">
            <KPIHeader 
-             shifts={shifts} 
+             shifts={enrichedShifts} 
              currentUser={authorizedPerson}
              onKPIClick={(type) => {
                setKpiListType(type);
@@ -418,10 +489,10 @@ export default function ShiftCalendar() {
           <CalendarGrid 
             currentDate={currentDate}
             viewMode={viewMode}
-            shifts={shifts}
+            shifts={enrichedShifts}
             onCellClick={handleCellClick}
             currentUserEmail={authorizedPerson.email}
-            currentUserRole={authorizedPerson.full_name} // Using full name as role identifier visually
+            currentUserRole={authorizedPerson.full_name}
             isAdmin={isAdmin}
           />
         </div>
@@ -548,7 +619,7 @@ export default function ShiftCalendar() {
         isOpen={showKPIListModal}
         onClose={() => setShowKPIListModal(false)}
         type={kpiListType}
-        shifts={shifts}
+        shifts={enrichedShifts}
         currentUser={authorizedPerson}
         onOfferCover={handleOfferCover}
       />

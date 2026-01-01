@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Plus, Users, Briefcase } from 'lucide-react';
@@ -18,40 +18,44 @@ export default function AddShiftModal({
   currentUser
 }) {
   const [department, setDepartment] = useState('');
-  const [role, setRole] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
 
-  // Fetch role definitions from DB
-  const { data: roleDefinitions = [] } = useQuery({
-    queryKey: ['role-definitions'],
-    queryFn: () => base44.entities.RoleDefinition.list(),
+  // Fetch authorized users from DB
+  const { data: authorizedUsers = [] } = useQuery({
+    queryKey: ['authorized-users'],
+    queryFn: () => base44.entities.AuthorizedPerson.list(),
     enabled: isOpen
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!department || !role) return;
+    if (!selectedUserId) return;
     
+    const selectedUser = authorizedUsers.find(u => u.serial_id === selectedUserId);
+    if (!selectedUser) return;
+
     onSubmit({
-      department,
-      role
+      original_user_id: selectedUser.serial_id,
+      start_date: format(date, 'yyyy-MM-dd'),
+      end_date: format(addDays(date, 1), 'yyyy-MM-dd'),
+      start_time: '09:00',
+      end_time: '09:00'
     });
   };
 
   const handleDepartmentChange = (value) => {
     setDepartment(value);
-    setRole(''); // Reset role when department changes
+    setSelectedUserId(''); // Reset user when department changes
   };
 
   if (!isOpen) return null;
 
   // Get unique departments
-  const departments = [...new Set(roleDefinitions.map(rd => rd.department))].sort();
+  const departments = [...new Set(authorizedUsers.map(u => u.department))].sort();
   
-  // Get roles (role_name) for selected department
-  const roles = department 
-    ? roleDefinitions
-        .filter(rd => rd.department === department && rd.role_name)
-        .map(rd => rd.role_name)
+  // Get users for selected department
+  const usersInDepartment = department 
+    ? authorizedUsers.filter(u => u.department === department)
     : [];
 
   return (
@@ -117,7 +121,7 @@ export default function AddShiftModal({
               </Select>
             </div>
 
-            {/* Role Selection */}
+            {/* User Selection */}
             <AnimatePresence>
               {department && (
                 <motion.div
@@ -128,16 +132,16 @@ export default function AddShiftModal({
                 >
                   <Label className="text-gray-700 font-medium flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-[#64B5F6]" />
-                    בחר שם מלא
+                    בחר משתמש
                   </Label>
-                  <Select value={role} onValueChange={setRole}>
+                  <Select value={selectedUserId.toString()} onValueChange={(val) => setSelectedUserId(parseInt(val))}>
                     <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#64B5F6]">
-                      <SelectValue placeholder="בחר שם..." />
+                      <SelectValue placeholder="בחר משתמש..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
+                      {usersInDepartment.map((user) => (
+                        <SelectItem key={user.serial_id} value={user.serial_id.toString()}>
+                          {user.full_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -149,7 +153,7 @@ export default function AddShiftModal({
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={isSubmitting || !department || !role}
+              disabled={isSubmitting || !selectedUserId}
               className="w-full bg-gradient-to-r from-[#64B5F6] to-[#42A5F5] hover:from-[#42A5F5] hover:to-[#2196F3] text-white py-6 rounded-xl text-lg font-medium disabled:opacity-50"
             >
               {isSubmitting ? (

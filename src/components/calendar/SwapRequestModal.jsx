@@ -116,15 +116,13 @@ export default function SwapRequestModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const status = swapType === 'full' ? 'REQUIRES_FULL_COVERAGE' : 'REQUIRES_PARTIAL_COVERAGE';
     
     onSubmit({
-      swapType,
-      status, 
-      startDate: swapType === 'partial' ? startDate : null,
-      startTime: swapType === 'partial' ? startTime : null,
-      endDate: swapType === 'partial' ? endDate : null,
-      endTime: swapType === 'partial' ? endTime : null
+      type: swapType,
+      startDate: swapType === 'partial' ? startDate : shift?.start_date,
+      startTime: swapType === 'partial' ? startTime : '09:00',
+      endDate: swapType === 'partial' ? endDate : shift?.end_date,
+      endTime: swapType === 'partial' ? endTime : '09:00'
     });
   };
   
