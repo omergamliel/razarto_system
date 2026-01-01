@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Search, Filter, MoreVertical, 
-  Edit2, Trash2, Shield, UserX, Plus, UserPlus,
-  Save, AlertTriangle, Archive, Check
+  Edit2, Trash2, Shield, UserX, UserPlus,
+  AlertTriangle, Archive, Check, Send, CheckCircle2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,16 +41,19 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
   // --- MODAL STATES ---
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [addUserStep, setAddUserStep] = useState('form'); // 'form' or 'success'
+  const [addedUserData, setAddedUserData] = useState(null); // Stores the newly added user for the invite
+  
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   // --- DATA STATES ---
   const [newUser, setNewUser] = useState({ full_name: '', department: '', email: '', permissions: 'View' });
-  const [editingUser, setEditingUser] = useState(null); // For Edit Mode
-  const [permissionUser, setPermissionUser] = useState(null); // For Permission Mode
-  const [selectedPermission, setSelectedPermission] = useState(''); // Temp state for permission selection
-  const [userToDelete, setUserToDelete] = useState(null); // For Delete Mode
+  const [editingUser, setEditingUser] = useState(null);
+  const [permissionUser, setPermissionUser] = useState(null);
+  const [selectedPermission, setSelectedPermission] = useState('');
+  const [userToDelete, setUserToDelete] = useState(null);
   
   // Archive Logic States
   const [isArchiveMode, setIsArchiveMode] = useState(false);
@@ -63,10 +66,18 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     switch (perm) {
       case 'RR': return { bg: '#fde4cf', text: '#5d3a1a', border: '#e8cdb3' };
       case 'View': return { bg: '#f1c0e8', text: '#682a5c', border: '#dcb0d4' };
-      case 'Manager': return { bg: '#8eecf5', text: '#155d66', border: '#7ddce5' };
+      case 'Manager': return { bg: '#dfe7fd', text: '#1e40af', border: '#bfdbfe' }; // Updated Color
       case 'Admin': return { bg: '#b9fbc0', text: '#1e5e24', border: '#a3e5aa' };
       default: return { bg: '#f3f4f6', text: '#4b5563', border: '#e5e7eb' };
     }
+  };
+
+  // --- HELPER: WhatsApp Invite ---
+  const handleSendInvite = (user) => {
+    if (!user) return;
+    const message = `היי *${user.full_name}* 👋🏼\nהוזמנת להצטרף ל*מערכת Razarto*\nיש להיכנס לקישור ולהתחבר באמצעות המייל האישי.\nקישור: https://razar-toran-b555aef5.base44.app`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   // --- QUERIES ---
@@ -86,22 +97,22 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries(['authorized-people']);
-      toast.success(`המשתמש ${data.full_name} התווסף בהצלחה!`);
-      setIsAddUserOpen(false);
-      setNewUser({ full_name: '', department: '', email: '', permissions: 'View' });
+      // Instead of closing, switch to success step
+      setAddedUserData(data);
+      setAddUserStep('success');
+      setNewUser({ full_name: '', department: '', email: '', permissions: 'View' }); // Reset form
     },
     onError: () => toast.error("שגיאה בהוספת המשתמש.")
   });
 
-  // 2. Update User (Used for both Edit and Permissions)
+  // 2. Update User
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       return await base44.entities.AuthorizedPerson.update(id, data);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries(['authorized-people']);
       toast.success("הפרטים עודכנו בהצלחה!");
-      // Close all potential modals
       setIsEditUserOpen(false);
       setIsPermissionsOpen(false);
     },
@@ -131,6 +142,12 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     try { await addUserMutation.mutateAsync(newUser); } finally { setIsSubmitting(false); }
   };
 
+  const handleCloseAddUser = () => {
+    setIsAddUserOpen(false);
+    // Reset state after animation completes usually, but here immediate is fine for next open
+    setTimeout(() => setAddUserStep('form'), 300);
+  };
+
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!editingUser.full_name || !editingUser.department || !editingUser.email) return toast.error("נא למלא את כל שדות החובה");
@@ -153,7 +170,6 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
   const handleDeleteConfirm = async () => {
     if (isArchiveMode) {
-      // Logic for Archive (Future implementation)
       toast.success("הבקשה להעברה לארכיון התקבלה (סימולציה)");
       setIsDeleteOpen(false);
       setIsArchiveMode(false);
@@ -242,7 +258,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                 </div>
 
                 <Button 
-                  onClick={() => setIsAddUserOpen(true)}
+                  onClick={() => { setAddUserStep('form'); setIsAddUserOpen(true); }}
                   className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-2 shadow-md shadow-blue-200 shrink-0 h-10 md:h-11 px-4"
                 >
                   <img src="https://cdn-icons-png.flaticon.com/128/9131/9131530.png" alt="Add" className="w-5 h-5 invert brightness-0 filter" style={{ filter: 'brightness(0) invert(1)' }} />
@@ -333,14 +349,17 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                                 <MoreVertical className="w-4 h-4 text-gray-500" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuItem onClick={() => { setEditingUser({...person}); setIsEditUserOpen(true); }} className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
                                 <span>עריכה</span><Edit2 className="w-4 h-4" />
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => { setPermissionUser(person); setSelectedPermission(person.permissions || 'View'); setIsPermissionsOpen(true); }} className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
                                 <span>ניהול הרשאות</span><Shield className="w-4 h-4" />
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setUserToDelete(person); setIsDeleteOpen(true); setIsArchiveMode(false); }} className="flex items-center justify-end gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
+                              <DropdownMenuItem onClick={() => handleSendInvite(person)} className="flex items-center justify-end gap-2 cursor-pointer text-blue-600 focus:text-blue-700 focus:bg-blue-50">
+                                <span>שליחת הזמנה</span><Send className="w-4 h-4" />
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setUserToDelete(person); setIsDeleteOpen(true); setIsArchiveMode(false); }} className="flex items-center justify-end gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 border-t mt-1 pt-1">
                                 <span>מחיקה</span><Trash2 className="w-4 h-4" />
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -361,51 +380,86 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
         </div>
       </motion.div>
 
-      {/* --- 1. ADD USER MODAL --- */}
-      <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+      {/* --- 1. ADD USER MODAL (Multi-Step) --- */}
+      <Dialog open={isAddUserOpen} onOpenChange={handleCloseAddUser}>
         <DialogContent className="sm:max-w-[425px] text-right" dir="rtl">
-          <DialogHeader className="text-right">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="bg-blue-100 p-2 rounded-full"><UserPlus className="w-5 h-5 text-blue-600" /></div>
-              הוספת משתמש מורשה
-            </DialogTitle>
-            <DialogDescription className="text-right">מלא את פרטי המשתמש החדש.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddUserSubmit} className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="full_name" className="text-right">שם מלא</Label>
-              <Input id="full_name" value={newUser.full_name} onChange={(e) => setNewUser({...newUser, full_name: e.target.value})} required className="text-right"/>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="department" className="text-right">מחלקה</Label>
-              <Select value={newUser.department} onValueChange={(val) => setNewUser({...newUser, department: val})} required>
-                <SelectTrigger className="w-full text-right" dir="rtl"><SelectValue placeholder="בחר מחלקה" /></SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="ש">מחלקה ש</SelectItem>
-                  <SelectItem value="מ">מחלקה מ</SelectItem>
-                  <SelectItem value="ת">מחלקה ת</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email" className="text-right">כתובת מייל</Label>
-              <Input id="email" type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} dir="ltr" className="text-left" required/>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="permissions" className="text-right">רמת הרשאות</Label>
-              <Select value={newUser.permissions} onValueChange={(val) => setNewUser({...newUser, permissions: val})}>
-                <SelectTrigger className="w-full text-right" dir="rtl"><SelectValue placeholder="בחר הרשאה" /></SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="View">צפייה בלבד (View)</SelectItem>
-                  <SelectItem value="RR">משתמש רגיל (RR)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>ביטול</Button>
-            <Button onClick={handleAddUserSubmit} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">{isSubmitting ? 'שומר...' : 'הוסף משתמש'}</Button>
-          </DialogFooter>
+          
+          {addUserStep === 'form' ? (
+            <>
+              <DialogHeader className="text-right">
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <div className="bg-blue-100 p-2 rounded-full"><UserPlus className="w-5 h-5 text-blue-600" /></div>
+                  הוספת משתמש מורשה
+                </DialogTitle>
+                <DialogDescription className="text-right">מלא את פרטי המשתמש החדש.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddUserSubmit} className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="full_name" className="text-right">שם מלא</Label>
+                  <Input id="full_name" value={newUser.full_name} onChange={(e) => setNewUser({...newUser, full_name: e.target.value})} required className="text-right"/>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="department" className="text-right">מחלקה</Label>
+                  <Select value={newUser.department} onValueChange={(val) => setNewUser({...newUser, department: val})} required>
+                    <SelectTrigger className="w-full text-right" dir="rtl"><SelectValue placeholder="בחר מחלקה" /></SelectTrigger>
+                    <SelectContent dir="rtl">
+                      <SelectItem value="ש">מחלקה ש</SelectItem>
+                      <SelectItem value="מ">מחלקה מ</SelectItem>
+                      <SelectItem value="ת">מחלקה ת</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="email" className="text-right">כתובת מייל</Label>
+                  <Input id="email" type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} dir="ltr" className="text-left" required/>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="permissions" className="text-right">רמת הרשאות</Label>
+                  <Select value={newUser.permissions} onValueChange={(val) => setNewUser({...newUser, permissions: val})}>
+                    <SelectTrigger className="w-full text-right" dir="rtl"><SelectValue placeholder="בחר הרשאה" /></SelectTrigger>
+                    <SelectContent dir="rtl">
+                      <SelectItem value="View">צפייה בלבד (View)</SelectItem>
+                      <SelectItem value="RR">משתמש רגיל (RR)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </form>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={handleCloseAddUser}>ביטול</Button>
+                <Button onClick={handleAddUserSubmit} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">{isSubmitting ? 'שומר...' : 'הוסף משתמש'}</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            // --- SUCCESS STEP ---
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              className="flex flex-col items-center text-center p-4 gap-4"
+            >
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">המשתמש התווסף!</h2>
+              <p className="text-gray-600">
+                המשתמש <b>{addedUserData?.full_name}</b> התווסף למערכת בהצלחה.
+              </p>
+              
+              <div className="flex flex-col w-full gap-3 mt-4">
+                <Button 
+                  onClick={() => handleSendInvite(addedUserData)} 
+                  className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white gap-2 h-12 text-md rounded-xl"
+                >
+                  <img src="https://cdn-icons-png.flaticon.com/128/3670/3670051.png" alt="WhatsApp" className="w-5 h-5 brightness-0 invert" style={{filter: 'brightness(0) invert(1)'}} />
+                  שתף הזמנה בוואטסאפ
+                </Button>
+                
+                <Button variant="outline" onClick={handleCloseAddUser} className="w-full h-11 rounded-xl">
+                  סגירה
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
         </DialogContent>
       </Dialog>
 
@@ -489,7 +543,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             >
               <div className="flex flex-col items-center text-center gap-3">
                 <img src="https://cdn-icons-png.flaticon.com/128/4133/4133589.png" alt="RR" className="w-12 h-12" />
-                <h3 className="font-bold text-gray-800">רלוונטיות (RR)</h3>
+                <h3 className="font-bold text-gray-800">משתמש רגיל (RR)</h3>
                 <p className="text-xs text-gray-500 leading-tight">מאפשר צפייה וביצוע פעולות במערכת</p>
               </div>
               {selectedPermission === 'RR' && (
