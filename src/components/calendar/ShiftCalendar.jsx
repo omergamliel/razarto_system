@@ -413,6 +413,18 @@ export default function ShiftCalendar() {
     }
   });
 
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await base44.auth.logout();
+    },
+    onSuccess: () => {
+      window.location.href = '/';
+    },
+    onError: () => {
+      toast.error('אירעה שגיאה בעת ההתנתקות');
+    }
+  });
+
   // --- HANDLERS ---
 
   const handleCellClick = (date, shift) => {
@@ -536,18 +548,6 @@ export default function ShiftCalendar() {
   const permissionLevel = authorizedPerson.permissions;
   const isAdmin = permissionLevel === 'Admin' || permissionLevel === 'Manager';
   const isViewOnly = permissionLevel === 'View';
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await base44.auth.logout();
-    },
-    onSuccess: () => {
-      window.location.href = '/';
-    },
-    onError: () => {
-      toast.error('אירעה שגיאה בעת ההתנתקות');
-    }
-  });
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans selection:bg-blue-100 overflow-x-hidden relative" dir="rtl">
@@ -759,5 +759,3 @@ export default function ShiftCalendar() {
     </div>
   );
 }
-
-
