@@ -1,45 +1,17 @@
 import React from 'react';
 import { format, isToday, isSameMonth } from 'date-fns';
-import { he } from 'date-fns/locale';
 import { motion } from 'framer-motion';
-import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { Clock, CheckCircle2, AlertCircle, ArrowLeftRight } from 'lucide-react';
 
-export default function ShiftCell({ 
-  date, 
-  shift, 
-  onClick, 
+export default function ShiftCell({
+  date,
+  shift,
+  onClick,
   currentMonth,
   isWeekView = false,
   currentUserEmail,
   isAdmin = false
 }) {
-
-  // --- Fetch Request Info if Exists ---
-  const { data: activeRequest } = useQuery({
-    queryKey: ['shift-active-request', shift?.id],
-    queryFn: async () => {
-       if (!shift?.id) return null;
-       // Find open requests for this shift
-       const reqs = await base44.entities.SwapRequest.filter({ shift_id: shift.id, status: 'Open' });
-       return reqs.length > 0 ? reqs[0] : null;
-    },
-    enabled: !!shift?.id && shift?.status === 'Swap_Requested'
-  });
-
-  // --- Logic Checks ---
-  const isMyShift = shift && currentUserEmail && shift.user_name === currentUserEmail; // Assuming user_name might be email in some contexts, or need to pass user ID. 
-  // Better logic: we need to check if the current user ID matches original_user_id
-  // But here we only have email. Let's rely on visual status for now.
-
-  const status = shift?.status || 'Active';
-  const isSwapRequested = status === 'Swap_Requested';
-  const isCovered = status === 'Covered';
-  
-  // Specific Swap Types (from request table)
-  const isPartial = activeRequest?.request_type === 'Partial';
-  const isFullSwap = activeRequest?.request_type === 'Full';
 
   const handleClick = () => {
     onClick(date, shift);
@@ -47,12 +19,13 @@ export default function ShiftCell({
 
   const isCurrentMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
-  
+
   const getStatusStyles = () => {
     if (!shift) return {};
-    
-    // Priority 1: Partial Coverage
-    if (isPartial) {
+
+    const status = shift.status || 'regular';
+
+    if (status === 'partial') {
       return {
         bg: 'bg-yellow-50',
         border: 'border-yellow-300',
@@ -62,30 +35,26 @@ export default function ShiftCell({
       };
     }
 
-    // Priority 2: Full Swap Request
-    if (isFullSwap) {
+    if (status === 'requested') {
       return {
         bg: 'bg-red-50',
         border: 'border-red-300',
         badge: 'bg-red-500',
-        icon: AlertCircle,
-        label: 'דרוש החלפה'
+        icon: ArrowLeftRight,
+        label: 'ממתין להחלפה'
       };
     }
-    
-    // Priority 3: Covered/Approved
-    if (isCovered) {
+
+    if (status === 'covered') {
       return {
         bg: 'bg-green-50',
         border: 'border-green-300',
         badge: 'bg-green-500',
         icon: CheckCircle2,
-        label: 'טופל'
+        label: 'הוחלף'
       };
     }
-    
-    // Priority 4: Regular (My Shift vs Others)
-    // Note: To perfectly detect "My Shift" we need user ID context. Assuming standard for now.
+
     return {
       bg: 'bg-white',
       border: 'border-gray-200',
@@ -97,7 +66,29 @@ export default function ShiftCell({
 
   const styles = getStatusStyles();
   const StatusIcon = styles.icon || Clock;
-  
+
+  const assignments = React.useMemo(() => {
+    if (!shift) return [];
+
+    if (shift.coverages && shift.coverages.length > 0) {
+      return shift.coverages.map((cov, idx) => ({
+        key: `${cov.id || cov.cover_start_time}-${idx}`,
+        name: cov.covering_name || 'מחליף',
+        timeRange: cov.cover_start_time && cov.cover_end_time
+          ? `${cov.cover_start_time} - ${cov.cover_end_time}`
+          : ''
+      }));
+    }
+
+    return [{
+      key: shift.id,
+      name: shift.user_name || 'לא ידוע',
+      timeRange: (shift.start_time !== '09:00' || shift.end_time !== '09:00')
+        ? `${shift.start_time} - ${shift.end_time}`
+        : ''
+    }];
+  }, [shift]);
+
   return (
     <motion.div
       whileHover={{ scale: 1.02, y: -2 }}
@@ -123,28 +114,32 @@ export default function ShiftCell({
       </div>
 
       {shift && (
-        <div className="mt-6 md:mt-10 space-y-0.5 md:space-y-1">
-          {/* User Name / Role */}
-          <p className="font-normal md:font-semibold text-gray-800 text-center text-[10px] leading-tight md:text-base break-words px-0.5">
-            {shift.user_name || 'לא ידוע'}
-          </p>
-
+        <div className="mt-6 md:mt-10 space-y-1 md:space-y-1.5">
           {/* Status Badge */}
           {styles.label && (
-            <div className="mt-0.5 md:mt-2 flex items-center gap-0.5 justify-center">
-              <StatusIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-gray-600 flex-shrink-0" />
-              <span className="text-[8px] md:text-xs text-gray-600 font-normal leading-tight">
+            <div className="mt-0.5 md:mt-1 flex items-center gap-1 justify-center">
+              <StatusIcon className="w-3 h-3 md:w-4 md:h-4 text-gray-700 flex-shrink-0" />
+              <span className="text-[9px] md:text-xs text-gray-700 font-semibold leading-tight">
                 {styles.label}
               </span>
             </div>
           )}
 
-          {/* Time Range (if custom) */}
-          {(shift.start_time !== '09:00' || shift.end_time !== '09:00') && (
-            <p className="text-[8px] md:text-xs text-gray-500 mt-0.5 text-center leading-tight">
-              {shift.start_time} - {shift.end_time}
-            </p>
-          )}
+          {/* Assignees / Covering Users */}
+          <div className="space-y-0.5">
+            {assignments.map(item => (
+              <div key={item.key} className="text-center">
+                <p className="font-normal md:font-semibold text-gray-800 text-[10px] leading-tight md:text-base break-words px-0.5">
+                  {item.name}
+                </p>
+                {item.timeRange && (
+                  <p className="text-[8px] md:text-xs text-gray-500 mt-0.5 text-center leading-tight">
+                    {item.timeRange}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -156,4 +151,3 @@ export default function ShiftCell({
     </motion.div>
   );
 }
-
