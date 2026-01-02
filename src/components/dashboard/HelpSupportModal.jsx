@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, HelpCircle, ChevronDown, ChevronUp, BookOpen, Video, MessageCircle } from 'lucide-react';
+import { X, HelpCircle, ChevronDown, ChevronUp, BookOpen, Video, MessageCircle, Play } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 export default function HelpSupportModal({ isOpen, onClose }) {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [infoMessage, setInfoMessage] = useState('');
+  const [showVideo, setShowVideo] = useState(false);
 
   if (!isOpen) return null;
 
@@ -44,20 +45,36 @@ export default function HelpSupportModal({ isOpen, onClose }) {
     {
       icon: BookOpen,
       label: 'מדריך שימוש מלא',
-      color: 'blue',
-      onClick: () => setInfoMessage('📘 בקרוב: מדריך שימוש מלא עם תסריטי עבודה לדסק ולמנהלים!')
+      color: 'from-blue-500/90 to-blue-600',
+      shadow: 'shadow-blue-200',
+      accent: 'bg-white/20 text-white',
+      onClick: () => {
+        setShowVideo(false);
+        setInfoMessage('📘 בקרוב: מדריך שימוש מלא עם תסריטי עבודה לדסק ולמנהלים!');
+      }
     },
     {
       icon: Video,
       label: 'סרטוני הדרכה',
-      color: 'purple',
-      onClick: () => setInfoMessage('🎬 בקרוב: סרטוני וידאו קצרים עם הדגמות חיות של תהליכי כיסוי משמרות!')
+      color: 'from-purple-500 to-indigo-600',
+      shadow: 'shadow-purple-200',
+      accent: 'bg-white/15 text-white',
+      onClick: () => {
+        setInfoMessage('');
+        setShowVideo(true);
+      }
     },
     {
       icon: MessageCircle,
       label: 'תמיכה טכנית',
-      color: 'green',
-      onClick: () => window.open('https://wa.me/972536221840', '_blank')
+      color: 'from-emerald-500 to-teal-600',
+      shadow: 'shadow-emerald-200',
+      accent: 'bg-white/20 text-white',
+      onClick: () => {
+        setShowVideo(false);
+        setInfoMessage('');
+        window.open('https://wa.me/972536221840', '_blank');
+      }
     }
   ];
 
@@ -117,23 +134,64 @@ export default function HelpSupportModal({ isOpen, onClose }) {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={link.onClick}
-                    className={`
-                      flex md:block items-center gap-3 md:gap-0 p-4 rounded-xl border-2 hover:shadow-lg transition-all text-right md:text-center
-                      ${link.color === 'blue' ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : ''}
-                      ${link.color === 'purple' ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : ''}
-                      ${link.color === 'green' ? 'border-green-200 bg-green-50 hover:bg-green-100' : ''}
-                    `}
+                    className={`relative overflow-hidden flex md:block items-center gap-3 md:gap-0 p-4 md:p-5 rounded-2xl border border-white/40 backdrop-blur-sm transition-all text-right md:text-center shadow-lg ${link.shadow}
+                      bg-gradient-to-br ${link.color} text-white hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/60 focus:ring-offset-0`}
                   >
-                    <Icon className={`w-6 h-6 md:mx-auto md:mb-2 flex-shrink-0 ${
-                      link.color === 'blue' ? 'text-blue-600' : ''
-                    }${link.color === 'purple' ? 'text-purple-600' : ''}${
-                      link.color === 'green' ? 'text-green-600' : ''
-                    }`} />
-                    <p className="text-sm font-medium text-gray-700">{link.label}</p>
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${link.accent} md:mx-auto md:mb-3`}> 
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 md:flex md:flex-col md:items-center">
+                      <p className="text-sm font-semibold drop-shadow-sm md:text-base">{link.label}</p>
+                      <span className="text-[11px] md:text-xs text-white/80 block mt-1">מותאם 100% למובייל ולדסקטופ</span>
+                    </div>
+                    {link.label === 'סרטוני הדרכה' && (
+                      <span className="absolute top-2 right-2 text-[10px] font-semibold px-2 py-1 rounded-full bg-white/20 text-white/90">
+                        חדש
+                      </span>
+                    )}
                   </motion.button>
                 );
               })}
             </div>
+
+            <AnimatePresence>
+              {showVideo && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  className="mb-6 overflow-hidden rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 via-white to-indigo-50 shadow-xl"
+                >
+                  <div className="flex items-center justify-between p-4 md:p-5 gap-3" dir="rtl">
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-lg">
+                        <Play className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm md:text-base font-semibold text-gray-900">סרטון פתיחה מהיר</p>
+                        <p className="text-xs text-gray-600">מוכן להרצה מידית וללא פקדים מיותרים</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowVideo(false)}
+                      className="text-gray-500 hover:text-gray-700 transition-colors"
+                      aria-label="סגור וידאו"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="relative w-full aspect-[16/9] bg-black">
+                    <iframe
+                      className="absolute inset-0 h-full w-full"
+                      src="https://www.youtube.com/embed/9u12tJQ1KF4?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1"
+                      title="סרטון הדרכה"
+                      allow="autoplay; encrypted-media; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {infoMessage && (
