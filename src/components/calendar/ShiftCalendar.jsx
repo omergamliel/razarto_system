@@ -178,9 +178,39 @@ export default function ShiftCalendar() {
   // Enrich shifts with user data and swap status
   const enrichedShifts = shifts.map(shift => {
     const user = allUsers.find(u => u.serial_id === shift.original_user_id);
-    const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
-    const shiftCoverages = coverages.filter(c => c.shift_id === shift.id);
-    
+    const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status !== 'Cancelled');
+    const shiftCoverages = coverages
+      .filter(c => c.shift_id === shift.id)
+      .map(cov => {
+        const coveringUser = allUsers.find(u => u.serial_id === cov.covering_user_id);
+        return {
+          ...cov,
+          covering_name: coveringUser?.full_name || 'מחליף',
+          covering_email: coveringUser?.email || '',
+          covering_department: coveringUser?.department || ''
+        };
+      });
+
+    let displayStatus = 'regular';
+
+    if (shift.status === 'Covered') {
+      displayStatus = 'covered';
+    }
+
+    if (activeRequest) {
+      if (activeRequest.status === 'Closed') {
+        displayStatus = 'covered';
+      } else if (activeRequest.status === 'Partially_Covered' || shiftCoverages.length > 0) {
+        displayStatus = 'partial';
+      } else if (activeRequest.status === 'Open' || shift.status === 'Swap_Requested') {
+        displayStatus = 'requested';
+      }
+    }
+
+    if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
+      displayStatus = 'partial';
+    }
+
     return {
       ...shift,
       date: shift.start_date, // Map to old structure for compatibility
@@ -189,13 +219,12 @@ export default function ShiftCalendar() {
       assigned_email: user?.email || '',
       assigned_person: user?.full_name || '',
       // Swap status mapping
-      status: activeRequest 
-        ? (activeRequest.request_type === 'Full' ? 'REQUIRES_FULL_COVERAGE' : 'REQUIRES_PARTIAL_COVERAGE')
-        : shift.status === 'Covered' ? 'approved' : 'regular',
+      status: displayStatus,
       swap_start_time: activeRequest?.req_start_time,
       swap_end_time: activeRequest?.req_end_time,
       swap_type: activeRequest?.request_type?.toLowerCase(),
-      coverages: shiftCoverages
+      coverages: shiftCoverages,
+      active_request: activeRequest
     };
   });
 
@@ -449,7 +478,7 @@ export default function ShiftCalendar() {
     const isViewOnly = permissionLevel === 'View';
     const isRR = permissionLevel === 'RR';
     const isMyShift = shift.original_user_id === authorizedPerson.serial_id || shift.assigned_email === authorizedPerson.email;
-    const isCoveredShift = shift.status === 'approved' || shift.status === 'Covered';
+    const isCoveredShift = shift.status === 'covered' || shift.status === 'Covered' || shift.status === 'approved';
     const isCoveringUser = (shift.coverages || []).some(cov => cov.covering_user_id === authorizedPerson.serial_id);
 
     // View-only users cannot open shifts at all
