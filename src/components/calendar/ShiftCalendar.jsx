@@ -224,7 +224,9 @@ export default function ShiftCalendar() {
       swap_type: activeRequest?.request_type?.toLowerCase(),
       coverageType,
       coverages: shiftCoverages,
-      active_request: activeRequest
+      active_request: activeRequest,
+      isMine: shift.original_user_id === authorizedPerson?.serial_id,
+      isCovering: shiftCoverages.some(cov => cov.covering_user_id === authorizedPerson?.serial_id)
     };
   });
 
