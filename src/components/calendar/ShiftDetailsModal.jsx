@@ -182,34 +182,30 @@ export default function ShiftDetailsModal({
             
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/20 rounded-xl"><Calendar className="w-6 h-6" /></div>
-              <div>
-                <h2 className="text-xl font-bold">פרטי משמרת</h2>
-                <p className="text-white/80 text-sm">{date && format(new Date(date), 'EEEE, d בMMMM yyyy', { locale: he })}</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-bold">פרטי משמרת</h2>
+                  {isSwapMode && (
+                    <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-tight text-white backdrop-blur-sm">
+                      {isPartial ? 'בקשה לכיסוי חלקי' : 'בקשה לכיסוי מלא'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            
-            {/* Status Card + Timing */}
-            <div
-              className={`border rounded-2xl p-6 text-center shadow-sm space-y-4 ${
-                isSwapMode
-                  ? isPartial
-                    ? 'bg-yellow-50 border-yellow-100'
-                    : 'bg-red-50 border-red-100'
-                  : 'bg-gray-50 border-gray-100'
-              }`}
-            >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold text-gray-800">{shift.user_name}</h2>
-                <div className="text-sm text-gray-500">{shift.department ? `מחלקה ${shift.department}` : ''}</div>
 
-                {isSwapMode && (
-                  <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-gray-200 text-sm font-medium">
-                    <AlertCircle className={`w-4 h-4 ${isPartial ? 'text-yellow-500' : 'text-red-500'}`} />
-                    {isPartial ? 'בקשה לכיסוי חלקי' : 'בקשה לכיסוי מלא'}
-                  </div>
+            {/* Status Card + Timing */}
+            <div className="border rounded-2xl p-6 text-center shadow-sm space-y-4 bg-[#F4F4F6] border-gray-200">
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500 font-medium">משובץ כרגע למשמרת</p>
+                <h2 className="text-2xl font-semibold text-gray-900">{shift.user_name}</h2>
+                {shift.department && (
+                  <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
+                    {shift.department}
+                  </span>
                 )}
               </div>
 
@@ -263,10 +259,10 @@ export default function ShiftDetailsModal({
                     onClose();
                     onOfferCover(shift);
                   }}
-                  className="min-w-[160px] flex-1 sm:flex-none h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg"
+                  className="min-w-[160px] flex-1 sm:flex-none h-12 bg-[#7bf1a8] hover:bg-[#66e59a] text-gray-900 rounded-xl shadow-md flex flex-row-reverse items-center justify-center gap-2"
                 >
-                  <CheckCircle className="w-5 h-5 ml-2" />
-                  אני יכול/ה לכסות
+                  <img src="https://cdn-icons-png.flaticon.com/128/9363/9363987.png" alt="עזרה" className="w-5 h-5" />
+                  אני רוצה לעזור!
                 </Button>
               )}
 
@@ -276,8 +272,9 @@ export default function ShiftDetailsModal({
                     onClose();
                     onHeadToHead?.(shift);
                   }}
-                  className="min-w-[140px] flex-1 sm:flex-none h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg"
+                  className="min-w-[140px] flex-1 sm:flex-none h-12 bg-[#ff70a6] hover:bg-[#ff5c98] text-white rounded-xl shadow-md flex flex-row-reverse items-center justify-center gap-2"
                 >
+                  <img src="https://cdn-icons-png.flaticon.com/128/1969/1969142.png" alt="ראש בראש" className="w-5 h-5" />
                   ראש בראש
                 </Button>
               )}
