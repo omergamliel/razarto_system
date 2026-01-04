@@ -26,6 +26,15 @@ export default function ShiftCell({
     const status = shift.status || 'regular';
     const coverageType = shift.coverageType || shift.swap_type;
 
+    if (status === 'requested' || status === 'Swap_Requested') {
+      return {
+        bg: 'bg-red-50',
+        border: 'border-red-300',
+        badge: 'bg-red-500',
+        icon: ArrowLeftRight
+      };
+    }
+
     if (status === 'partial' || (status === 'requested' && coverageType === 'partial')) {
       return {
         bg: 'bg-yellow-50',
@@ -35,21 +44,21 @@ export default function ShiftCell({
       };
     }
 
-    if (status === 'requested') {
-      return {
-        bg: 'bg-red-50',
-        border: 'border-red-300',
-        badge: 'bg-red-500',
-        icon: ArrowLeftRight
-      };
-    }
-
     if (status === 'covered') {
       return {
         bg: 'bg-green-50',
         border: 'border-green-300',
         badge: 'bg-green-500',
         icon: CheckCircle2
+      };
+    }
+
+    if (shift.isMine) {
+      return {
+        bg: 'bg-blue-50',
+        border: 'border-blue-300',
+        badge: 'bg-blue-500',
+        icon: Clock
       };
     }
 
@@ -81,47 +90,60 @@ export default function ShiftCell({
       return `${startText} - ${endText}`;
     };
 
-    const coverageSegments = (shift.coverages || []).map((cov, idx) => {
-      const covStart = new Date(`${cov.cover_start_date || requestStartDate}T${cov.cover_start_time || requestStartStr}`);
-      let covEnd = new Date(`${cov.cover_end_date || requestEndDate}T${cov.cover_end_time || requestEndStr}`);
-      if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
-      return {
-        key: `${cov.id || idx}-${cov.cover_start_time || ''}`,
-        name: cov.covering_name || 'מחליף',
-        start: covStart,
-        end: covEnd,
-        timeRange: formatRange(covStart, covEnd),
-      };
-    });
-
-    let missing = [{ start: baseStart, end: baseEnd }];
-    coverageSegments.sort((a, b) => a.start - b.start).forEach(cov => {
-      missing = missing.flatMap(seg => {
-        if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
-        const gaps = [];
-        if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
-        if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
-        return gaps;
+    const coverageSegments = (shift.coverages || [])
+      .filter(cov => cov.status !== 'Cancelled')
+      .map((cov, idx) => {
+        const covStart = new Date(`${cov.cover_start_date || requestStartDate}T${cov.cover_start_time || requestStartStr}`);
+        let covEnd = new Date(`${cov.cover_end_date || requestEndDate}T${cov.cover_end_time || requestEndStr}`);
+        if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
+        return {
+          key: `${cov.id || idx}-${cov.cover_start_time || ''}`,
+          name: cov.covering_name || 'מחליף',
+          start: covStart,
+          end: covEnd,
+          timeRange: formatRange(covStart, covEnd),
+        };
       });
-    });
 
-    const uniqueAssignments = [
-      {
+    const isPartial = shift.status === 'partial';
+    const uniqueAssignments = [];
+
+    if (shift.status === 'covered' && shift.coverageType !== 'partial' && coverageSegments.length) {
+      uniqueAssignments.push(...coverageSegments);
+    } else {
+      uniqueAssignments.push({
         key: shift.id,
         name: shift.user_name || 'לא ידוע',
         timeRange: formatRange(baseStart, baseEnd),
         isOwner: true,
-      },
-      ...coverageSegments,
-      ...missing
-        .filter(seg => seg.end > seg.start)
-        .map((seg, idx) => ({
-          key: `gap-${idx}`,
-          name: 'שעות חסרות',
-          timeRange: formatRange(seg.start, seg.end),
-          isGap: true,
-        })),
-    ];
+      });
+
+      uniqueAssignments.push(...coverageSegments);
+
+      if (isPartial) {
+        let missing = [{ start: baseStart, end: baseEnd }];
+        coverageSegments.sort((a, b) => a.start - b.start).forEach(cov => {
+          missing = missing.flatMap(seg => {
+            if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+            const gaps = [];
+            if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
+            if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
+            return gaps;
+          });
+        });
+
+        uniqueAssignments.push(
+          ...missing
+            .filter(seg => seg.end > seg.start)
+            .map((seg, idx) => ({
+              key: `gap-${idx}`,
+              name: 'טרם אויש',
+              timeRange: formatRange(seg.start, seg.end),
+              isGap: true,
+            }))
+        );
+      }
+    }
 
     return uniqueAssignments;
   }, [shift]);
