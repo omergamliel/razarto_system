@@ -138,6 +138,63 @@ export default function ShiftDetailsModal({
     }
   }
 
+  const coverageType = shift?.coverageType || shift?.swap_type || (isPartial ? 'partial' : 'full');
+  const statusLabelClasses = isPartial
+    ? 'bg-yellow-100 text-yellow-900 border border-yellow-200'
+    : 'bg-red-100 text-red-900 border border-red-200';
+  const statusIndicator = useMemo(() => {
+    const status = shift?.status || 'regular';
+    if (status === 'covered') return { color: 'bg-green-400', text: 'מאוישת' };
+    if (coverageType === 'partial') return { color: 'bg-yellow-400', text: 'דורשת החלפה חלקית' };
+    if (status === 'requested') return { color: 'bg-red-500', text: 'דורשת החלפה' };
+    return { color: 'bg-gray-400', text: 'פתוחה' };
+  }, [coverageType, shift?.status]);
+
+  const requestStartStr = activeRequest?.req_start_time || startTime;
+  const requestEndStr = activeRequest?.req_end_time || endTime;
+  const requestStartDate = activeRequest?.req_start_date || shift.start_date;
+  const requestEndDate = activeRequest?.req_end_date || shift.end_date || requestStartDate;
+
+  const coverageRows = useMemo(() => {
+    return coverages.map((cov, idx) => {
+      const user = coveringUsers.find(u => u.serial_id === cov.covering_user_id);
+      const start = `${cov.cover_start_date || requestStartDate}T${cov.cover_start_time}`;
+      const end = `${cov.cover_end_date || requestEndDate}T${cov.cover_end_time}`;
+      return {
+        id: cov.id || idx,
+        name: user?.full_name || 'מתנדב',
+        start: new Date(start),
+        end: new Date(end)
+      };
+    });
+  }, [coverages, coveringUsers, requestEndDate, requestStartDate]);
+
+  const missingSegments = useMemo(() => {
+    if (!isPartial) return [];
+    const baseStart = new Date(`${requestStartDate}T${requestStartStr}`);
+    let baseEnd = new Date(`${requestEndDate}T${requestEndStr}`);
+    if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
+
+    const ordered = [...coverageRows].sort((a, b) => a.start - b.start);
+    let segments = [{ start: baseStart, end: baseEnd }];
+    ordered.forEach(cov => {
+      segments = segments.flatMap(seg => {
+        if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+        const gaps = [];
+        if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
+        if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
+        return gaps;
+      });
+    });
+    return segments.filter(seg => seg.end > seg.start);
+  }, [coverageRows, isPartial, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
+
+  const formatSegment = (start, end) => {
+    const sameDay = format(start, 'dd/MM') === format(end, 'dd/MM');
+    const datePart = sameDay ? format(start, 'dd/MM') : `${format(start, 'dd/MM')} → ${format(end, 'dd/MM')}`;
+    return `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')} (${datePart})`;
+  };
+
   const handleAddToCalendar = () => {
      // Google Calendar Logic... (Same as before)
      const title = `משמרת - ${shift.user_name}`;
@@ -185,12 +242,17 @@ export default function ShiftDetailsModal({
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-bold">פרטי משמרת</h2>
-                  {isSwapMode && (
-                    <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-tight text-white backdrop-blur-sm">
-                      {isPartial ? 'בקשה לכיסוי חלקי' : 'בקשה לכיסוי מלא'}
-                    </span>
-                  )}
+                  <span
+                    className={`w-3 h-3 rounded-full ${statusIndicator.color}`}
+                    title={`סטטוס המשמרת: ${statusIndicator.text}`}
+                    aria-label={`סטטוס המשמרת: ${statusIndicator.text}`}
+                  />
                 </div>
+                {isSwapMode && (
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-tight backdrop-blur-sm ${statusLabelClasses}`}>
+                    {isPartial ? 'בקשה לכיסוי חלקי' : 'בקשה לכיסוי מלא'}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -222,6 +284,46 @@ export default function ShiftDetailsModal({
                 </div>
               </div>
             </div>
+
+            {isPartial && (
+              <div className="space-y-3">
+                <div className="rounded-2xl bg-yellow-50 border border-yellow-200 p-4 text-sm text-yellow-900 leading-relaxed shadow-sm">
+                  <p>
+                    המשתמש {shift.user_name} ביקש סיוע בהחלפה חלקית בטווח השעות {requestStartStr}–{requestEndStr} בתאריך {format(new Date(requestStartDate), 'dd.MM.yyyy')}
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl shadow-sm divide-y">
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <User className="w-4 h-4 text-gray-500" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-900">{shift.user_name}</p>
+                      <p className="text-xs text-gray-600" dir="ltr">{formatSegment(startDateObj, endDateObj)}</p>
+                    </div>
+                  </div>
+
+                  {coverageRows.map(row => (
+                    <div key={row.id} className="flex items-center gap-3 px-4 py-3 bg-green-50">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-green-800">{row.name}</p>
+                        <p className="text-xs text-green-700" dir="ltr">{formatSegment(row.start, row.end)}</p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {missingSegments.map((seg, idx) => (
+                    <div key={`${seg.start}-${idx}`} className="flex items-center gap-3 px-4 py-3 bg-red-50">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-red-700">שעות חסרות</p>
+                        <p className="text-xs text-red-700" dir="ltr">{formatSegment(seg.start, seg.end)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Coverage List */}
             {coverages.length > 0 && (
@@ -259,7 +361,7 @@ export default function ShiftDetailsModal({
                     onClose();
                     onOfferCover(shift);
                   }}
-                  className="min-w-[160px] flex-1 sm:flex-none h-12 bg-[#7bf1a8] hover:bg-[#66e59a] text-gray-900 rounded-xl shadow-md flex flex-row-reverse items-center justify-center gap-2"
+                  className="min-w-[160px] flex-1 sm:flex-none h-12 bg-[#22c55e] hover:bg-[#16a34a] focus-visible:ring focus-visible:ring-offset-2 focus-visible:ring-[#15803d] text-white rounded-xl shadow-md flex flex-row-reverse items-center justify-center gap-2"
                 >
                   <img src="https://cdn-icons-png.flaticon.com/128/9363/9363987.png" alt="עזרה" className="w-5 h-5" />
                   אני רוצה לעזור!
@@ -272,7 +374,7 @@ export default function ShiftDetailsModal({
                     onClose();
                     onHeadToHead?.(shift);
                   }}
-                  className="min-w-[140px] flex-1 sm:flex-none h-12 bg-[#ff70a6] hover:bg-[#ff5c98] text-white rounded-xl shadow-md flex flex-row-reverse items-center justify-center gap-2"
+                  className="min-w-[140px] flex-1 sm:flex-none h-12 bg-[#3b82f6] hover:bg-[#2563eb] focus-visible:ring focus-visible:ring-offset-2 focus-visible:ring-[#1d4ed8] text-white rounded-xl shadow-md flex flex-row-reverse items-center justify-center gap-2"
                 >
                   <img src="https://cdn-icons-png.flaticon.com/128/1969/1969142.png" alt="ראש בראש" className="w-5 h-5" />
                   ראש בראש
@@ -397,4 +499,3 @@ export default function ShiftDetailsModal({
     </AnimatePresence>
   );
 }
-
