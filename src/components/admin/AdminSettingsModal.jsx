@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Search, Filter, MoreVertical,
   Edit2, Trash2, Shield, UserX, UserPlus,
-  AlertTriangle, Archive, Check, Send, CheckCircle2
+  AlertTriangle, Archive, Check, Send, CheckCircle2,
+  Palette, HelpCircle, PhoneCall, ChevronUp, ChevronDown,
+  GripVertical, Circle, Plus, CalendarDays, Globe
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,54 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('users');
+  const [systemStatus, setSystemStatus] = useState(true);
+  const [systemSettings, setSystemSettings] = useState({
+    title: 'מערכת ניהול החלפות',
+    subtitle: 'דשבורד לניהול תהליכי משמרות והחלפות',
+    keywords: 'Razarto, משמרות, החלפות',
+    offlineMessage: 'המערכת כרגע בתחזוקה מתוכננת. חזרו בעוד מספר דקות.',
+  });
+  const [supportSettings, setSupportSettings] = useState({
+    guideUrl: 'https://base44.app/help',
+    videoUrl: 'https://youtu.be/dummy-help-video',
+    permissionsPhone: '03-555-0101',
+    issuesPhone: '03-555-0123',
+  });
+  const [faqItems, setFaqItems] = useState([
+    { id: 1, question: 'איך מאשרים בקשת החלפה?', answer: 'נכנסים למשמרת הרלוונטית, לוחצים על בקשת ההחלפה ומאשרים.', expanded: false },
+    { id: 2, question: 'איך מעדכנים זמינות?', answer: 'בתפריט האישי לחצו על "הזמינויות שלי" והגדירו שעות נוחות.', expanded: false },
+    { id: 3, question: 'מה עושים אם שכחתי סיסמה?', answer: 'ניתן להתחבר עם Google OAUTH או לבקש איפוס דרך המייל.', expanded: false },
+  ]);
+  const [themePalette, setThemePalette] = useState({
+    kpi: {
+      fullSwap: '#c1f0c7',
+      partialSwap: '#f9d9c2',
+      history: '#d6e4ff',
+      futureShifts: '#ffe8f1',
+    },
+    calendar: {
+      myShifts: '#d1e8ff',
+      regularShift: '#e8f5c8',
+      swapRequest: '#ffd6e8',
+      partialGap: '#fff4c2',
+      approvedSwap: '#c7f6e2',
+    },
+    buttons: {
+      volunteer: '#b4e3ff',
+      swapDirect: '#ffcde6',
+      whatsapp: '#c7f7d4',
+      calendar: '#e3dcff',
+      requestSwap: '#ffd8b8',
+      cancel: '#f5c2c0',
+      cancelRequest: '#e9e9e9',
+    },
+    hallOfFame: {
+      first: '#fff2b2',
+      second: '#e3e8ff',
+      third: '#f5d6c6',
+    }
+  });
+  const [logFilters, setLogFilters] = useState({ search: '', date: '', type: 'all' });
 
   // --- MODAL STATES ---
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -61,6 +111,38 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   const [archiveReason, setArchiveReason] = useState('');
 
   const queryClient = useQueryClient();
+
+  const monitorChecks = useMemo(() => ([
+    { id: 'storage', label: 'אחסון מערכת', detail: 'קצב קריאה/כתיבה תקין', status: 'ok' },
+    { id: 'security', label: 'תאימות אבטחה', detail: 'חיבורים חתומים ותוקפים', status: 'ok' },
+    { id: 'database', label: 'מסד נתונים', detail: 'חיבור יציב', status: 'ok' },
+    { id: 'oauth', label: 'OAUTH Google', detail: 'זמין ומאושר', status: 'ok' },
+    { id: 'notifications', label: 'חיווי התראות', detail: 'שליחת פושים ולמייל פעילה', status: 'ok' },
+    { id: 'backup', label: 'גיבוי יומי', detail: 'נשמר ב-03:00', status: 'ok' },
+  ]), []);
+
+  const logEntries = useMemo(() => ([
+    { status: 'ok', user: 'חיים פרנסיו', action: 'ביקש החלפה מלאה', date: '2026-06-01', displayDate: '01/06/2026', time: '09:00', type: 'בקשות החלפה' },
+    { status: 'ok', user: 'עומר גמליאל', action: 'נכנס למערכת', date: '2026-06-01', displayDate: '01/06/2026', time: '09:12', type: 'כניסות משתמשים' },
+    { status: 'ok', user: 'ספיר לוי', action: 'הוסיף משמרת חדשה', date: '2026-06-02', displayDate: '02/06/2026', time: '14:00', type: 'הוספת משמרות' },
+    { status: 'warn', user: 'שחר כהן', action: 'שינה הרשאה למשתמש', date: '2026-06-02', displayDate: '02/06/2026', time: '14:05', type: 'שינויים בהרשאות' },
+    { status: 'error', user: 'איתי מזרחי', action: 'ניסה למחוק משמרת שלא קיימת', date: '2026-06-02', displayDate: '02/06/2026', time: '14:07', type: 'מחיקת משמרות' },
+    { status: 'ok', user: 'ספיר לוי', action: 'שיתף בקשה בוואטסאפ', date: '2026-06-02', displayDate: '02/06/2026', time: '14:12', type: 'שיתופים (WhatsApp, יומן)' },
+    { status: 'warn', user: 'עומר גמליאל', action: 'ערך את כותרת המערכת', date: '2026-06-03', displayDate: '03/06/2026', time: '10:00', type: 'עדכון מערכת' },
+    { status: 'error', user: 'חיים פרנסיו', action: 'ביצע ניסיון כושל להתחברות', date: '2026-06-03', displayDate: '03/06/2026', time: '10:12', type: 'כניסות משתמשים' },
+    { status: 'ok', user: 'ספיר הרשקו', action: 'אישר כיסוי משמרת', date: '2026-06-03', displayDate: '03/06/2026', time: '11:00', type: 'בקשות החלפה' },
+    { status: 'error', user: 'אלעד פסל', action: 'ביצע שיתוף ללא הרשאה', date: '2026-06-03', displayDate: '03/06/2026', time: '11:12', type: 'שיתופים (WhatsApp, יומן)' },
+  ]), []);
+
+  const logTypeOptions = [
+    'בקשות החלפה',
+    'כניסות משתמשים',
+    'שינויים בהרשאות',
+    'הוספת משמרות',
+    'מחיקת משמרות',
+    'שיתופים (WhatsApp, יומן)',
+    'עדכון מערכת',
+  ];
 
   // --- HELPER: Permission Colors ---
   const getPermissionStyle = (perm) => {
@@ -136,6 +218,39 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
   // --- HANDLERS ---
 
+  const handleSystemChange = (field, value) => {
+    setSystemSettings((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSupportChange = (field, value) => {
+    setSupportSettings((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFaqToggle = (id) => {
+    setFaqItems((prev) => prev.map((item) => item.id === id ? { ...item, expanded: !item.expanded } : item));
+  };
+
+  const handleFaqChange = (id, field, value) => {
+    setFaqItems((prev) => prev.map((item) => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const handleAddFaq = () => {
+    const nextId = (faqItems.length ? Math.max(...faqItems.map((i) => i.id)) : 0) + 1;
+    setFaqItems((prev) => [...prev, { id: nextId, question: 'שאלה חדשה', answer: 'הקלידו תשובה', expanded: true }]);
+  };
+
+  const moveFaq = (id, direction) => {
+    setFaqItems((prev) => {
+      const index = prev.findIndex((item) => item.id === id);
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= prev.length) return prev;
+      const updated = [...prev];
+      const [removed] = updated.splice(index, 1);
+      updated.splice(newIndex, 0, removed);
+      return updated;
+    });
+  };
+
   const handleAddUserSubmit = async (e) => {
     e.preventDefault();
     if (!newUser.full_name || !newUser.department || !newUser.email) return toast.error("נא למלא את כל שדות החובה");
@@ -195,12 +310,25 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
   const filteredPeople = getFilteredPeople();
 
+  const filteredLogs = logEntries.filter((entry) => {
+    const matchesSearch = entry.action.toLowerCase().includes(logFilters.search.toLowerCase()) || entry.user.toLowerCase().includes(logFilters.search.toLowerCase());
+    const matchesDate = !logFilters.date || entry.date === logFilters.date;
+    const matchesType = logFilters.type === 'all' || entry.type === logFilters.type;
+    return matchesSearch && matchesDate && matchesType;
+  });
+
+  const statusColors = {
+    ok: 'bg-emerald-500',
+    warn: 'bg-amber-400',
+    error: 'bg-rose-500'
+  };
+
   const tabs = useMemo(() => ([
-    { id: 'settings', label: 'הגדרות', icon: 'https://cdn-icons-png.flaticon.com/128/3247/3247957.png', enabled: false },
-    { id: 'users', label: 'משתמשים', icon: 'https://cdn-icons-png.flaticon.com/128/9888/9888730.png', enabled: true },
-    { id: 'support', label: 'תמיכה', icon: 'https://cdn-icons-png.flaticon.com/128/15202/15202496.png', enabled: false },
-    { id: 'themes', label: 'ערכת נושא', icon: 'https://cdn-icons-png.flaticon.com/128/9521/9521756.png', enabled: false },
-    { id: 'logs', label: 'לוגים', icon: 'https://cdn-icons-png.flaticon.com/128/10397/10397230.png', enabled: false },
+    { id: 'settings', label: 'הגדרות', icon: 'https://cdn-icons-png.flaticon.com/128/3247/3247957.png' },
+    { id: 'users', label: 'משתמשים', icon: 'https://cdn-icons-png.flaticon.com/128/9888/9888730.png' },
+    { id: 'support', label: 'תמיכה', icon: 'https://cdn-icons-png.flaticon.com/128/15202/15202496.png' },
+    { id: 'themes', label: 'ערכת נושא', icon: 'https://cdn-icons-png.flaticon.com/128/9521/9521756.png' },
+    { id: 'logs', label: 'לוגים', icon: 'https://cdn-icons-png.flaticon.com/128/10397/10397230.png' },
   ]), []);
 
   if (!isOpen) return null;
@@ -228,7 +356,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>פאנל ניהול חכם עם טאבים מודולאריים</span>
+              <span>שכבת ניהול מוכנה לפריסה מלאה במובייל ובדסקטופ</span>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
@@ -263,13 +391,12 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                 >
                   <img src={tab.icon} alt={tab.label} className="w-4 h-4 md:w-5 md:h-5" />
                   <span>{tab.label}</span>
-                  {!tab.enabled && <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">בקרוב</span>}
                 </button>
               ))}
             </div>
           </div>
 
-          {activeTab === 'users' ? (
+          {activeTab === 'users' && (
             <div className="h-full flex flex-col gap-4 md:gap-6">
 
               {/* Toolbar */}
@@ -424,26 +551,384 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="bg-white rounded-2xl border border-dashed border-gray-200 shadow-sm p-8 md:p-12 text-center max-w-xl flex flex-col gap-4">
-                <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 flex items-center justify-center shadow-inner">
-                  <img src={tabs.find((tab) => tab.id === activeTab)?.icon} alt="Tab icon" className="w-8 h-8" />
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">מאפייני המערכת</p>
+                      <p className="text-xs text-gray-500">כותרות ושדות לזיהוי מהיר במנועי חיפוש</p>
+                    </div>
+                    <Globe className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="grid gap-3" dir="rtl">
+                    <div className="grid gap-1">
+                      <Label className="text-sm text-gray-700">כותרת ראשית</Label>
+                      <Input value={systemSettings.title} onChange={(e) => handleSystemChange('title', e.target.value)} className="rounded-xl" />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-sm text-gray-700">תת כותרת</Label>
+                      <Input value={systemSettings.subtitle} onChange={(e) => handleSystemChange('subtitle', e.target.value)} className="rounded-xl" />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-sm text-gray-700">מילות מפתח</Label>
+                      <Textarea
+                        value={systemSettings.keywords}
+                        onChange={(e) => handleSystemChange('keywords', e.target.value)}
+                        className="rounded-xl min-h-[72px]"
+                        placeholder='לדוגמה: "משמרת", "החלפה", Razarto'
+                      />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-sm text-gray-700">לוגו</Label>
+                      <input type="file" accept="image/png,image/jpeg,image/svg+xml" className="block w-full text-sm text-gray-600 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-blue-600 font-semibold">בקרוב</p>
-                  <h3 className="text-xl md:text-2xl font-bold text-gray-800">עוד רגע הטאב הזה יתמלא ביכולות חדשות</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">
-                    הממשק נבנה במבנה מודולארי כדי שתוכלו להפעיל ולכבות מודולים לפי הצורך. בקרוב נוסיף לכאן כלי ניהול, דוחות, ערכות נושא ולוגים מתקדמים.
-                  </p>
+
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">זמינות המערכת</p>
+                      <p className="text-xs text-gray-500">הפעלת מצב תחזוקה והודעות למשתמשים</p>
+                    </div>
+                    <CalendarDays className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-gray-800">סטטוס מערכת</span>
+                      <span className="text-xs text-gray-500">{systemStatus ? 'פעיל ומחובר' : 'כבוי - מצב תחזוקה'}</span>
+                    </div>
+                    <button
+                      onClick={() => setSystemStatus(!systemStatus)}
+                      className={`relative inline-flex h-10 w-16 items-center rounded-full border px-1 transition ${systemStatus ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-100 border-gray-200'}`}
+                      aria-pressed={systemStatus}
+                    >
+                      <span className={`absolute inset-y-1 ${systemStatus ? 'left-1' : 'right-1'} w-8 rounded-full bg-white shadow flex items-center justify-center text-xs font-semibold text-gray-700 transition-all`}>
+                        {systemStatus ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="grid gap-3" dir="rtl">
+                    <div className="grid gap-1">
+                      <Label className="text-sm text-gray-700">הודעה שמופיעה כשהמערכת כבויה</Label>
+                      <Textarea
+                        value={systemSettings.offlineMessage}
+                        onChange={(e) => handleSystemChange('offlineMessage', e.target.value)}
+                        className="rounded-xl min-h-[100px]"
+                      />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-sm text-gray-700">דומיין</Label>
+                      <Input value="www.razar-toran-b555aef5.base44.app" readOnly className="rounded-xl bg-gray-50 text-gray-500" />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-sm text-gray-700">תשתית</Label>
+                      <Input value="base44" readOnly className="rounded-xl bg-gray-50 text-gray-500" />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button variant="outline" className="rounded-xl">תנו לנו לדעת מה חשוב לכם</Button>
-                  <Button className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white">קבלו עדכון כשזה מוכן</Button>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">מוניטור</p>
+                    <p className="text-xs text-gray-500">בדיקת שירותים בזמן אמת</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-600">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> הכל תקין
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {monitorChecks.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gradient-to-br from-white to-gray-50">
+                      <span className={`w-3 h-3 rounded-full ${statusColors[item.status]} animate-pulse`} />
+                      <div className="flex flex-col text-sm">
+                        <span className="font-semibold text-gray-800">{item.label}</span>
+                        <span className="text-xs text-gray-500">{item.detail}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
+
+          {activeTab === 'support' && (
+            <div className="space-y-4 md:space-y-6">
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">הגדרות חלון עזרה ותמיכה</p>
+                    <p className="text-xs text-gray-500">קישורים לחומרים ומספרי טלפון ישירים</p>
+                  </div>
+                  <HelpCircle className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3" dir="rtl">
+                  <div className="grid gap-1">
+                    <Label className="text-sm text-gray-700">קישור למדריך שימוש מלא</Label>
+                    <Input value={supportSettings.guideUrl} onChange={(e) => handleSupportChange('guideUrl', e.target.value)} className="rounded-xl" dir="ltr" />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-sm text-gray-700">קישור לסרטון הדרכה</Label>
+                    <Input value={supportSettings.videoUrl} onChange={(e) => handleSupportChange('videoUrl', e.target.value)} className="rounded-xl" dir="ltr" />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-sm text-gray-700">מס' טלפון משתמשים והרשאות</Label>
+                    <Input value={supportSettings.permissionsPhone} onChange={(e) => handleSupportChange('permissionsPhone', e.target.value)} className="rounded-xl" dir="ltr" />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-sm text-gray-700">מס' טלפון הצעות ובעיות במערכת</Label>
+                    <Input value={supportSettings.issuesPhone} onChange={(e) => handleSupportChange('issuesPhone', e.target.value)} className="rounded-xl" dir="ltr" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">שאלות נפוצות</p>
+                    <p className="text-xs text-gray-500">תצוגה מודרנית עם גרירה לשינוי סדר</p>
+                  </div>
+                  <Button onClick={handleAddFaq} className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10 px-3">
+                    <Plus className="w-4 h-4" /> הוספת שאלה
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {faqItems.map((item, idx) => (
+                    <div key={item.id} className="border border-gray-100 rounded-xl p-3 bg-gradient-to-br from-white to-gray-50 shadow-sm">
+                      <div className="flex items-start gap-2">
+                        <div className="flex flex-col items-center text-gray-400 pt-1">
+                          <GripVertical className="w-4 h-4" />
+                          <div className="flex flex-col text-[10px] text-gray-500">
+                            <button onClick={() => moveFaq(item.id, -1)} className="hover:text-gray-700"><ChevronUp className="w-3 h-3" /></button>
+                            <button onClick={() => moveFaq(item.id, 1)} className="hover:text-gray-700"><ChevronDown className="w-3 h-3" /></button>
+                          </div>
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <button onClick={() => handleFaqToggle(item.id)} className="text-right flex-1 text-sm font-semibold text-gray-800">
+                              {item.question}
+                            </button>
+                            <div className="flex items-center gap-2 text-gray-500">
+                              <button onClick={() => handleFaqToggle(item.id)} className="p-2 rounded-lg hover:bg-gray-100">
+                                {item.expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </button>
+                              <button onClick={() => setFaqItems((prev) => prev.filter((q) => q.id !== item.id))} className="p-2 rounded-lg hover:bg-red-50 text-red-600">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          {item.expanded && (
+                            <div className="grid gap-2" dir="rtl">
+                              <Label className="text-xs text-gray-600">שאלה</Label>
+                              <Input value={item.question} onChange={(e) => handleFaqChange(item.id, 'question', e.target.value)} className="rounded-xl" />
+                              <Label className="text-xs text-gray-600 mt-1">תשובה</Label>
+                              <Textarea value={item.answer} onChange={(e) => handleFaqChange(item.id, 'answer', e.target.value)} className="rounded-xl min-h-[80px]" />
+                              <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
+                                <span>סעיף {idx + 1}</span>
+                                <span className="flex items-center gap-1"><PhoneCall className="w-3 h-3" /> תמיכה זמינה</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'themes' && (
+            <div className="space-y-4 md:space-y-6">
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">דשבורד KPI</p>
+                    <p className="text-xs text-gray-500">בחירה בצבעי פסטל נעימים</p>
+                  </div>
+                  <Palette className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { key: 'fullSwap', label: 'בקשות להחלפה מלאה' },
+                    { key: 'partialSwap', label: 'בקשות להחלפה חלקית' },
+                    { key: 'history', label: 'היסטוריית החלפות' },
+                    { key: 'futureShifts', label: 'המשמרות העתידיות שלי' },
+                  ].map((item) => (
+                    <div key={item.key} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                      <div className="flex flex-col text-sm text-gray-700">
+                        <span className="font-semibold">{item.label}</span>
+                        <span className="text-xs text-gray-500">גוון פסטלי מומלץ</span>
+                      </div>
+                      <input type="color" value={themePalette.kpi[item.key]} onChange={(e) => setThemePalette((prev) => ({ ...prev, kpi: { ...prev.kpi, [item.key]: e.target.value } }))} className="w-12 h-10 rounded-lg border border-gray-200" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">תצוגה קלנדרית</p>
+                    <p className="text-xs text-gray-500">התאמת צבע לכל סטטוס</p>
+                  </div>
+                  <CalendarDays className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { key: 'myShifts', label: 'המשמרות שלי' },
+                    { key: 'regularShift', label: 'משמרת רגילה' },
+                    { key: 'swapRequest', label: 'בקשה להחלפה' },
+                    { key: 'partialGap', label: 'כיסוי חלקי – פער' },
+                    { key: 'approvedSwap', label: 'החלפה אושרה' },
+                  ].map((item) => (
+                    <div key={item.key} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                      <span className="text-sm font-semibold text-gray-800">{item.label}</span>
+                      <input type="color" value={themePalette.calendar[item.key]} onChange={(e) => setThemePalette((prev) => ({ ...prev, calendar: { ...prev.calendar, [item.key]: e.target.value } }))} className="w-12 h-10 rounded-lg border border-gray-200" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">כפתורים</p>
+                    <p className="text-xs text-gray-500">התאמה לפעולות נפוצות</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { key: 'volunteer', label: 'אני רוצה לעזור' },
+                    { key: 'swapDirect', label: 'החלפה ראש בראש' },
+                    { key: 'whatsapp', label: 'שיתוף בווצאפ' },
+                    { key: 'calendar', label: 'הוספה ליומן' },
+                    { key: 'requestSwap', label: 'בקש החלפה' },
+                    { key: 'cancel', label: 'ביטול' },
+                    { key: 'cancelRequest', label: 'ביטול בקשת החלפה' },
+                  ].map((item) => (
+                    <div key={item.key} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                      <span className="text-sm font-semibold text-gray-800">{item.label}</span>
+                      <input type="color" value={themePalette.buttons[item.key]} onChange={(e) => setThemePalette((prev) => ({ ...prev, buttons: { ...prev.buttons, [item.key]: e.target.value } }))} className="w-12 h-10 rounded-lg border border-gray-200" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">היכל התהילה</p>
+                    <p className="text-xs text-gray-500">עיצוב רקע לשלושת המקומות</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { key: 'first', label: 'מקום ראשון' },
+                    { key: 'second', label: 'מקום שני' },
+                    { key: 'third', label: 'מקום שלישי' },
+                  ].map((item) => (
+                    <div key={item.key} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                      <span className="text-sm font-semibold text-gray-800">{item.label}</span>
+                      <input type="color" value={themePalette.hallOfFame[item.key]} onChange={(e) => setThemePalette((prev) => ({ ...prev, hallOfFame: { ...prev.hallOfFame, [item.key]: e.target.value } }))} className="w-12 h-10 rounded-lg border border-gray-200" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'logs' && (
+            <div className="space-y-4 md:space-y-6">
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">פילטרים</p>
+                    <p className="text-xs text-gray-500">חיפוש, תאריכים וסוג פעולה</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-600">
+                    <Circle className="w-2.5 h-2.5 fill-emerald-500 text-emerald-500" /> לוגים עדכניים
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3" dir="rtl">
+                  <div className="relative">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="חיפוש טקסט חופשי"
+                      value={logFilters.search}
+                      onChange={(e) => setLogFilters((prev) => ({ ...prev, search: e.target.value }))}
+                      className="pr-9 rounded-xl"
+                    />
+                  </div>
+                  <div className="relative">
+                    <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      type="date"
+                      value={logFilters.date}
+                      onChange={(e) => setLogFilters((prev) => ({ ...prev, date: e.target.value }))}
+                      className="pr-9 rounded-xl"
+                    />
+                  </div>
+                  <Select value={logFilters.type} onValueChange={(val) => setLogFilters((prev) => ({ ...prev, type: val }))}>
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue placeholder="בחר סוג פעולה" />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl">
+                      <SelectItem value="all">הכל</SelectItem>
+                      {logTypeOptions.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right">
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">סטטוס</th>
+                        <th className="px-4 py-3 font-semibold">משתמש</th>
+                        <th className="px-4 py-3 font-semibold">פעולה</th>
+                        <th className="px-4 py-3 font-semibold">תאריך</th>
+                        <th className="px-4 py-3 font-semibold">שעה</th>
+                        <th className="px-4 py-3 font-semibold">סוג פעולה</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredLogs.slice(0, 10).map((log, idx) => (
+                        <tr key={`${log.user}-${idx}`} className="text-sm hover:bg-gray-50/60">
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-2 text-xs font-semibold ${log.status === 'ok' ? 'text-emerald-600' : log.status === 'warn' ? 'text-amber-600' : 'text-rose-600'}`}>
+                              <span className={`w-3 h-3 rounded-full ${statusColors[log.status]} animate-pulse`} />
+                              {log.status === 'ok' ? 'תקין' : log.status === 'warn' ? 'חריג' : 'אסור'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-gray-800">{log.user}</td>
+                          <td className="px-4 py-3 text-gray-700">{log.action}</td>
+                          <td className="px-4 py-3 text-gray-600">{log.displayDate}</td>
+                          <td className="px-4 py-3 text-gray-600">{log.time}</td>
+                          <td className="px-4 py-3 text-gray-600">{log.type}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="p-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex justify-between px-6">
+                  <span>מציג {filteredLogs.slice(0, 10).length} מתוך {filteredLogs.length}</span>
+                  <span className="hidden md:inline">עד 10 רשומות בעמוד</span>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </motion.div>
 
