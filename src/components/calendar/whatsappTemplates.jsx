@@ -1,70 +1,13 @@
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-/**
- * תבנית הודעת בקשת החלפה לווטסאפ
- */
-export function buildSwapTemplate({
-  employeeName,
-  startDate,
-  startTime,
-  endDate,
-  endTime,
-  approvalUrl
-}) {
-  const startDateObj = startDate ? new Date(startDate) : null;
-  const isValidDate = startDateObj && !isNaN(startDateObj);
+export const buildSwapTemplate = ({ employeeName, startDate, startTime, endDate, endTime, approvalUrl }) => {
+  const safeStart = startDate ? format(new Date(startDate), 'dd/MM/yyyy', { locale: he }) : '';
+  const safeEnd = endDate ? format(new Date(endDate), 'dd/MM/yyyy', { locale: he }) : safeStart;
 
-  let dateLine = 'תאריך לא ידוע';
-  
-  if (isValidDate) {
-    const dayText = format(startDateObj, 'EEEE', { locale: he });
-    const dateText = format(startDateObj, 'dd/MM/yyyy', { locale: he });
-    dateLine = `${dayText} ${dateText}`;
-  }
+  return `היי, פתחתי בקשה ב-Razarto להחלפה למשמרת *${employeeName || ''}* 👮‍♂️\nמתאריך ${safeStart} בשעה ${startTime || ''} ועד תאריך ${safeEnd} בשעה ${endTime || ''} ⏰\n\nמי יכול לעזור? 🙏\nאפשר לאשר כאן:\n${approvalUrl || ''}`;
+};
 
-  const timeRange = `${startTime || '09:00'} - ${endTime || '09:00'}`;
-
-  return `🔁 *בקשת החלפה חדשה!*
-
-📅 תאריך: ${dateLine}
-⏰ שעות: ${timeRange}
-👤 מבקש: ${employeeName || 'עובד'}
-
-${employeeName || 'העובד'} מבקש/ת החלפה על המשמרת.
-המעוניינים להחליף – נא ללחוץ על הקישור לאישור:
-
-${approvalUrl || 'קישור לא זמין'}
-
-תודה רבה! 🙏`;
-}
-
-/**
- * תבנית הודעת החלפה ראש בראש
- */
-export function buildHeadToHeadTemplate({
-  targetUserName,
-  targetShiftOwner,
-  targetShiftDate,
-  myShiftOwner,
-  myShiftDate,
-  uniqueApprovalUrl
-}) {
-  return `🔄 *הצעת החלפה ראש בראש*
-
-היי ${targetUserName || 'חבר/ה'},
-
-אני מעוניין/ת להחליף איתך משמרות:
-
-📌 *המשמרת שלך:*
-👤 ${targetShiftOwner || 'לא ידוע'}
-📅 ${targetShiftDate || 'תאריך לא ידוע'}
-
-🔁 *המשמרת שלי שאני מציע/ה:*
-👤 ${myShiftOwner || 'לא ידוע'}
-📅 ${myShiftDate || 'תאריך לא ידוע'}
-
-${uniqueApprovalUrl ? `לחץ/י כאן לאישור ההחלפה במערכת:\n${uniqueApprovalUrl}` : 'יש ליצור קשר ישיר לאישור'}
-
-תודה! 🙏`;
-}
+export const buildHeadToHeadTemplate = ({ targetUserName, targetShiftOwner, targetShiftDate, myShiftOwner, myShiftDate, uniqueApprovalUrl }) => {
+  return `היי *${targetUserName || ''}*! 👋🏼\nאני מעוניין להחליף איתך משמרת רז״רתו ראש בראש:\n\n🫡 הצעת החלפה:\n🫵🏼 המשמרת שלך: *${targetShiftOwner || ''}* ${targetShiftDate || ''}\n🤞🏼 המשמרת שלי: *${myShiftOwner || ''}* ${myShiftDate || ''}\n\n✅ לחץ כאן לאישור ההחלפה בתוך המערכת:\n${uniqueApprovalUrl || ''}`;
+};
