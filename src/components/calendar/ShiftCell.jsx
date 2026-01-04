@@ -30,8 +30,7 @@ export default function ShiftCell({
         bg: 'bg-yellow-50',
         border: 'border-yellow-300',
         badge: 'bg-yellow-500',
-        icon: AlertCircle,
-        label: 'כיסוי חלקי'
+        icon: AlertCircle
       };
     }
 
@@ -40,8 +39,7 @@ export default function ShiftCell({
         bg: 'bg-red-50',
         border: 'border-red-300',
         badge: 'bg-red-500',
-        icon: ArrowLeftRight,
-        label: 'ממתין להחלפה'
+        icon: ArrowLeftRight
       };
     }
 
@@ -50,8 +48,7 @@ export default function ShiftCell({
         bg: 'bg-green-50',
         border: 'border-green-300',
         badge: 'bg-green-500',
-        icon: CheckCircle2,
-        label: 'הוחלף'
+        icon: CheckCircle2
       };
     }
 
@@ -59,13 +56,11 @@ export default function ShiftCell({
       bg: 'bg-white',
       border: 'border-gray-200',
       badge: 'bg-gray-400',
-      icon: Clock,
-      label: ''
+      icon: Clock
     };
   };
 
   const styles = getStatusStyles();
-  const StatusIcon = styles.icon || Clock;
 
   const assignments = React.useMemo(() => {
     if (!shift) return [];
@@ -115,16 +110,6 @@ export default function ShiftCell({
 
       {shift && (
         <div className="mt-6 md:mt-10 space-y-1 md:space-y-1.5">
-          {/* Status Badge */}
-          {styles.label && (
-            <div className="mt-0.5 md:mt-1 flex items-center gap-1 justify-center">
-              <StatusIcon className="w-3 h-3 md:w-4 md:h-4 text-gray-700 flex-shrink-0" />
-              <span className="text-[9px] md:text-xs text-gray-700 font-semibold leading-tight">
-                {styles.label}
-              </span>
-            </div>
-          )}
-
           {/* Assignees / Covering Users */}
           <div className="space-y-0.5">
             {assignments.map(item => (
