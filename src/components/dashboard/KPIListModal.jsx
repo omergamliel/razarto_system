@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, ArrowLeftRight, ChevronDown, Send } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const isLoading = isSwapRequestsLoading || isShiftsLoading || isUsersLoading || (type === 'partial_gaps' && isCoveragesLoading);
 
   // --- Helpers ---
-  const enrichRequestsWithShiftInfo = (requests) => {
+  const enrichRequestsWithShiftInfo = useCallback((requests) => {
       return requests.map(req => {
           const shift = shiftsAll.find(s => s.id === req.shift_id);
           const user = authorizedUsers.find(u => u?.serial_id === shift?.original_user_id);
@@ -59,16 +59,16 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
               is_request_object: true
           };
       });
-  };
+  }, [shiftsAll, authorizedUsers]);
 
-  const enrichShiftsWithUserInfo = (shifts) => {
+  const enrichShiftsWithUserInfo = useCallback((shifts) => {
       return shifts.map(s => ({
           ...s,
-          user_name: currentUser.full_name,
+          user_name: currentUser?.full_name,
           shift_date: s.start_date,
           is_shift_object: true
       }));
-  };
+  }, [currentUser]);
 
   // --- Handlers ---
   const formatDateTimeForDisplay = (dateStr, timeStr) => {
@@ -200,7 +200,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
         default:
           return [];
       }
-  }, [futureShifts, partialGapItems, swapRequestsAll, type, shiftsAll, authorizedUsers, currentUser]);
+  }, [enrichRequestsWithShiftInfo, enrichShiftsWithUserInfo, futureShifts, partialGapItems, swapRequestsAll, type]);
 
   const sortedData = useMemo(() => {
       const items = [...baseData];
