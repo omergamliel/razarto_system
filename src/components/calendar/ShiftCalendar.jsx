@@ -520,7 +520,6 @@ export default function ShiftCalendar() {
   };
 
   const handleOpenSwapRequest = (shift) => {
-    setSwapRequestLogs([]);
     setSelectedShift(shift);
     setShowSwapRequestModal(true);
   };
