@@ -474,7 +474,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                               <span className="truncate">{person.full_name}</span>
                             </div>
                             <div className="md:hidden text-xs text-gray-400 mr-10 mt-0.5 flex gap-2">
-                              <span>{person.department}</span> • <span style={{ color: permStyle.text }}>{person.permissions}</span>
+                              <span>{`מחלקה ${person.department}`}</span> • <span style={{ color: permStyle.text }}>{person.permissions}</span>
                             </div>
                           </div>
 
