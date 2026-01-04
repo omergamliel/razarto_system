@@ -200,7 +200,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
         default:
           return [];
       }
-  }, [enrichRequestsWithShiftInfo, enrichShiftsWithUserInfo, futureShifts, partialGapItems, swapRequestsAll, type]);
+  }, [futureShifts, partialGapItems, swapRequestsAll, type, shiftsAll, authorizedUsers, currentUser]);
 
   const sortedData = useMemo(() => {
       const items = [...baseData];
