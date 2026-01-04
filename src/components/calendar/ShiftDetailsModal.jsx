@@ -105,11 +105,13 @@ export default function ShiftDetailsModal({
   });
 
   const handleDelete = () => {
+    if (!shift?.id) return;
     onDelete(shift.id);
     setShowDeleteConfirm(false);
   };
 
-  if (!isOpen || !shift) return null;
+  const shiftStartDate = shift?.start_date || date;
+  const shiftEndDate = shift?.end_date || shiftStartDate;
 
   // Determine State
   const isSwapMode = !!activeRequest;
@@ -127,11 +129,11 @@ export default function ShiftDetailsModal({
 
   const startTime = shift?.start_time || '09:00';
   const endTime = shift?.end_time || '09:00';
-  const startDateObj = shift?.start_date ? new Date(shift.start_date) : new Date(date);
+  const startDateObj = shiftStartDate ? new Date(shiftStartDate) : new Date(date || new Date());
 
   let endDateObj;
-  if (shift?.end_date) {
-    endDateObj = new Date(shift.end_date);
+  if (shiftEndDate) {
+    endDateObj = new Date(shiftEndDate);
   } else {
     const sH = parseInt(startTime.split(':')[0]);
     const eH = parseInt(endTime.split(':')[0]);
@@ -156,8 +158,8 @@ export default function ShiftDetailsModal({
 
   const requestStartStr = activeRequest?.req_start_time || startTime;
   const requestEndStr = activeRequest?.req_end_time || endTime;
-  const requestStartDate = activeRequest?.req_start_date || shift.start_date;
-  const requestEndDate = activeRequest?.req_end_date || shift.end_date || requestStartDate;
+  const requestStartDate = activeRequest?.req_start_date || shiftStartDate;
+  const requestEndDate = activeRequest?.req_end_date || shiftEndDate || requestStartDate;
 
   const coverageRows = useMemo(() => {
     return coverages.map((cov, idx) => {
@@ -221,6 +223,8 @@ export default function ShiftDetailsModal({
      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
      window.open(whatsappUrl, '_blank');
   };
+
+  if (!isOpen || !shift) return null;
 
   return (
     <AnimatePresence>
