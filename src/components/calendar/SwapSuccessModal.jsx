@@ -2,43 +2,34 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, Share2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 export default function SwapSuccessModal({ isOpen, onClose, shift }) {
   if (!isOpen || !shift) return null;
 
   const handleWhatsAppShare = () => {
-    // 1. Extract dates and times
-    const baseDate = new Date(shift.date);
-    const startDateStr = format(baseDate, 'dd/MM', { locale: he });
-    
-    // Default to full shift if times are missing
-    const startTime = shift.swap_start_time || '09:00';
-    const endTime = shift.swap_end_time || '09:00';
+    const baseDateStr = shift.start_date || shift.date;
+    const baseDate = baseDateStr ? new Date(baseDateStr) : null;
+    const isValidDate = baseDate && !isNaN(baseDate);
 
-    // 2. Smart End Date Calculation
-    // If end time is before start time (overnight) OR it is exactly 09:00-09:00 (24h), add a day.
-    let endDateObj = baseDate;
-    const startH = parseInt(startTime.split(':')[0]);
-    const endH = parseInt(endTime.split(':')[0]);
+    const startTime = shift.swap_start_time || shift.start_time || '09:00';
+    const requesterName = shift.user_name || shift.role || 'העובד';
 
-    if (endH < startH || (endH === startH && startTime === '09:00' && endTime === '09:00')) {
-        endDateObj = addDays(baseDate, 1);
+    let dateLine = 'תאריך לא ידוע';
+
+    if (isValidDate) {
+      const dayText = format(baseDate, 'EEEE', { locale: he });
+      const dateText = format(baseDate, 'dd/MM/yyyy', { locale: he });
+      dateLine = `${dayText} ${dateText} בשעה ${startTime}`;
+    } else {
+      dateLine = `בשעה ${startTime}`;
     }
-    
-    const endDateStr = format(endDateObj, 'dd/MM', { locale: he });
 
-    // 3. Build the message
-    const timeDescription = `מתאריך ${startDateStr} בשעה ${startTime} ועד תאריך ${endDateStr} בשעה ${endTime}`;
-    const roleName = shift.role || 'תפקיד';
-    const appLink = window.location.href;
-
-    const message = `היי, פתחתי בקשה ב-Razarto להחלפה למשמרת *${roleName}* 👮‍♂️
-${timeDescription} ⏰
-
-מי יכול לעזור? 🙏
-אפשר לאשר כאן: ${appLink}`;
+    const message = `🔁 בקשת החלפה חדשה!
+${dateLine}
+${requesterName} מבקש החלפה על המשמרת שלו.
+המעוניינים להחליף – נא לפנות אליו 🙏`;
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -104,3 +95,4 @@ ${timeDescription} ⏰
     </AnimatePresence>
   );
 }
+
