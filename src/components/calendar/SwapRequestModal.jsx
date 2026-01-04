@@ -14,8 +14,7 @@ export default function SwapRequestModal({
   date,
   shift,
   onSubmit,
-  isSubmitting,
-  logMessages = []
+  isSubmitting
 }) {
   const [swapType, setSwapType] = useState('full');
   
@@ -204,7 +203,7 @@ export default function SwapRequestModal({
                     </h3>
                     {shift?.department && (
                       <span className="inline-flex items-center justify-center rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
-                        {shift.department}
+                        {`מחלקה ${shift.department}`}
                       </span>
                     )}
                 </div>
@@ -424,18 +423,6 @@ export default function SwapRequestModal({
 
           {/* Footer with Actions */}
           <div className="p-6 pt-0 border-t border-gray-50 mt-auto bg-white space-y-3">
-            {logMessages.length > 0 && (
-              <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs text-right space-y-2 max-h-32 overflow-y-auto">
-                <p className="text-gray-500 font-semibold">לוגים אחרונים:</p>
-                <ul className="space-y-1">
-                  {logMessages.map((log, idx) => (
-                    <li key={idx} className="font-mono text-[11px] text-gray-700 break-words leading-snug">
-                      {log}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
             <div className="flex gap-3 mt-4">
                 <Button
                    type="submit"
@@ -453,5 +440,3 @@ export default function SwapRequestModal({
     </AnimatePresence>
   );
 }
-
-
