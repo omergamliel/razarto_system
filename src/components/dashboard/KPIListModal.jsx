@@ -98,7 +98,9 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const { data: coveragesAll = [], isLoading: isCoveragesLoading } = useQuery({
     queryKey: ['kpi-coverages-all'],
     queryFn: () => base44.entities.ShiftCoverage.list(),
-    enabled: isOpen && isPartialGapsView
+    // Keep this hook active for every type while the modal is mounted to avoid
+    // changing the hook graph when switching KPI views mid-session.
+    enabled: isOpen
   });
 
   const { data: authorizedUsers = [], isLoading: isUsersLoading } = useQuery({
