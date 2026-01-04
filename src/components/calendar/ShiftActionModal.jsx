@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, ShieldAlert } from 'lucide-react';
+import { X, Trash2, ShieldAlert, Calendar, Clock } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -59,7 +59,7 @@ export default function ShiftActionModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -67,114 +67,111 @@ export default function ShiftActionModal({
               onClick={onClose}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
-            
+
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col"
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col font-sans"
             >
-              {/* Header Image/Gradient */}
-              <div className="h-32 bg-gradient-to-r from-[#a9def9] to-[#a9def9] relative flex items-end p-4 text-[#0b3a5e]">
-                 <div className="absolute top-4 left-4 text-[#0b3a5e] text-xs font-medium bg-white/50 px-2 py-1 rounded-full backdrop-blur-md border border-white/40">
-                    פעולות על המשמרת
+              {/* Header */}
+              <div className="bg-[#EF5350] p-5 text-white flex justify-between items-center shrink-0">
+                 <div className="flex items-center gap-3">
+                    <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-sm shadow-inner">
+                        <Calendar className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold tracking-wide">פעולות על המשמרת</h2>
+                        <p className="text-white/80 text-sm">
+                            {format(startDateObj, 'EEEE dd/MM/yyyy', { locale: he })} · {startTime}
+                        </p>
+                    </div>
                  </div>
-                 <div className="text-[#0b3a5e]">
-                    <h2 className="text-2xl font-bold">{format(startDateObj, 'd בMMMM', { locale: he })}</h2>
-                    <p className="text-sm opacity-80">{format(startDateObj, 'yyyy', { locale: he })}</p>
-                 </div>
-
-                 <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 p-2 bg-white/60 rounded-full hover:bg-white/80 transition-colors text-[#0b3a5e]"
-                  >
+                 <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20 transition-colors">
                     <X className="w-5 h-5" />
-                  </button>
+                 </button>
               </div>
 
               {/* Body Content */}
-              <div className="p-6 space-y-6">
-                
-                {/* Status Badge & Name */}
-                <div className="text-center">
-                    <div className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold mb-3">
-                        משמרת רגילה
-                    </div>
-                    {/* תיקון פונט: הוספנו font-sans */}
-                    <h3 className="text-2xl font-sans font-bold text-gray-900 leading-tight">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+
+                {/* Assignment Info */}
+                <div className="text-center space-y-2">
+                    <p className="text-sm text-gray-400 font-medium">משובץ כרגע למשמרת</p>
+                    <h3 className="text-3xl font-extrabold text-gray-800 leading-none font-sans">
                         {shift.user_name || shift.role}
                     </h3>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-gray-500">
                        {shift.department ? `מחלקה ${shift.department}` : 'פרטי משמרת'}
                     </p>
                 </div>
 
                 {/* Times Display (Start -> End) */}
-                <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between border border-gray-100 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                    
+                <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-1 border border-gray-100 shadow-sm">
                     {/* Start */}
-                    <div className="text-center flex-1">
-                        <p className="text-xs text-gray-400 mb-1">התחלה</p>
-                        <p className="font-bold text-gray-800 text-lg leading-none">{startTime}</p>
-                        <p className="text-[10px] text-gray-500 mt-1">{format(startDateObj, 'dd/MM')}</p>
+                    <div className="flex-1 text-center py-3">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                            {format(startDateObj, 'EEEE', { locale: he })}
+                        </p>
+                        <p className="text-xl font-bold text-gray-800 leading-none mb-1 font-mono">{startTime}</p>
+                        <p className="text-[11px] text-gray-400">{format(startDateObj, 'dd/MM/yyyy')}</p>
                     </div>
 
-                    {/* Arrow Divider */}
-                    <div className="flex flex-col items-center justify-center px-2 opacity-30">
-                        <div className="w-8 h-[2px] bg-gray-400 rounded-full"></div>
+                    {/* Divider */}
+                    <div className="flex flex-col items-center justify-center px-2 text-gray-400">
+                        <Clock className="w-5 h-5" />
                     </div>
 
                     {/* End */}
-                    <div className="text-center flex-1">
-                        <p className="text-xs text-gray-400 mb-1">סיום</p>
-                        <p className="font-bold text-gray-800 text-lg leading-none">{endTime}</p>
-                        <p className="text-[10px] text-gray-500 mt-1">{format(endDateObj, 'dd/MM')}</p>
+                    <div className="flex-1 text-center py-3">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                            {format(endDateObj, 'EEEE', { locale: he })}
+                        </p>
+                        <p className="text-xl font-bold text-gray-800 leading-none mb-1 font-mono">{endTime}</p>
+                        <p className="text-[11px] text-gray-400">{format(endDateObj, 'dd/MM/yyyy')}</p>
                     </div>
                 </div>
 
-                {/* Action Buttons - Swapped Order for RTL */}
-                <div className="flex gap-3 pt-2">
-                   {/* כפתור בקשה - ראשון (ימין) */}
-                   <Button 
+                {/* Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                   <Button
                       onClick={onRequestSwap}
-                      className="flex-[2] h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-base font-bold"
+                      className="flex-1 h-12 bg-gradient-to-r from-[#EF5350] to-[#E53935] hover:from-[#E53935] hover:to-[#D32F2F] text-white rounded-xl shadow-lg shadow-red-500/20 text-base font-bold"
                     >
                       בקש החלפה
                    </Button>
 
-                   {/* כפתור ביטול - שני (שמאל) */}
-                   <Button 
+                   <Button
                       onClick={onClose}
-                      variant="outline"
-                      className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50 text-base font-medium"
+                      variant="ghost"
+                      className="flex-1 h-12 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 text-base font-medium"
                     >
                       ביטול
                    </Button>
                 </div>
 
                 {/* Admin Actions */}
-                <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                    {isAdmin && (
-                        <div className="flex gap-2 w-full">
-                            <Button 
-                                variant="ghost" 
-                                onClick={onEditRole}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs flex-1"
-                            >
-                                ערוך שיבוץ
-                            </Button>
-                            <Button 
-                                variant="ghost" 
-                                onClick={() => setShowDeleteConfirm(true)}
-                                className="text-red-400 hover:text-red-500 hover:bg-red-50 text-xs flex-1"
-                            >
-                                <Trash2 className="w-3 h-3 mr-1" />
-                                מחק משמרת
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                {isAdmin && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <div className="flex gap-2 w-full">
+                        <Button
+                            variant="ghost"
+                            onClick={onEditRole}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs flex-1"
+                        >
+                            ערוך שיבוץ
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="text-red-400 hover:text-red-500 hover:bg-red-50 text-xs flex-1"
+                        >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            מחק משמרת
+                        </Button>
+                    </div>
+                  </div>
+                )}
 
               </div>
             </motion.div>
@@ -205,3 +202,4 @@ export default function ShiftActionModal({
     </AnimatePresence>
   );
 }
+
