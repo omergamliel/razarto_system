@@ -2,86 +2,71 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, ArrowLeftRight, ChevronDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { format } from 'date-fns';
+import { format, differenceInMinutes, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import LoadingSkeleton from '../LoadingSkeleton';
+import { buildSwapTemplate } from '../calendar/whatsappTemplates';
 
 export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onRequestSwap, actionsDisabled = false }) {
   
   const [visibleCount, setVisibleCount] = useState(10);
-  const [listData, setListData] = useState([]); // Unified state for the list items
 
   useEffect(() => {
     if (isOpen) setVisibleCount(10);
   }, [isOpen, type]);
 
-  // --- QUERY: Fetch Data Based on Type ---
-  const { data: rawData = [], isLoading } = useQuery({
-    queryKey: ['kpi-list-data', type, currentUser?.serial_id],
-    queryFn: async () => {
-        if (type === 'swap_requests') {
-            // Fetch Open Full Requests + Join Shift Info
-            const reqs = await base44.entities.SwapRequest.filter({ status: 'Open', request_type: 'Full' });
-            return await enrichRequestsWithShiftInfo(reqs);
-        }
-        if (type === 'partial_gaps') {
-            // Fetch Open/Partial Partial Requests
-            const reqsOpen = await base44.entities.SwapRequest.filter({ status: 'Open', request_type: 'Partial' });
-            const reqsPartial = await base44.entities.SwapRequest.filter({ status: 'Partially_Covered' });
-            return await enrichRequestsWithShiftInfo([...reqsOpen, ...reqsPartial]);
-        }
-        if (type === 'approved') {
-            // Fetch Completed Requests
-            const reqs = await base44.entities.SwapRequest.filter({ status: 'Completed' });
-            return await enrichRequestsWithShiftInfo(reqs);
-        }
-        if (type === 'my_shifts') {
-            // Complex: Get My Shifts + My Coverages
-            // For simplicity, fetching all shifts where original_user_id is me
-            const myShifts = await base44.entities.Shift.filter({ original_user_id: currentUser.serial_id });
-            const todayStr = new Date().toISOString().split('T')[0];
-            const futureShifts = myShifts.filter(s => s.start_date >= todayStr);
-            // Enrich them to look like requests for uniform display (or handle differently)
-            return await enrichShiftsWithUserInfo(futureShifts);
-        }
-        return [];
-    },
-    enabled: isOpen && !!currentUser?.serial_id
+  const isLoading = isSwapRequestsLoading || isShiftsLoading || isUsersLoading || (type === 'partial_gaps' && isCoveragesLoading);
+
+  const { data: swapRequestsAll = [], isLoading: isSwapRequestsLoading } = useQuery({
+    queryKey: ['kpi-swap-requests-all'],
+    queryFn: () => base44.entities.SwapRequest.list(),
+    enabled: isOpen
+  });
+
+  const { data: shiftsAll = [], isLoading: isShiftsLoading } = useQuery({
+    queryKey: ['kpi-shifts-all'],
+    queryFn: () => base44.entities.Shift.list(),
+    enabled: isOpen
+  });
+
+  const { data: coveragesAll = [], isLoading: isCoveragesLoading } = useQuery({
+    queryKey: ['kpi-coverages-all'],
+    queryFn: () => base44.entities.ShiftCoverage.list(),
+    enabled: isOpen
+  });
+
+  const { data: authorizedUsers = [], isLoading: isUsersLoading } = useQuery({
+    queryKey: ['kpi-users-all'],
+    queryFn: () => base44.entities.AuthorizedPerson.list(),
+    enabled: isOpen
   });
 
   // --- Helpers ---
-  const enrichRequestsWithShiftInfo = async (requests) => {
-      const shiftIds = [...new Set(requests.map(r => r.shift_id))];
-      // Fetch all relevant shifts (Mocking bulk fetch via multiple calls or if API supports IN)
-      const shifts = await Promise.all(shiftIds.map(id => base44.entities.Shift.get(id)));
-      
-      // Fetch users for names
-      const userIds = [...new Set(shifts.map(s => s.original_user_id))];
-      const users = await Promise.all(userIds.map(id => 
-          base44.entities.AuthorizedPerson.filter({ serial_id: id }).then(res => res[0])
-      ));
-
+  const enrichRequestsWithShiftInfo = (requests) => {
       return requests.map(req => {
-          const shift = shifts.find(s => s.id === req.shift_id);
-          const user = users.find(u => u?.serial_id === shift?.original_user_id);
+          const shift = shiftsAll.find(s => s.id === req.shift_id);
+          const user = authorizedUsers.find(u => u?.serial_id === shift?.original_user_id);
           return {
               ...req,
               shift_date: shift?.start_date,
+              start_time: shift?.start_time,
+              end_time: shift?.end_time,
               user_name: user?.full_name || 'לא ידוע',
+              department: user?.department,
               original_shift: shift,
               is_request_object: true
           };
       });
   };
 
-  const enrichShiftsWithUserInfo = async (shifts) => {
-      // Just adding user name (me) for consistency
+  const enrichShiftsWithUserInfo = (shifts) => {
       return shifts.map(s => ({
           ...s,
           user_name: currentUser.full_name,
           shift_date: s.start_date,
-          is_shift_object: true // Distinguish from request object
+          is_shift_object: true
       }));
   };
 
@@ -115,6 +100,20 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       return startText || 'זמן לא ידוע';
   };
 
+  const computeMissingSegments = (windowStart, windowEnd, coverageSegments) => {
+      let segments = [{ start: windowStart, end: windowEnd }];
+      coverageSegments.forEach(cov => {
+        segments = segments.flatMap(seg => {
+          if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+          const gaps = [];
+          if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
+          if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
+          return gaps;
+        });
+      });
+      return segments.filter(seg => differenceInMinutes(seg.end, seg.start) > 0);
+  };
+
   const getStartDateTime = (item) => {
       const dateStr = item.shift_date || item.start_date || item.req_start_date;
       const timeStr = item.start_time || item.req_start_time || item.req_end_time || '00:00';
@@ -136,8 +135,75 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       return candidates[0] || null;
   };
 
+  const partialGapItems = useMemo(() => {
+      if (!isOpen) return [];
+      return shiftsAll.map((shift) => {
+          const activeRequest = swapRequestsAll.find(r => r.shift_id === shift.id && r.status !== 'Cancelled');
+          const coverageType = (activeRequest?.request_type || shift.coverageType || shift.swap_type || '').toLowerCase();
+          const user = authorizedUsers.find(u => u.serial_id === shift.original_user_id);
+          const startTime = activeRequest?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
+          const endTime = activeRequest?.req_end_time || shift.swap_end_time || shift.end_time || startTime;
+          const startDate = activeRequest?.req_start_date || shift.start_date;
+          const endDate = activeRequest?.req_end_date || shift.end_date || startDate;
+          const windowStart = new Date(`${startDate}T${startTime}`);
+          let windowEnd = new Date(`${endDate}T${endTime}`);
+          if (windowEnd <= windowStart) windowEnd = addDays(windowEnd, 1);
+
+          const coverageSegments = coveragesAll
+            .filter(c => c.shift_id === shift.id)
+            .map((c, idx) => {
+              const covStart = new Date(`${c.cover_start_date || startDate}T${c.cover_start_time || startTime}`);
+              let covEnd = new Date(`${c.cover_end_date || endDate}T${c.cover_end_time || endTime}`);
+              if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
+              return { key: c.id || idx, start: covStart, end: covEnd };
+            });
+
+          const missing = computeMissingSegments(windowStart, windowEnd, coverageSegments);
+          const hasGap = missing.length > 0;
+          const partialState = coverageType === 'partial' || activeRequest?.status === 'Partially_Covered' || shift.status === 'partial';
+
+          if (!hasGap && !partialState) return null;
+
+          return {
+            ...activeRequest,
+            id: activeRequest?.id || `partial-${shift.id}`,
+            shift_id: shift.id,
+            user_name: user?.full_name || shift.user_name || 'לא ידוע',
+            req_start_time: startTime,
+            req_end_time: endTime,
+            shift_date: startDate,
+            request_type: 'Partial',
+            requesting_user_id: activeRequest?.requesting_user_id || shift.original_user_id,
+            missingSegments: missing,
+            is_request_object: true,
+          };
+      }).filter(Boolean);
+  }, [authorizedUsers, coveragesAll, isOpen, shiftsAll, swapRequestsAll]);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const futureShifts = shiftsAll.filter(s => s.original_user_id === currentUser?.serial_id && s.start_date >= todayStr);
+
+  const baseData = useMemo(() => {
+      const fullRequests = swapRequestsAll.filter(r => r.status === 'Open' && r.request_type === 'Full');
+      const partialRequests = swapRequestsAll.filter(r => (r.status === 'Open' && r.request_type === 'Partial') || r.status === 'Partially_Covered');
+      const approvedReqs = swapRequestsAll.filter(r => ['Completed', 'Closed'].includes(r.status));
+
+      switch (type) {
+        case 'swap_requests':
+          return enrichRequestsWithShiftInfo(fullRequests);
+        case 'partial_gaps':
+          return partialGapItems.length ? partialGapItems : enrichRequestsWithShiftInfo(partialRequests);
+        case 'approved':
+          return enrichRequestsWithShiftInfo(approvedReqs);
+        case 'my_shifts':
+          return enrichShiftsWithUserInfo(futureShifts);
+        default:
+          return [];
+      }
+  }, [enrichRequestsWithShiftInfo, enrichShiftsWithUserInfo, futureShifts, partialGapItems, swapRequestsAll, type]);
+
   const sortedData = useMemo(() => {
-      const items = [...rawData];
+      const items = [...baseData];
 
       if (type === 'approved') {
           items.sort((a, b) => {
@@ -155,7 +221,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       });
 
       return items;
-  }, [rawData, type]);
+  }, [baseData, type]);
 
   const handleAddToCalendar = (item) => {
       if (actionsDisabled) return;
@@ -191,6 +257,24 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       }
   };
 
+  const getApprovalUrl = (item) => {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      return `${base}/approve/${item.shift_id || item.id || ''}`;
+  };
+
+  const handleReshareWhatsapp = (item) => {
+      const message = buildSwapTemplate({
+        employeeName: item.user_name,
+        startDate: item.start_date || item.shift_date,
+        startTime: item.start_time || item.req_start_time || '09:00',
+        endDate: item.end_date || item.shift_date,
+        endTime: item.end_time || item.req_end_time || item.req_start_time || '09:00',
+        approvalUrl: getApprovalUrl(item)
+      });
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+  };
+
   // --- Render ---
   const getTitleAndColor = () => {
     switch (type) {
@@ -223,9 +307,20 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
           </div>
 
           <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
-            {isLoading ? <p className="text-center py-10 text-gray-500">טוען...</p> : 
-             rawData.length === 0 ? (
-              <div className="text-center py-12 text-gray-500"><p>אין נתונים להצגה</p></div>
+            {isLoading ? (
+              <div className="space-y-3" aria-label="טעינת נתונים">
+                <LoadingSkeleton className="h-16 w-full" />
+                <LoadingSkeleton className="h-16 w-full" />
+                <LoadingSkeleton className="h-16 w-full" />
+              </div>
+            ) : baseData.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="mx-auto w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <AlertCircle className="w-6 h-6 text-gray-400" />
+                </div>
+                <p className="font-semibold">אין נתונים להצגה</p>
+                <p className="text-sm text-gray-400">המשימות יופיעו כאן ברגע שיהיו</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {displayedItems.map((item, idx) => {
@@ -280,6 +375,17 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                                     >
                                         <CalendarPlus className="w-5 h-5" />
                                     </Button>
+                                    {isFutureShiftsView && item.is_shift_object && (
+                                      <Button
+                                        onClick={() => handleReshareWhatsapp(item)}
+                                        size="icon"
+                                        disabled={actionsDisabled}
+                                        className={`rounded-full w-10 h-10 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        title="שיתוף הבקשה מחדש בוואטסאפ"
+                                      >
+                                        <Send className="w-5 h-5" />
+                                      </Button>
+                                    )}
                                     {item.is_shift_object && (
                                       <Button
                                         onClick={() => handleRequestSwap(item)}
@@ -313,4 +419,3 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     </AnimatePresence>
   );
 }
-
