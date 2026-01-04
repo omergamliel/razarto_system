@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, Search, Filter, MoreVertical, 
+import {
+  X, Search, Filter, MoreVertical,
   Edit2, Trash2, Shield, UserX, UserPlus,
   AlertTriangle, Archive, Check, Send, CheckCircle2
 } from 'lucide-react';
@@ -38,12 +38,13 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('users');
 
   // --- MODAL STATES ---
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [addUserStep, setAddUserStep] = useState('form'); // 'form' or 'success'
   const [addedUserData, setAddedUserData] = useState(null); // Stores the newly added user for the invite
-  
+
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -54,7 +55,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   const [permissionUser, setPermissionUser] = useState(null);
   const [selectedPermission, setSelectedPermission] = useState('');
   const [userToDelete, setUserToDelete] = useState(null);
-  
+
   // Archive Logic States
   const [isArchiveMode, setIsArchiveMode] = useState(false);
   const [archiveReason, setArchiveReason] = useState('');
@@ -75,7 +76,8 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   // --- HELPER: WhatsApp Invite ---
   const handleSendInvite = (user) => {
     if (!user) return;
-    const message = `היי *${user.full_name}* \nהוזמנת להצטרף למערכת Razarto\nיש להיכנס לקישור ולהתחבר באמצעות המייל האישי.\nקישור: https://razar-toran-b555aef5.base44.app`;    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    const message = `היי *${user.full_name}* \nהוזמנת להצטרף למערכת Razarto\nיש להיכנס לקישור ולהתחבר באמצעות המייל האישי.\nקישור: https://razar-toran-b555aef5.base44.app`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -151,8 +153,8 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     e.preventDefault();
     if (!editingUser.full_name || !editingUser.department || !editingUser.email) return toast.error("נא למלא את כל שדות החובה");
     setIsSubmitting(true);
-    try { 
-      await updateUserMutation.mutateAsync({ id: editingUser.id, data: editingUser }); 
+    try {
+      await updateUserMutation.mutateAsync({ id: editingUser.id, data: editingUser });
     } finally { setIsSubmitting(false); }
   };
 
@@ -160,9 +162,9 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
     if (!permissionUser || !selectedPermission) return;
     setIsSubmitting(true);
     try {
-      await updateUserMutation.mutateAsync({ 
-        id: permissionUser.id, 
-        data: { permissions: selectedPermission } 
+      await updateUserMutation.mutateAsync({
+        id: permissionUser.id,
+        data: { permissions: selectedPermission }
       });
     } finally { setIsSubmitting(false); }
   };
@@ -184,7 +186,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   // Filter Logic
   const getFilteredPeople = () => {
     return authorizedPeople.filter(person => {
-      const searchMatch = person.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      const searchMatch = person.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           person.email?.toLowerCase().includes(searchTerm.toLowerCase());
       const deptMatch = selectedDepartments.length === 0 || selectedDepartments.includes(person.department);
       return searchMatch && deptMatch;
@@ -192,6 +194,14 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
   };
 
   const filteredPeople = getFilteredPeople();
+
+  const tabs = useMemo(() => ([
+    { id: 'settings', label: 'הגדרות', icon: 'https://cdn-icons-png.flaticon.com/128/3247/3247957.png', enabled: false },
+    { id: 'users', label: 'משתמשים', icon: 'https://cdn-icons-png.flaticon.com/128/9888/9888730.png', enabled: true },
+    { id: 'support', label: 'תמיכה', icon: 'https://cdn-icons-png.flaticon.com/128/15202/15202496.png', enabled: false },
+    { id: 'themes', label: 'ערכת נושא', icon: 'https://cdn-icons-png.flaticon.com/128/9521/9521756.png', enabled: false },
+    { id: 'logs', label: 'לוגים', icon: 'https://cdn-icons-png.flaticon.com/128/10397/10397230.png', enabled: false },
+  ]), []);
 
   if (!isOpen) return null;
 
@@ -211,9 +221,15 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
       >
         {/* Header */}
         <div className="bg-white px-6 py-4 md:px-8 md:py-6 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-800">ניהול מערכת</h2>
-            <p className="text-gray-500 text-xs md:text-sm mt-1">רשימת משתמשים מורשים וניהול גישה</p>
+          <div className="flex flex-col gap-2">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-blue-600 font-semibold">system console</p>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800">ניהול מערכת</h2>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>פאנל ניהול חכם עם טאבים מודולאריים</span>
+            </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
             <X className="w-6 h-6 text-gray-400" />
@@ -221,168 +237,220 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden bg-[#F9FAFB] p-4 md:p-8">
-          <div className="h-full flex flex-col gap-4 md:gap-6">
-            
-            {/* Toolbar */}
-            <div className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
-              <div className="relative w-full md:w-80 lg:w-96">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input 
-                  placeholder="חיפוש לפי שם או מייל..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-10 h-10 md:h-11 bg-gray-50 border-gray-200 focus:bg-white rounded-xl text-sm"
-                />
+        <div className="flex-1 overflow-hidden bg-[#F9FAFB] p-4 md:p-8 flex flex-col gap-4 md:gap-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 md:p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 text-[11px] rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-100">פאנל מודולארי</span>
+                <span className="text-gray-400 text-xs hidden md:inline">בחר את המודול לניהול</span>
               </div>
-
-              <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto hide-scrollbar pb-1 md:pb-0 justify-between md:justify-end">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500 ml-2 whitespace-nowrap flex items-center gap-1 shrink-0 hidden md:flex">
-                    <Filter className="w-4 h-4" /> סינון:
-                  </span>
-                  {['ש', 'מ', 'ת'].map(dept => (
-                    <button
-                      key={dept}
-                      onClick={() => {
-                        setSelectedDepartments(prev => prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]);
-                      }}
-                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all border shrink-0 ${
-                        selectedDepartments.includes(dept) ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {dept}
-                    </button>
-                  ))}
-                </div>
-
-                <Button 
-                  onClick={() => { setAddUserStep('form'); setIsAddUserOpen(true); }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-2 shadow-md shadow-blue-200 shrink-0 h-10 md:h-11 px-4"
-                >
-                  <img src="https://cdn-icons-png.flaticon.com/128/9131/9131530.png" alt="Add" className="w-5 h-5 invert brightness-0 filter" style={{ filter: 'brightness(0) invert(1)' }} />
-                  <span className="hidden md:inline">הוספה</span>
-                </Button>
+              <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                <span className="hidden md:inline">מותאם למובייל ודסקטופ</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden flex flex-col">
-              <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <div className="col-span-3">שם מלא</div>
-                <div className="col-span-2">מחלקה</div>
-                <div className="col-span-3">אימייל</div>
-                <div className="col-span-2">הרשאות</div>
-                <div className="col-span-1 text-center">קישוריות</div>
-                <div className="col-span-1 text-center">פעולות</div>
-              </div>
-
-              <div className="overflow-y-auto flex-1 custom-scrollbar">
-                {isLoadingPeople ? (
-                  <div className="flex items-center justify-center h-40 text-gray-400">טוען נתונים...</div>
-                ) : filteredPeople.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-2">
-                    <UserX className="w-10 h-10 opacity-20" />
-                    <span>לא נמצאו משתמשים</span>
-                  </div>
-                ) : (
-                  filteredPeople.map((person) => {
-                    const permStyle = getPermissionStyle(person.permissions);
-                    return (
-                      <div key={person.id} className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 border-b border-gray-50 items-center hover:bg-blue-50/30 transition-colors group relative">
-                        {/* Name */}
-                        <div className="col-span-7 md:col-span-3 flex flex-col justify-center">
-                          <div className="font-bold text-gray-800 text-sm truncate flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
-                              {person.full_name?.charAt(0)}
-                            </div>
-                            <span className="truncate">{person.full_name}</span>
-                          </div>
-                          <div className="md:hidden text-xs text-gray-400 mr-10 mt-0.5 flex gap-2">
-                            <span>{person.department}</span> • <span style={{ color: permStyle.text }}>{person.permissions}</span>
-                          </div>
-                        </div>
-
-                        {/* Department */}
-                        <div className="hidden md:block col-span-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            מחלקה {person.department}
-                          </span>
-                        </div>
-
-                        {/* Email */}
-                        <div className="hidden md:block col-span-3 text-sm text-gray-500 truncate font-mono">
-                          {person.email}
-                        </div>
-
-                        {/* Permissions (Styled) */}
-                        <div className="hidden md:block col-span-2">
-                          <span 
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold border shadow-sm"
-                            style={{ 
-                              backgroundColor: permStyle.bg, 
-                              color: permStyle.text,
-                              borderColor: permStyle.border
-                            }}
-                          >
-                            {person.permissions || 'View'}
-                          </span>
-                        </div>
-
-                        {/* Connectivity */}
-                        <div className="col-span-3 md:col-span-1 flex justify-center items-center">
-                          <img 
-                            src={person.linked_user_id 
-                              ? "https://i.imagesup.co/images2/30a37d06678a9808e762570c63cede181682172e.png" 
-                              : "https://i.imagesup.co/images2/b4873b1a4a57971b9ab6294adda44a6a184efc66.png"} 
-                            alt="Status"
-                            className="w-6 h-6 object-contain"
-                          />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="col-span-2 md:col-span-1 flex justify-end md:justify-center">
-                          <DropdownMenu dir="rtl">
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-gray-200">
-                                <MoreVertical className="w-4 h-4 text-gray-500" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onClick={() => { setEditingUser({...person}); setIsEditUserOpen(true); }} className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
-                                <span>עריכה</span><Edit2 className="w-4 h-4" />
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setPermissionUser(person); setSelectedPermission(person.permissions || 'View'); setIsPermissionsOpen(true); }} className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
-                                <span>ניהול הרשאות</span><Shield className="w-4 h-4" />
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleSendInvite(person)} className="flex items-center justify-end gap-2 cursor-pointer text-blue-600 focus:text-blue-700 focus:bg-blue-50">
-                                <span>שליחת הזמנה</span><Send className="w-4 h-4" />
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setUserToDelete(person); setIsDeleteOpen(true); setIsArchiveMode(false); }} className="flex items-center justify-end gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 border-t mt-1 pt-1">
-                                <span>מחיקה</span><Trash2 className="w-4 h-4" />
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              
-              <div className="p-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex justify-between px-6 shrink-0">
-                <span>סה"כ רשומות: {filteredPeople.length}</span>
-                <span className="hidden md:inline">מציג {filteredPeople.length} מתוך {authorizedPeople.length}</span>
-              </div>
+            <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar py-2" dir="rtl">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl border transition-all shrink-0 text-sm font-semibold
+                    ${activeTab === tab.id
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md shadow-blue-100'
+                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}
+                  `}
+                >
+                  <img src={tab.icon} alt={tab.label} className="w-4 h-4 md:w-5 md:h-5" />
+                  <span>{tab.label}</span>
+                  {!tab.enabled && <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">בקרוב</span>}
+                </button>
+              ))}
             </div>
           </div>
+
+          {activeTab === 'users' ? (
+            <div className="h-full flex flex-col gap-4 md:gap-6">
+
+              {/* Toolbar */}
+              <div className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
+                <div className="relative w-full md:w-80 lg:w-96">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="חיפוש לפי שם או מייל..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pr-10 h-10 md:h-11 bg-gray-50 border-gray-200 focus:bg-white rounded-xl text-sm"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto hide-scrollbar pb-1 md:pb-0 justify-between md:justify-end">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 ml-2 whitespace-nowrap flex items-center gap-1 shrink-0 hidden md:flex">
+                      <Filter className="w-4 h-4" /> סינון:
+                    </span>
+                    {['ש', 'מ', 'ת'].map(dept => (
+                      <button
+                        key={dept}
+                        onClick={() => {
+                          setSelectedDepartments(prev => prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]);
+                        }}
+                        className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all border shrink-0 ${
+                          selectedDepartments.includes(dept) ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {dept}
+                      </button>
+                    ))}
+                  </div>
+
+                  <Button
+                    onClick={() => { setAddUserStep('form'); setIsAddUserOpen(true); }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-2 shadow-md shadow-blue-200 shrink-0 h-10 md:h-11 px-4"
+                  >
+                    <img src="https://cdn-icons-png.flaticon.com/128/9131/9131530.png" alt="Add" className="w-5 h-5 invert brightness-0 filter" style={{ filter: 'brightness(0) invert(1)' }} />
+                    <span className="hidden md:inline">הוספה</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden flex flex-col">
+                <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <div className="col-span-3">שם מלא</div>
+                  <div className="col-span-2">מחלקה</div>
+                  <div className="col-span-3">אימייל</div>
+                  <div className="col-span-2">הרשאות</div>
+                  <div className="col-span-1 text-center">קישוריות</div>
+                  <div className="col-span-1 text-center">פעולות</div>
+                </div>
+
+                <div className="overflow-y-auto flex-1 custom-scrollbar">
+                  {isLoadingPeople ? (
+                    <div className="flex items-center justify-center h-40 text-gray-400">טוען נתונים...</div>
+                  ) : filteredPeople.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-2">
+                      <UserX className="w-10 h-10 opacity-20" />
+                      <span>לא נמצאו משתמשים</span>
+                    </div>
+                  ) : (
+                    filteredPeople.map((person) => {
+                      const permStyle = getPermissionStyle(person.permissions);
+                      return (
+                        <div key={person.id} className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 border-b border-gray-50 items-center hover:bg-blue-50/30 transition-colors group relative">
+                          {/* Name */}
+                          <div className="col-span-7 md:col-span-3 flex flex-col justify-center">
+                            <div className="font-bold text-gray-800 text-sm truncate flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
+                                {person.full_name?.charAt(0)}
+                              </div>
+                              <span className="truncate">{person.full_name}</span>
+                            </div>
+                            <div className="md:hidden text-xs text-gray-400 mr-10 mt-0.5 flex gap-2">
+                              <span>{person.department}</span> • <span style={{ color: permStyle.text }}>{person.permissions}</span>
+                            </div>
+                          </div>
+
+                          {/* Department */}
+                          <div className="hidden md:block col-span-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              מחלקה {person.department}
+                            </span>
+                          </div>
+
+                          {/* Email */}
+                          <div className="hidden md:block col-span-3 text-sm text-gray-500 truncate font-mono">
+                            {person.email}
+                          </div>
+
+                          {/* Permissions (Styled) */}
+                          <div className="hidden md:block col-span-2">
+                            <span
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold border shadow-sm"
+                              style={{
+                                backgroundColor: permStyle.bg,
+                                color: permStyle.text,
+                                borderColor: permStyle.border
+                              }}
+                            >
+                              {person.permissions || 'View'}
+                            </span>
+                          </div>
+
+                          {/* Connectivity */}
+                          <div className="col-span-3 md:col-span-1 flex justify-center items-center">
+                            <img
+                              src={person.linked_user_id
+                                ? "https://i.imagesup.co/images2/30a37d06678a9808e762570c63cede181682172e.png"
+                                : "https://i.imagesup.co/images2/b4873b1a4a57971b9ab6294adda44a6a184efc66.png"}
+                              alt="Status"
+                              className="w-6 h-6 object-contain"
+                            />
+                          </div>
+
+                          {/* Actions */}
+                          <div className="col-span-2 md:col-span-1 flex justify-end md:justify-center">
+                            <DropdownMenu dir="rtl">
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-gray-200">
+                                  <MoreVertical className="w-4 h-4 text-gray-500" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => { setEditingUser({...person}); setIsEditUserOpen(true); }} className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
+                                  <span>עריכה</span><Edit2 className="w-4 h-4" />
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setPermissionUser(person); setSelectedPermission(person.permissions || 'View'); setIsPermissionsOpen(true); }} className="flex items-center justify-end gap-2 cursor-pointer text-gray-700">
+                                  <span>ניהול הרשאות</span><Shield className="w-4 h-4" />
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSendInvite(person)} className="flex items-center justify-end gap-2 cursor-pointer text-blue-600 focus:text-blue-700 focus:bg-blue-50">
+                                  <span>שליחת הזמנה</span><Send className="w-4 h-4" />
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setUserToDelete(person); setIsDeleteOpen(true); setIsArchiveMode(false); }} className="flex items-center justify-end gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 border-t mt-1 pt-1">
+                                  <span>מחיקה</span><Trash2 className="w-4 h-4" />
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="p-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex justify-between px-6 shrink-0">
+                  <span>סה"כ רשומות: {filteredPeople.length}</span>
+                  <span className="hidden md:inline">מציג {filteredPeople.length} מתוך {authorizedPeople.length}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 shadow-sm p-8 md:p-12 text-center max-w-xl flex flex-col gap-4">
+                <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 flex items-center justify-center shadow-inner">
+                  <img src={tabs.find((tab) => tab.id === activeTab)?.icon} alt="Tab icon" className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-blue-600 font-semibold">בקרוב</p>
+                  <h3 className="text-xl md:text-2xl font-bold text-gray-800">עוד רגע הטאב הזה יתמלא ביכולות חדשות</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">
+                    הממשק נבנה במבנה מודולארי כדי שתוכלו להפעיל ולכבות מודולים לפי הצורך. בקרוב נוסיף לכאן כלי ניהול, דוחות, ערכות נושא ולוגים מתקדמים.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button variant="outline" className="rounded-xl">תנו לנו לדעת מה חשוב לכם</Button>
+                  <Button className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white">קבלו עדכון כשזה מוכן</Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </motion.div>
 
       {/* --- 1. ADD USER MODAL (Multi-Step) --- */}
       <Dialog open={isAddUserOpen} onOpenChange={handleCloseAddUser}>
         <DialogContent className="sm:max-w-[425px] text-right" dir="rtl">
-          
+
           {addUserStep === 'form' ? (
             <>
               <DialogHeader className="text-right">
@@ -430,9 +498,9 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             </>
           ) : (
             // --- SUCCESS STEP ---
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }} 
-              animate={{ opacity: 1, scale: 1 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center text-center p-4 gap-4"
             >
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-2">
@@ -442,16 +510,16 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
               <p className="text-gray-600">
                 המשתמש <b>{addedUserData?.full_name}</b> התווסף למערכת בהצלחה.
               </p>
-              
+
               <div className="flex flex-col w-full gap-3 mt-4">
-                <Button 
-                  onClick={() => handleSendInvite(addedUserData)} 
+                <Button
+                  onClick={() => handleSendInvite(addedUserData)}
                   className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white gap-2 h-12 text-md rounded-xl"
                 >
                   <img src="https://cdn-icons-png.flaticon.com/128/3670/3670051.png" alt="WhatsApp" className="w-5 h-5 brightness-0 invert" style={{filter: 'brightness(0) invert(1)'}} />
                   שתף הזמנה בוואטסאפ
                 </Button>
-                
+
                 <Button variant="outline" onClick={handleCloseAddUser} className="w-full h-11 rounded-xl">
                   סגירה
                 </Button>
@@ -517,7 +585,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
             {/* View Option */}
-            <div 
+            <div
               onClick={() => setSelectedPermission('View')}
               className={`cursor-pointer rounded-xl border-2 p-4 transition-all relative overflow-hidden group
                 ${selectedPermission === 'View' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-200 hover:bg-gray-50'}
@@ -534,7 +602,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             </div>
 
             {/* RR Option */}
-            <div 
+            <div
               onClick={() => setSelectedPermission('RR')}
               className={`cursor-pointer rounded-xl border-2 p-4 transition-all relative overflow-hidden group
                 ${selectedPermission === 'RR' ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:border-orange-200 hover:bg-gray-50'}
@@ -577,9 +645,9 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
             ) : (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
                 <Label className="mb-2 block text-gray-700">סיבת העברה לארכיון:</Label>
-                <Textarea 
-                  value={archiveReason} 
-                  onChange={(e) => setArchiveReason(e.target.value)} 
+                <Textarea
+                  value={archiveReason}
+                  onChange={(e) => setArchiveReason(e.target.value)}
                   placeholder="הכנס סיבה או הערה..."
                   className="bg-gray-50 focus:bg-white min-h-[80px]"
                 />
@@ -594,22 +662,22 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
               </Button>
               <Button variant="outline" onClick={() => setIsDeleteOpen(false)} className="flex-1">לא, ביטול</Button>
             </div>
-            
+
             {/* Archive Toggle Button (Only visible if not already in archive mode) */}
             {!isArchiveMode && (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 onClick={() => setIsArchiveMode(true)}
                 className="w-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 gap-2 mt-2"
               >
                 <Archive className="w-4 h-4" /> אפשרויות ארכיון
               </Button>
             )}
-            
+
             {/* Cancel Archive Mode (Go back to delete) */}
             {isArchiveMode && (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 onClick={() => setIsArchiveMode(false)}
                 className="w-full text-sm text-gray-400 hover:text-gray-600"
               >
