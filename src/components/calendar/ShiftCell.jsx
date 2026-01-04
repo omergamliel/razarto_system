@@ -84,12 +84,6 @@ export default function ShiftCell({
     let baseEnd = new Date(`${requestEndDate}T${requestEndStr}`);
     if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
 
-    const formatRange = (start, end) => {
-      const startText = format(start, 'HH:mm');
-      const endText = format(end, 'HH:mm');
-      return `${startText} - ${endText}`;
-    };
-
     const coverageSegments = (shift.coverages || [])
       .filter(cov => cov.status !== 'Cancelled')
       .map((cov, idx) => {
@@ -101,48 +95,71 @@ export default function ShiftCell({
           name: cov.covering_name || 'מחליף',
           start: covStart,
           end: covEnd,
-          timeRange: formatRange(covStart, covEnd),
         };
       });
 
-    const isPartial = shift.status === 'partial';
+    const mergedCoverages = coverageSegments
+      .map(seg => ({ start: seg.start, end: seg.end }))
+      .sort((a, b) => a.start - b.start)
+      .reduce((acc, seg) => {
+        if (!acc.length) return [seg];
+        const last = acc[acc.length - 1];
+        if (seg.start <= last.end) {
+          last.end = new Date(Math.max(last.end, seg.end));
+          return acc;
+        }
+        return [...acc, seg];
+      }, []);
+
+    let ownerSlots = [{ start: baseStart, end: baseEnd }];
+
+    mergedCoverages.forEach(cov => {
+      ownerSlots = ownerSlots.flatMap(slot => {
+        if (cov.end <= slot.start || cov.start >= slot.end) return [slot];
+        const pieces = [];
+        if (cov.start > slot.start) pieces.push({ start: slot.start, end: cov.start });
+        if (cov.end < slot.end) pieces.push({ start: cov.end, end: slot.end });
+        return pieces;
+      });
+    });
+
+    ownerSlots = ownerSlots.filter(seg => seg.end > seg.start);
+
+    const formatRange = (start, end) => {
+      const startText = format(start, 'HH:mm');
+      const endText = format(end, 'HH:mm');
+      return `${startText} - ${endText}`;
+    };
+
+    const hasMultipleCoverages = coverageSegments.length > 1;
+    const hasOwnerCoverage = ownerSlots.length > 0;
+    const showTimeForPartial = coverageSegments.length > 0 && (
+      hasOwnerCoverage ||
+      hasMultipleCoverages ||
+      shift.coverageType === 'partial' ||
+      shift.status === 'partial'
+    );
+
+    const coverageAssignments = coverageSegments.map(seg => ({
+      key: seg.key,
+      name: seg.name,
+      timeRange: showTimeForPartial ? formatRange(seg.start, seg.end) : null,
+    }));
+
+    const ownerName = shift.user_name || 'לא ידוע';
+    const ownerAssignments = ownerSlots.map((seg, idx) => ({
+      key: `owner-${shift.id}-${idx}`,
+      name: ownerName,
+      timeRange: showTimeForPartial ? formatRange(seg.start, seg.end) : null,
+      isOwner: true,
+    }));
+
     const uniqueAssignments = [];
 
-    if (shift.status === 'covered' && shift.coverageType !== 'partial' && coverageSegments.length) {
-      uniqueAssignments.push(...coverageSegments);
+    if (shift.status === 'covered' && shift.coverageType !== 'partial' && coverageSegments.length && !hasOwnerCoverage) {
+      uniqueAssignments.push(...coverageAssignments);
     } else {
-      uniqueAssignments.push({
-        key: shift.id,
-        name: shift.user_name || 'לא ידוע',
-        timeRange: formatRange(baseStart, baseEnd),
-        isOwner: true,
-      });
-
-      uniqueAssignments.push(...coverageSegments);
-
-      if (isPartial) {
-        let missing = [{ start: baseStart, end: baseEnd }];
-        coverageSegments.sort((a, b) => a.start - b.start).forEach(cov => {
-          missing = missing.flatMap(seg => {
-            if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
-            const gaps = [];
-            if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
-            if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
-            return gaps;
-          });
-        });
-
-        uniqueAssignments.push(
-          ...missing
-            .filter(seg => seg.end > seg.start)
-            .map((seg, idx) => ({
-              key: `gap-${idx}`,
-              name: 'טרם אויש',
-              timeRange: formatRange(seg.start, seg.end),
-              isGap: true,
-            }))
-        );
-      }
+      uniqueAssignments.push(...ownerAssignments, ...coverageAssignments);
     }
 
     return uniqueAssignments;
