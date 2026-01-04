@@ -191,6 +191,7 @@ export default function ShiftCalendar() {
         };
       });
 
+    const coverageType = activeRequest?.request_type?.toLowerCase() || shift.coverageType || shift.swap_type || 'full';
     let displayStatus = 'regular';
 
     if (shift.status === 'Covered') {
@@ -198,17 +199,20 @@ export default function ShiftCalendar() {
     }
 
     if (activeRequest) {
+      const isPartialRequest = coverageType === 'partial';
+      const hasCoverages = shiftCoverages.length > 0;
+
       if (activeRequest.status === 'Closed') {
         displayStatus = 'covered';
-      } else if (activeRequest.status === 'Partially_Covered' || shiftCoverages.length > 0) {
+      } else if (activeRequest.status === 'Partially_Covered' || (isPartialRequest && hasCoverages)) {
         displayStatus = 'partial';
       } else if (activeRequest.status === 'Open' || shift.status === 'Swap_Requested') {
-        displayStatus = 'requested';
+        displayStatus = isPartialRequest ? 'partial' : 'requested';
       }
     }
 
     if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
-      displayStatus = 'partial';
+      displayStatus = coverageType === 'partial' ? 'partial' : 'covered';
     }
 
     return {
@@ -223,6 +227,7 @@ export default function ShiftCalendar() {
       swap_start_time: activeRequest?.req_start_time,
       swap_end_time: activeRequest?.req_end_time,
       swap_type: activeRequest?.request_type?.toLowerCase(),
+      coverageType,
       coverages: shiftCoverages,
       active_request: activeRequest
     };
@@ -788,4 +793,3 @@ export default function ShiftCalendar() {
     </div>
   );
 }
-
