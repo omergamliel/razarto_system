@@ -99,9 +99,9 @@ export default function ShiftActionModal({
                         {shift.user_name || shift.role}
                     </h3>
                     {shift.department && (
-                      <span className="inline-flex items-center justify-center rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
-                        {shift.department}
-                      </span>
+                        <span className="inline-flex items-center justify-center rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
+                        {`מחלקה ${shift.department}`}
+                        </span>
                     )}
                 </div>
 
@@ -201,4 +201,3 @@ export default function ShiftActionModal({
     </AnimatePresence>
   );
 }
-
