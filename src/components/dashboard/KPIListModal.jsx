@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, ArrowLeftRight, ChevronDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -115,6 +115,48 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       return startText || 'זמן לא ידוע';
   };
 
+  const getStartDateTime = (item) => {
+      const dateStr = item.shift_date || item.start_date || item.req_start_date;
+      const timeStr = item.start_time || item.req_start_time || item.req_end_time || '00:00';
+
+      if (!dateStr) return null;
+
+      const composed = new Date(`${dateStr}T${timeStr}`);
+      if (!isNaN(composed)) return composed;
+
+      const fallback = new Date(dateStr);
+      return isNaN(fallback) ? null : fallback;
+  };
+
+  const getLatestActivityDate = (item) => {
+      const candidates = [item.updated_at, item.created_at, item.shift_date, item.req_start_date]
+        .map(val => val ? new Date(val) : null)
+        .filter(val => val && !isNaN(val));
+
+      return candidates[0] || null;
+  };
+
+  const sortedData = useMemo(() => {
+      const items = [...rawData];
+
+      if (type === 'approved') {
+          items.sort((a, b) => {
+              const bDate = getLatestActivityDate(b)?.getTime() || 0;
+              const aDate = getLatestActivityDate(a)?.getTime() || 0;
+              return bDate - aDate;
+          });
+          return items;
+      }
+
+      items.sort((a, b) => {
+          const aTime = getStartDateTime(a)?.getTime() ?? Infinity;
+          const bTime = getStartDateTime(b)?.getTime() ?? Infinity;
+          return aTime - bTime;
+      });
+
+      return items;
+  }, [rawData, type]);
+
   const handleAddToCalendar = (item) => {
       if (actionsDisabled) return;
 
@@ -163,8 +205,8 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const { title, color, textColor } = getTitleAndColor();
   const secondaryHeaderText = type === 'my_shifts' ? 'text-[#0b3a5e]/80' : 'text-white/90';
   const isFutureShiftsView = type === 'my_shifts';
-  const displayedItems = rawData.slice(0, visibleCount);
-  const hasMore = rawData.length > visibleCount;
+  const displayedItems = sortedData.slice(0, visibleCount);
+  const hasMore = sortedData.length > visibleCount;
 
   if (!isOpen) return null;
 
@@ -177,7 +219,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
           <div className={`bg-gradient-to-r ${color} p-6 ${textColor}`}>
             <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors text-current"><X className="w-5 h-5" /></button>
             <h2 className="text-2xl font-bold">{title}</h2>
-            <p className={`${secondaryHeaderText} text-sm mt-1`}>{rawData.length} רשומות</p>
+            <p className={`${secondaryHeaderText} text-sm mt-1`}>{sortedData.length} רשומות</p>
           </div>
 
           <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
@@ -271,3 +313,4 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     </AnimatePresence>
   );
 }
+
