@@ -17,8 +17,6 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     if (isOpen) setVisibleCount(10);
   }, [isOpen, type]);
 
-  const isLoading = isSwapRequestsLoading || isShiftsLoading || isUsersLoading || (type === 'partial_gaps' && isCoveragesLoading);
-
   const { data: swapRequestsAll = [], isLoading: isSwapRequestsLoading } = useQuery({
     queryKey: ['kpi-swap-requests-all'],
     queryFn: () => base44.entities.SwapRequest.list(),
@@ -42,6 +40,8 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     queryFn: () => base44.entities.AuthorizedPerson.list(),
     enabled: isOpen
   });
+
+  const isLoading = isSwapRequestsLoading || isShiftsLoading || isUsersLoading || (type === 'partial_gaps' && isCoveragesLoading);
 
   // --- Helpers ---
   const enrichRequestsWithShiftInfo = (requests) => {
