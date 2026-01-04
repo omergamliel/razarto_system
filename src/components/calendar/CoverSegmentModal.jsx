@@ -5,8 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import LoadingSkeleton from '../LoadingSkeleton';
 
 export default function CoverSegmentModal({ 
   isOpen, 
@@ -32,7 +34,7 @@ export default function CoverSegmentModal({
   const shiftStartObjRef = useRef(null);
   const shiftEndObjRef = useRef(null);
 
-  const { data: existingCoverages = [] } = useQuery({
+  const { data: existingCoverages = [], isLoading: isCoveragesLoading } = useQuery({
     queryKey: ['shift-coverages-modal', shift?.id],
     queryFn: async () => {
       if (!shift?.id) return [];
@@ -161,6 +163,15 @@ export default function CoverSegmentModal({
 
 
   const handleTypeChange = (type) => {
+    const hasSpecificGap = allowedRange[0] > 0 || allowedRange[1] < totalDurationRef.current;
+    if (
+      type === 'full' &&
+      hasSpecificGap &&
+      !window.confirm('למשמרת זו יש צורך בהחלפה בטווח שעות ספציפי בלבד. האם אתה בטוח שברצונך להחליף את כל המשמרת?')
+    ) {
+      return;
+    }
+
     setCoverageType(type);
     setError('');
 
@@ -250,6 +261,33 @@ export default function CoverSegmentModal({
     updateInputsFromRange(newRange);
   };
 
+  const handleManualTimeChange = (field, value) => {
+    if (!shiftStartObjRef.current || !value) return;
+    const [hours, minutes] = value.split(':').map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return;
+
+    const candidate = new Date(shiftStartObjRef.current);
+    candidate.setHours(hours, minutes, 0, 0);
+
+    const limitRange = coverageType === 'partial' ? allowedRange : [0, totalDurationRef.current];
+    const step = 30;
+    let minutesFromStart = Math.round(differenceInMinutes(candidate, shiftStartObjRef.current) / step) * step;
+    minutesFromStart = Math.min(Math.max(minutesFromStart, limitRange[0]), limitRange[1]);
+
+    let newRange = [...range];
+    if (field === 'start') {
+      newRange[0] = Math.min(minutesFromStart, newRange[1] - step);
+    } else {
+      newRange[1] = Math.max(minutesFromStart, newRange[0] + step);
+    }
+
+    newRange[0] = Math.max(limitRange[0], newRange[0]);
+    newRange[1] = Math.min(limitRange[1], newRange[1]);
+
+    setRange(newRange);
+    updateInputsFromRange(newRange);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
@@ -323,12 +361,20 @@ export default function CoverSegmentModal({
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
+            {isCoveragesLoading ? (
+              <div className="space-y-4" aria-label="טעינת נתוני כיסוי">
+                <LoadingSkeleton className="h-24 w-full" />
+                <LoadingSkeleton className="h-16 w-full" />
+                <LoadingSkeleton className="h-24 w-full" />
+              </div>
+            ) : (
+            <>
             <div className="bg-[#F4F4F6] rounded-2xl p-4 border border-gray-200 shadow-sm text-center space-y-3">
               <p className="text-sm text-gray-500 font-medium">משובץ למשמרת:</p>
               <h3 className="text-2xl font-semibold text-gray-900">{shift.user_name || shift.role}</h3>
               {shift?.department && (
                 <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
-                  {shift.department}
+                  {`מחלקה ${shift.department}`}
                 </span>
               )}
 
@@ -524,9 +570,39 @@ export default function CoverSegmentModal({
                       </div>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3 mt-4" dir="rtl">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-gray-700">שעת התחלה ידנית</Label>
+                      <Input
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => handleManualTimeChange('start', e.target.value)}
+                        className="h-11 text-center font-mono"
+                        dir="ltr"
+                        aria-label="קביעת שעת התחלה"
+                      />
+                      <p className="text-[11px] text-gray-500 text-center">רק בתוך החלון החסר</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-gray-700">שעת סיום ידנית</Label>
+                      <Input
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => handleManualTimeChange('end', e.target.value)}
+                        className="h-11 text-center font-mono"
+                        dir="ltr"
+                        aria-label="קביעת שעת סיום"
+                      />
+                      <p className="text-[11px] text-gray-500 text-center">השעות מוגבלות לפי הפער הפתוח</p>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
+
+            </>
+            )}
 
             {error && (
               <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg border border-red-100 font-medium">
