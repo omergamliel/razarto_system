@@ -114,7 +114,7 @@ export default function AddShiftModal({
                 <SelectContent>
                   {departments.map((dept) => (
                     <SelectItem key={dept} value={dept}>
-                      {dept}
+                      {`מחלקה ${dept}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
