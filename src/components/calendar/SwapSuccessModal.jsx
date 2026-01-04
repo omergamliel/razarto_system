@@ -4,33 +4,21 @@ import { X, CheckCircle, Share2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { buildSwapTemplate } from './whatsappTemplates';
 
 export default function SwapSuccessModal({ isOpen, onClose, shift }) {
   if (!isOpen || !shift) return null;
 
   const handleWhatsAppShare = () => {
-    const baseDateStr = shift.start_date || shift.date;
-    const baseDate = baseDateStr ? new Date(baseDateStr) : null;
-    const isValidDate = baseDate && !isNaN(baseDate);
-
-    const startTime = shift.swap_start_time || shift.start_time || '09:00';
-    const requesterName = shift.user_name || shift.role || 'העובד';
-
-    let dateLine = 'תאריך לא ידוע';
-
-    if (isValidDate) {
-      const dayText = format(baseDate, 'EEEE', { locale: he });
-      const dateText = format(baseDate, 'dd/MM/yyyy', { locale: he });
-      dateLine = `${dayText} ${dateText} בשעה ${startTime}`;
-    } else {
-      dateLine = `בשעה ${startTime}`;
-    }
-
-    const message = `🔁 בקשת החלפה חדשה!
-${dateLine}
-${requesterName} מבקש החלפה על המשמרת שלו.
-המעוניינים להחליף – נא לפנות אליו 🙏`;
-
+    const approvalUrl = typeof window !== 'undefined' ? `${window.location.origin}/approve/${shift.id}` : '';
+    const message = buildSwapTemplate({
+      employeeName: shift.user_name || shift.role,
+      startDate: shift.start_date || shift.date,
+      startTime: shift.swap_start_time || shift.start_time || '09:00',
+      endDate: shift.end_date || shift.start_date,
+      endTime: shift.swap_end_time || shift.end_time || shift.start_time || '09:00',
+      approvalUrl
+    });
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -95,4 +83,3 @@ ${requesterName} מבקש החלפה על המשמרת שלו.
     </AnimatePresence>
   );
 }
-
