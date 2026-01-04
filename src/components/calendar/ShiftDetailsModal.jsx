@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { buildSwapTemplate } from './whatsappTemplates';
+import LoadingSkeleton from '../LoadingSkeleton';
 
 export default function ShiftDetailsModal({
   isOpen,
@@ -32,7 +34,7 @@ export default function ShiftDetailsModal({
   const queryClient = useQueryClient();
 
   // --- Fetch Active Request Info ---
-  const { data: activeRequest } = useQuery({
+  const { data: activeRequest, isLoading: isActiveRequestLoading } = useQuery({
     queryKey: ['shift-active-request-details', shift?.id],
     queryFn: async () => {
        if (!shift?.id) return null;
@@ -43,7 +45,7 @@ export default function ShiftDetailsModal({
   });
 
   // --- Fetch Coverages ---
-  const { data: coverages = [] } = useQuery({
+  const { data: coverages = [], isLoading: isCoveragesLoading } = useQuery({
     queryKey: ['shift-coverages-details', activeRequest?.id],
     queryFn: async () => {
       if (!activeRequest?.id) return [];
@@ -94,6 +96,8 @@ export default function ShiftDetailsModal({
       queryFn: async () => {
           if (coverages.length === 0) return [];
           const userIds = coverages.map(c => c.covering_user_id);
+          // Assuming we can fetch multiple or fetch all and filter
+          // Optimized: Fetch all authorized (cached)
           const allAuth = await base44.entities.AuthorizedPerson.list();
           return allAuth.filter(u => userIds.includes(u.serial_id));
       },
@@ -101,30 +105,32 @@ export default function ShiftDetailsModal({
   });
 
   const handleDelete = () => {
-    onDelete(shift?.id);
+    onDelete(shift.id);
     setShowDeleteConfirm(false);
   };
 
   if (!isOpen || !shift) return null;
 
-  // Determine State (AFTER early return check)
+  // Determine State
   const isSwapMode = !!activeRequest;
   const isPartial = activeRequest?.request_type === 'Partial';
   const isFull = activeRequest?.request_type === 'Full';
+  const isPartialLike = isPartial || shift?.status === 'partial' || shift?.coverageType === 'partial';
+  const isDetailsLoading = isActiveRequestLoading || isCoveragesLoading;
 
   const userEmail = currentUser?.email || currentUser?.Email;
   const isOwnShift = Boolean(
-    (currentUser?.serial_id && shift.original_user_id === currentUser.serial_id) ||
-    (userEmail && shift.assigned_email === userEmail) ||
-    (currentUser?.full_name && shift.user_name === currentUser.full_name)
+    (currentUser?.serial_id && shift?.original_user_id === currentUser.serial_id) ||
+    (userEmail && shift?.assigned_email === userEmail) ||
+    (currentUser?.full_name && shift?.user_name === currentUser.full_name)
   );
 
-  const startTime = shift.start_time || '09:00';
-  const endTime = shift.end_time || '09:00';
-  const startDateObj = shift.start_date ? new Date(shift.start_date) : new Date(date);
+  const startTime = shift?.start_time || '09:00';
+  const endTime = shift?.end_time || '09:00';
+  const startDateObj = shift?.start_date ? new Date(shift.start_date) : new Date(date);
 
   let endDateObj;
-  if (shift.end_date) {
+  if (shift?.end_date) {
     endDateObj = new Date(shift.end_date);
   } else {
     const sH = parseInt(startTime.split(':')[0]);
@@ -136,36 +142,39 @@ export default function ShiftDetailsModal({
     }
   }
 
-  const coverageType = shift.coverageType || shift.swap_type || (isPartial ? 'partial' : 'full');
+  const coverageType = shift?.coverageType || shift?.swap_type || (isPartial ? 'partial' : 'full');
   const statusLabelClasses = isPartial
     ? 'bg-yellow-100 text-yellow-900 border border-yellow-200'
     : 'bg-red-100 text-red-900 border border-red-200';
-  
-  const status = shift.status || 'regular';
-  let statusIndicator = { color: 'bg-gray-400', text: 'פתוחה' };
-  if (status === 'covered') statusIndicator = { color: 'bg-green-400', text: 'מאוישת' };
-  else if (coverageType === 'partial') statusIndicator = { color: 'bg-yellow-400', text: 'דורשת החלפה חלקית' };
-  else if (status === 'requested') statusIndicator = { color: 'bg-red-500', text: 'דורשת החלפה' };
+  const statusIndicator = useMemo(() => {
+    const status = shift?.status || 'regular';
+    if (status === 'covered') return { color: 'bg-green-400', text: 'מאוישת' };
+    if (coverageType === 'partial') return { color: 'bg-yellow-400', text: 'דורשת החלפה חלקית' };
+    if (status === 'requested') return { color: 'bg-red-500', text: 'דורשת החלפה' };
+    return { color: 'bg-gray-400', text: 'פתוחה' };
+  }, [coverageType, shift?.status]);
 
   const requestStartStr = activeRequest?.req_start_time || startTime;
   const requestEndStr = activeRequest?.req_end_time || endTime;
   const requestStartDate = activeRequest?.req_start_date || shift.start_date;
   const requestEndDate = activeRequest?.req_end_date || shift.end_date || requestStartDate;
 
-  const coverageRows = coverages.map((cov, idx) => {
-    const user = coveringUsers.find(u => u.serial_id === cov.covering_user_id);
-    const start = `${cov.cover_start_date || requestStartDate}T${cov.cover_start_time}`;
-    const end = `${cov.cover_end_date || requestEndDate}T${cov.cover_end_time}`;
-    return {
-      id: cov.id || idx,
-      name: user?.full_name || 'מתנדב',
-      start: new Date(start),
-      end: new Date(end)
-    };
-  });
+  const coverageRows = useMemo(() => {
+    return coverages.map((cov, idx) => {
+      const user = coveringUsers.find(u => u.serial_id === cov.covering_user_id);
+      const start = `${cov.cover_start_date || requestStartDate}T${cov.cover_start_time}`;
+      const end = `${cov.cover_end_date || requestEndDate}T${cov.cover_end_time}`;
+      return {
+        id: cov.id || idx,
+        name: user?.full_name || 'מתנדב',
+        start: new Date(start),
+        end: new Date(end)
+      };
+    });
+  }, [coverages, coveringUsers, requestEndDate, requestStartDate]);
 
-  let missingSegments = [];
-  if (isPartial) {
+  const missingSegments = useMemo(() => {
+    if (!isPartialLike) return [];
     const baseStart = new Date(`${requestStartDate}T${requestStartStr}`);
     let baseEnd = new Date(`${requestEndDate}T${requestEndStr}`);
     if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
@@ -181,8 +190,8 @@ export default function ShiftDetailsModal({
         return gaps;
       });
     });
-    missingSegments = segments.filter(seg => seg.end > seg.start);
-  }
+    return segments.filter(seg => seg.end > seg.start);
+  }, [coverageRows, isPartialLike, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
 
   const formatSegment = (start, end) => {
     const sameDay = format(start, 'dd/MM') === format(end, 'dd/MM');
@@ -198,8 +207,17 @@ export default function ShiftDetailsModal({
   };
 
   const handleWhatsAppShare = () => {
-     const appLink = window.location.origin;
-     const message = `היי, מבקש החלפה למשמרת ${shift.user_name} בתאריך ${format(new Date(shift.start_date), 'dd/MM')}. עזרה? ${appLink}`;
+     const approvalUrl = typeof window !== 'undefined'
+       ? `${window.location.origin}/approve/${shift.id}`
+       : '';
+     const message = buildSwapTemplate({
+       employeeName: shift.user_name,
+       startDate: requestStartDate,
+       startTime: requestStartStr,
+       endDate: requestEndDate,
+       endTime: requestEndStr,
+       approvalUrl
+     });
      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
      window.open(whatsappUrl, '_blank');
   };
@@ -253,6 +271,14 @@ export default function ShiftDetailsModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {isDetailsLoading ? (
+              <div className="space-y-4" aria-label="טעינת נתוני משמרת">
+                <LoadingSkeleton className="h-28 w-full" />
+                <LoadingSkeleton className="h-16 w-full" />
+                <LoadingSkeleton className="h-20 w-full" />
+              </div>
+            ) : (
+              <>
 
             {/* Status Card + Timing */}
             <div className="border rounded-2xl p-6 text-center shadow-sm space-y-4 bg-[#F4F4F6] border-gray-200">
@@ -261,7 +287,7 @@ export default function ShiftDetailsModal({
                 <h2 className="text-2xl font-semibold text-gray-900">{shift.user_name}</h2>
                 {shift.department && (
                   <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
-                    {shift.department}
+                    {`מחלקה ${shift.department}`}
                   </span>
                 )}
               </div>
@@ -280,7 +306,7 @@ export default function ShiftDetailsModal({
               </div>
             </div>
 
-            {isPartial && (
+            {isPartialLike && (
               <div className="space-y-3">
                 <div className="rounded-2xl bg-yellow-50 border border-yellow-200 p-4 text-sm text-yellow-900 leading-relaxed shadow-sm">
                   <p>
@@ -397,6 +423,9 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
             </div>
+
+              </>
+            )}
 
           </div>
         </motion.div>
