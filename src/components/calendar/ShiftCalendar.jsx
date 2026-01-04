@@ -791,6 +791,7 @@ export default function ShiftCalendar() {
       )}
 
       <KPIListModal
+        key={kpiListType}
         isOpen={showKPIListModal}
         onClose={() => setShowKPIListModal(false)}
         type={kpiListType}
