@@ -254,16 +254,18 @@ export default function CoverSegmentModal({
                     <CheckCircle className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold">כיסוי משמרת</h2>
-                <p className="text-white/90 text-sm">
-                  {date && format(new Date(date), 'EEEE, d בMMMM', { locale: he })}
-                </p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
-            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 shadow-sm">
-              <p className="text-xs text-gray-500 mb-1">משמרת</p>
-              <h3 className="text-xl font-bold text-gray-800 mb-3">{shift.user_name || shift.role}</h3>
+            <div className="bg-[#F4F4F6] rounded-2xl p-4 border border-gray-200 shadow-sm text-center space-y-3">
+              <p className="text-sm text-gray-500 font-medium">משובץ למשמרת:</p>
+              <h3 className="text-2xl font-semibold text-gray-900">{shift.user_name || shift.role}</h3>
+              {shift?.department && (
+                <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
+                  {shift.department}
+                </span>
+              )}
 
               <div className="bg-white rounded-2xl border border-gray-200 px-4 py-3 shadow-sm grid grid-cols-2 gap-4 text-center">
                 <div className="space-y-1">
