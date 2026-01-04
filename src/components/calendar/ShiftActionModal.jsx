@@ -82,9 +82,6 @@ export default function ShiftActionModal({
                     </div>
                     <div>
                         <h2 className="text-xl font-bold tracking-wide">פעולות על המשמרת</h2>
-                        <p className="text-white/80 text-sm">
-                            {format(startDateObj, 'EEEE dd/MM/yyyy', { locale: he })} · {startTime}
-                        </p>
                     </div>
                  </div>
                  <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20 transition-colors">
@@ -96,14 +93,16 @@ export default function ShiftActionModal({
               <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
 
                 {/* Assignment Info */}
-                <div className="text-center space-y-2">
-                    <p className="text-sm text-gray-400 font-medium">משובץ כרגע למשמרת</p>
-                    <h3 className="text-3xl font-extrabold text-gray-800 leading-none font-sans">
+                <div className="text-center space-y-3">
+                    <p className="text-sm text-gray-500 font-medium">משובץ כרגע למשמרת</p>
+                    <h3 className="text-2xl font-semibold text-gray-900 leading-none">
                         {shift.user_name || shift.role}
                     </h3>
-                    <p className="text-sm text-gray-500">
-                       {shift.department ? `מחלקה ${shift.department}` : 'פרטי משמרת'}
-                    </p>
+                    {shift.department && (
+                      <span className="inline-flex items-center justify-center rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
+                        {shift.department}
+                      </span>
+                    )}
                 </div>
 
                 {/* Times Display (Start -> End) */}
