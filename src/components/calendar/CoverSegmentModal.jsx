@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { format, addDays, parseISO, isValid, differenceInMinutes, addMinutes } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,6 +24,9 @@ export default function CoverSegmentModal({
   const [error, setError] = useState('');
 
   const [range, setRange] = useState([0, 0]);
+  const [availableSegments, setAvailableSegments] = useState([]);
+  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(0);
+  const [allowedRange, setAllowedRange] = useState([0, 0]);
   const sliderRef = useRef(null);
   const totalDurationRef = useRef(0);
   const shiftStartObjRef = useRef(null);
@@ -37,6 +40,25 @@ export default function CoverSegmentModal({
     },
     enabled: !!shift?.id && isOpen
   });
+
+  const coverageRows = useMemo(() => {
+    const source = shift?.coverages?.length ? shift.coverages : existingCoverages;
+    return source
+      .map((cov, idx) => {
+        const covStartDate = cov.cover_start_date || cov.start_date || cov.coverDate || cov.cover_date || shift?.start_date;
+        const covEndDate = cov.cover_end_date || cov.end_date || cov.coverDate || cov.cover_end_date || covStartDate;
+        const start = new Date(`${covStartDate}T${cov.cover_start_time || cov.start_time || cov.cover_start || cov.startTime || '09:00'}`);
+        let end = new Date(`${covEndDate}T${cov.cover_end_time || cov.end_time || cov.cover_end || cov.endTime || '09:00'}`);
+        if (end <= start) end = addDays(end, 1);
+        return {
+          id: cov.id || `${covStartDate}-${idx}`,
+          name: cov.covering_name || cov.covering_user_name || cov.covering_user_id || 'מתנדב',
+          start,
+          end
+        };
+      })
+      .filter(row => isValid(row.start) && isValid(row.end));
+  }, [shift?.coverages, existingCoverages, shift?.start_date]);
 
   useEffect(() => {
     if (isOpen && shift) {
@@ -65,66 +87,78 @@ export default function CoverSegmentModal({
         const totalDuration = differenceInMinutes(endObj, startObj);
         totalDurationRef.current = totalDuration;
 
-        let calcStart = startObj;
-        let calcEnd = endObj;
-        let type = 'full';
+        const requestStartStr = shift?.active_request?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
+        const requestEndStr = shift?.active_request?.req_end_time || shift.swap_end_time || shift.end_time || shiftEndStr;
+        const requestStartDateStr = shift?.active_request?.req_start_date || shift.start_date || format(baseDateObj, 'yyyy-MM-dd');
+        const requestEndDateStr = shift?.active_request?.req_end_date || shift.end_date || requestStartDateStr;
 
-        if (existingCoverages.length > 0) {
-          type = 'partial';
-          const occupiedSegments = existingCoverages.map(c => ({
-            start: new Date(`${c.start_date}T${c.start_time}`),
-            end: new Date(`${c.end_date}T${c.end_time}`)
-          }));
-
-          const startsAtShiftStart = occupiedSegments.some(seg =>
-            seg.start.getTime() === startObj.getTime()
-          );
-
-          if (startsAtShiftStart) {
-            const maxEnd = new Date(Math.max(...occupiedSegments.map(s => s.end)));
-            if (maxEnd < endObj) {
-              calcStart = maxEnd;
-              calcEnd = endObj;
-            }
-          } else {
-            const minStart = new Date(Math.min(...occupiedSegments.map(s => s.start)));
-            if (minStart > startObj) {
-              calcStart = startObj;
-              calcEnd = minStart;
-            }
-          }
-        } else if (shift.swap_start_time && shift.swap_end_time) {
-          const isFull24Hours = shift.swap_start_time === '09:00' && shift.swap_end_time === '09:00';
-          if (!isFull24Hours) {
-            type = 'partial';
-            const startH = parseInt(shift.swap_start_time.split(':')[0]);
-            const endH = parseInt(shift.swap_end_time.split(':')[0]);
-
-            let sDate = startObj;
-            if (startH < 9) sDate = addDays(baseDateObj, 1);
-            calcStart = new Date(`${format(sDate, 'yyyy-MM-dd')}T${shift.swap_start_time}`);
-
-            let eDate = sDate;
-            if (endH <= startH) eDate = addDays(sDate, 1);
-            calcEnd = new Date(`${format(eDate, 'yyyy-MM-dd')}T${shift.swap_end_time}`);
-          }
+        const requestStartObj = new Date(`${requestStartDateStr}T${requestStartStr}`);
+        let requestEndObj = new Date(`${requestEndDateStr}T${requestEndStr}`);
+        if (requestEndObj <= requestStartObj) {
+          requestEndObj = addDays(requestEndObj, 1);
         }
 
-        setStartDate(format(calcStart, 'yyyy-MM-dd'));
-        setStartTime(format(calcStart, 'HH:mm'));
-        setEndDate(format(calcEnd, 'yyyy-MM-dd'));
-        setEndTime(format(calcEnd, 'HH:mm'));
-        setCoverageType(type);
-        setRange([
-          differenceInMinutes(calcStart, startObj),
-          differenceInMinutes(calcEnd, startObj)
-        ]);
+        const normalizedCoverages = (shift.coverages?.length ? shift.coverages : existingCoverages).map(c => {
+          const covStartDate = c.cover_start_date || c.start_date || c.coverDate || c.cover_date || requestStartDateStr;
+          const covEndDate = c.cover_end_date || c.end_date || c.coverDate || c.cover_end_date || covStartDate;
+          const covStart = new Date(`${covStartDate}T${c.cover_start_time || c.start_time || c.cover_start || c.startTime || '09:00'}`);
+          let covEnd = new Date(`${covEndDate}T${c.cover_end_time || c.end_time || c.cover_end || c.endTime || '09:00'}`);
+          if (covEnd <= covStart) {
+            covEnd = addDays(covEnd, 1);
+          }
+          return { start: covStart, end: covEnd };
+        }).filter(c => isValid(c.start) && isValid(c.end));
+
+        const computeUncoveredSegments = (windowStart, windowEnd, coveragesList) => {
+          const ordered = [...coveragesList].sort((a, b) => a.start - b.start);
+          let segments = [{ start: windowStart, end: windowEnd }];
+
+          ordered.forEach(cov => {
+            segments = segments.flatMap(seg => {
+              if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+              const gaps = [];
+              if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
+              if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
+              return gaps;
+            });
+          });
+
+          return segments.filter(seg => differenceInMinutes(seg.end, seg.start) > 0);
+        };
+
+        const uncoveredSegments = computeUncoveredSegments(requestStartObj, requestEndObj, normalizedCoverages);
+        setAvailableSegments(uncoveredSegments);
+        setSelectedSegmentIndex(0);
+
+        const isPartialFlow = shift?.active_request?.request_type === 'Partial' || shift?.swap_type === 'partial';
+        const resolvedType = isPartialFlow ? 'partial' : 'full';
+        setCoverageType(resolvedType);
+
+        const defaultSegment = uncoveredSegments[0] || { start: requestStartObj, end: requestEndObj };
+        const startMinutes = differenceInMinutes(defaultSegment.start, startObj);
+        const endMinutes = differenceInMinutes(defaultSegment.end, startObj);
+        const fullRange = [0, totalDuration];
+        const partialRange = [Math.max(0, startMinutes), Math.min(totalDuration, endMinutes)];
+
+        setAllowedRange(partialRange);
+        setRange(resolvedType === 'partial' ? partialRange : fullRange);
+
+        const initialStart = resolvedType === 'partial' ? defaultSegment.start : startObj;
+        const initialEnd = resolvedType === 'partial' ? defaultSegment.end : endObj;
+
+        setStartDate(format(initialStart, 'yyyy-MM-dd'));
+        setStartTime(format(initialStart, 'HH:mm'));
+        setEndDate(format(initialEnd, 'yyyy-MM-dd'));
+        setEndTime(format(initialEnd, 'HH:mm'));
         setError('');
       } catch (e) {
-        console.error("Date calculation error:", e);
+        console.error('Date calculation error:', e);
+        setError('אירעה שגיאה בטעינת נתוני המשמרת');
       }
     }
+
   }, [isOpen, date, shift, existingCoverages]);
+
 
   const handleTypeChange = (type) => {
     setCoverageType(type);
@@ -135,17 +169,47 @@ export default function CoverSegmentModal({
       setStartTime(format(shiftStartObjRef.current, 'HH:mm'));
       setEndDate(format(shiftEndObjRef.current, 'yyyy-MM-dd'));
       setEndTime(format(shiftEndObjRef.current, 'HH:mm'));
+      setAllowedRange([0, totalDurationRef.current]);
       setRange([0, totalDurationRef.current]);
     }
 
     if (type === 'partial' && shiftStartObjRef.current) {
-      const startDateTime = new Date(`${startDate || format(shiftStartObjRef.current, 'yyyy-MM-dd')}T${startTime}`);
-      const endDateTime = new Date(`${endDate || format(shiftEndObjRef.current || shiftStartObjRef.current, 'yyyy-MM-dd')}T${endTime}`);
-      setRange([
-        Math.max(0, differenceInMinutes(startDateTime, shiftStartObjRef.current)),
-        Math.min(totalDurationRef.current, differenceInMinutes(endDateTime, shiftStartObjRef.current))
-      ]);
+      const segment = availableSegments[selectedSegmentIndex] || availableSegments[0];
+      const fallback = segment || { start: shiftStartObjRef.current, end: shiftEndObjRef.current || shiftStartObjRef.current };
+      const startMinutes = Math.max(0, differenceInMinutes(fallback.start, shiftStartObjRef.current));
+      const endMinutes = Math.min(totalDurationRef.current, differenceInMinutes(fallback.end, shiftStartObjRef.current));
+      const adjustedRange = [startMinutes, Math.max(startMinutes + 30, endMinutes)];
+      setAllowedRange([startMinutes, endMinutes]);
+      setRange(adjustedRange);
+      setStartDate(format(fallback.start, 'yyyy-MM-dd'));
+      setStartTime(format(fallback.start, 'HH:mm'));
+      setEndDate(format(fallback.end, 'yyyy-MM-dd'));
+      setEndTime(format(fallback.end, 'HH:mm'));
     }
+  };
+
+  const handleSegmentSelect = (index) => {
+    if (!shiftStartObjRef.current) return;
+    const segment = availableSegments[index];
+    if (!segment) return;
+    const startMinutes = Math.max(0, differenceInMinutes(segment.start, shiftStartObjRef.current));
+    const endMinutes = Math.min(totalDurationRef.current, differenceInMinutes(segment.end, shiftStartObjRef.current));
+    setSelectedSegmentIndex(index);
+    setCoverageType('partial');
+    setAllowedRange([startMinutes, endMinutes]);
+    setRange([startMinutes, endMinutes]);
+    setStartDate(format(segment.start, 'yyyy-MM-dd'));
+    setStartTime(format(segment.start, 'HH:mm'));
+    setEndDate(format(segment.end, 'yyyy-MM-dd'));
+    setEndTime(format(segment.end, 'HH:mm'));
+    setError('');
+  };
+
+  const formatSegmentLabel = (start, end) => {
+    if (!start || !end) return '';
+    const sameDay = format(start, 'dd/MM') === format(end, 'dd/MM');
+    const datePart = sameDay ? format(start, 'dd/MM') : `${format(start, 'dd/MM')} → ${format(end, 'dd/MM')}`;
+    return `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')} (${datePart})`;
   };
 
   const updateInputsFromRange = (newRange) => {
@@ -173,12 +237,13 @@ export default function CoverSegmentModal({
     let minutes = Math.round((percentage * totalDurationRef.current) / step) * step;
 
     const newRange = [...range];
-    newRange[handleIndex] = minutes;
+    const limitRange = coverageType === 'partial' ? allowedRange : [0, totalDurationRef.current];
+    newRange[handleIndex] = Math.min(Math.max(minutes, limitRange[0]), limitRange[1]);
 
     if (handleIndex === 0) {
-      if (newRange[0] >= newRange[1]) newRange[0] = newRange[1] - step;
+      if (newRange[0] >= newRange[1]) newRange[0] = Math.max(limitRange[0], newRange[1] - step);
     } else {
-      if (newRange[1] <= newRange[0]) newRange[1] = newRange[0] + step;
+      if (newRange[1] <= newRange[0]) newRange[1] = Math.min(limitRange[1], newRange[0] + step);
     }
 
     setRange(newRange);
@@ -278,6 +343,55 @@ export default function CoverSegmentModal({
                   <p className="text-lg font-bold text-gray-800">{endTime}</p>
                   <p className="text-[11px] text-gray-500">{endDate && format(new Date(endDate), 'dd/MM')}</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">שעות פנויות לכיסוי</p>
+                    <p className="text-xs text-gray-500">רק טווחי הזמן שעדיין חסרים זמינים לבחירה</p>
+                  </div>
+                  <AlertCircle className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {availableSegments.length > 0 ? (
+                    availableSegments.map((seg, idx) => (
+                      <button
+                        key={`${seg.start}-${idx}`}
+                        type="button"
+                        onClick={() => handleSegmentSelect(idx)}
+                        className={`w-full flex items-center justify-between rounded-xl border px-3 py-2 transition-colors text-right ${
+                          selectedSegmentIndex === idx && coverageType === 'partial'
+                            ? 'border-blue-500 bg-blue-50 text-blue-800'
+                            : 'border-gray-200 hover:border-blue-300 bg-gray-50 text-gray-800'
+                        }`}
+                      >
+                        <span className="text-sm font-semibold">חלון #{idx + 1}</span>
+                        <span className="text-xs text-gray-600 font-mono" dir="ltr">{formatSegmentLabel(seg.start, seg.end)}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-600">כל המשמרת כבר מאוישת או פתוחה לכיסוי מלא.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <p className="text-sm font-semibold text-gray-900 mb-2">מי כבר מכסה?</p>
+                {coverageRows.length > 0 ? (
+                  <div className="space-y-2">
+                    {coverageRows.map(row => (
+                      <div key={row.id} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                        <span className="text-sm font-semibold text-gray-800">{row.name}</span>
+                        <span className="text-xs text-gray-600 font-mono" dir="ltr">{formatSegmentLabel(row.start, row.end)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-600">אין עדיין מתנדבים. בחר/י חלון כדי להיות הראשון/ה.</p>
+                )}
               </div>
             </div>
 
@@ -433,4 +547,3 @@ export default function CoverSegmentModal({
     </AnimatePresence>
   );
 }
-
