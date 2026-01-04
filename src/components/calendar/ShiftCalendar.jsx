@@ -30,6 +30,7 @@ import HeadToHeadSelectorModal from './HeadToHeadSelectorModal';
 import HeadToHeadApprovalModal from './HeadToHeadApprovalModal';
 import HallOfFameModal from '../dashboard/HallOfFameModal';
 import HelpSupportModal from '../dashboard/HelpSupportModal';
+import LoadingSkeleton from '../LoadingSkeleton';
 
 export default function ShiftCalendar() {
   const queryClient = useQueryClient();
@@ -66,17 +67,11 @@ export default function ShiftCalendar() {
   const [h2hTargetId, setH2hTargetId] = useState(null);
   const [h2hOfferId, setH2hOfferId] = useState(null);
 
-  // --- DEBUG LOGS FOR SWAP REQUEST MODAL ---
-  const [swapRequestLogs, setSwapRequestLogs] = useState([]);
-
+  // --- DEBUG LOGS (Internal Only, Hidden from UI) ---
   const appendSwapLog = (message, data) => {
     const timestamp = new Date().toLocaleTimeString('he-IL', { hour12: false });
     const payloadText = data ? ` | נתונים: ${JSON.stringify(data)}` : '';
-
-    setSwapRequestLogs(prev => {
-      const next = [...prev, `${timestamp} — ${message}${payloadText}`];
-      return next.slice(-12); // cap to last 12 entries to avoid overflow
-    });
+    console.debug(`[SWAP-LOG ${timestamp}] ${message}${payloadText}`);
   };
 
   // --- AUTH & USER IDENTIFICATION LOGIC ---
@@ -582,6 +577,23 @@ export default function ShiftCalendar() {
   const permissionLevel = authorizedPerson.permissions;
   const isAdmin = permissionLevel === 'Admin' || permissionLevel === 'Manager';
   const isViewOnly = permissionLevel === 'View';
+  const isLoadingApp = isUserLoading || isAuthCheckLoading || isShiftsLoading;
+
+  if (isLoadingApp) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] text-gray-900" dir="rtl">
+        <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
+          <LoadingSkeleton className="h-14 w-full" ariaLabel="טוען כותרת" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <LoadingSkeleton key={idx} className="h-16" ariaLabel="טעינת KPI" />
+            ))}
+          </div>
+          <LoadingSkeleton className="h-[420px] w-full" ariaLabel="טעינת לוח משמרות" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans selection:bg-blue-100 overflow-x-hidden relative" dir="rtl">
@@ -663,7 +675,6 @@ export default function ShiftCalendar() {
         shift={selectedShift}
         onSubmit={handleSwapSubmit}
         isSubmitting={requestSwapMutation.isPending}
-        logMessages={swapRequestLogs}
       />
 
       <AddShiftModal
