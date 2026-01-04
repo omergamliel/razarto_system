@@ -9,6 +9,71 @@ import { base44 } from '@/api/base44Client';
 import LoadingSkeleton from '../LoadingSkeleton';
 import { buildSwapTemplate } from '../calendar/whatsappTemplates';
 
+// --- Static Helper Functions (Outside Component) ---
+const formatDateTimeForDisplay = (dateStr, timeStr) => {
+  if (!dateStr) return null;
+  try {
+    const composed = new Date(`${dateStr}T${timeStr || '09:00'}`);
+    if (isNaN(composed)) return null;
+    return format(composed, 'dd/MM/yy HH:mm', { locale: he });
+  } catch (err) {
+    console.error('Failed to format date time for display', err);
+    return null;
+  }
+};
+
+const isFullShift = (shift) => {
+  const start = shift?.start_time || '09:00';
+  const end = shift?.end_time || '09:00';
+  return start === end;
+};
+
+const getShiftTimeDisplay = (shift) => {
+  if (!shift?.start_date) return 'זמן לא ידוע';
+  if (isFullShift(shift)) return 'משמרת מלאה';
+
+  const startText = formatDateTimeForDisplay(shift.start_date, shift.start_time);
+  const endText = formatDateTimeForDisplay(shift.end_date || shift.start_date, shift.end_time || shift.start_time);
+
+  if (startText && endText) return `${startText} - ${endText}`;
+  return startText || 'זמן לא ידוע';
+};
+
+const computeMissingSegments = (windowStart, windowEnd, coverageSegments) => {
+  let segments = [{ start: windowStart, end: windowEnd }];
+  coverageSegments.forEach(cov => {
+    segments = segments.flatMap(seg => {
+      if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+      const gaps = [];
+      if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
+      if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
+      return gaps;
+    });
+  });
+  return segments.filter(seg => differenceInMinutes(seg.end, seg.start) > 0);
+};
+
+const getStartDateTime = (item) => {
+  const dateStr = item.shift_date || item.start_date || item.req_start_date;
+  const timeStr = item.start_time || item.req_start_time || item.req_end_time || '00:00';
+
+  if (!dateStr) return null;
+
+  const composed = new Date(`${dateStr}T${timeStr}`);
+  if (!isNaN(composed)) return composed;
+
+  const fallback = new Date(dateStr);
+  return isNaN(fallback) ? null : fallback;
+};
+
+const getLatestActivityDate = (item) => {
+  const candidates = [item.updated_at, item.created_at, item.shift_date, item.req_start_date]
+    .map(val => val ? new Date(val) : null)
+    .filter(val => val && !isNaN(val));
+
+  return candidates[0] || null;
+};
+
 export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onRequestSwap, actionsDisabled = false }) {
   
   const [visibleCount, setVisibleCount] = useState(10);
@@ -75,71 +140,6 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       }));
   }, [currentUser]);
 
-  // --- Handlers ---
-  const formatDateTimeForDisplay = (dateStr, timeStr) => {
-      if (!dateStr) return null;
-      try {
-          const composed = new Date(`${dateStr}T${timeStr || '09:00'}`);
-          if (isNaN(composed)) return null;
-          return format(composed, 'dd/MM/yy HH:mm', { locale: he });
-      } catch (err) {
-          console.error('Failed to format date time for display', err);
-          return null;
-      }
-  };
-
-  const isFullShift = (shift) => {
-      const start = shift?.start_time || '09:00';
-      const end = shift?.end_time || '09:00';
-      return start === end;
-  };
-
-  const getShiftTimeDisplay = (shift) => {
-      if (!shift?.start_date) return 'זמן לא ידוע';
-      if (isFullShift(shift)) return 'משמרת מלאה';
-
-      const startText = formatDateTimeForDisplay(shift.start_date, shift.start_time);
-      const endText = formatDateTimeForDisplay(shift.end_date || shift.start_date, shift.end_time || shift.start_time);
-
-      if (startText && endText) return `${startText} - ${endText}`;
-      return startText || 'זמן לא ידוע';
-  };
-
-  const computeMissingSegments = (windowStart, windowEnd, coverageSegments) => {
-      let segments = [{ start: windowStart, end: windowEnd }];
-      coverageSegments.forEach(cov => {
-        segments = segments.flatMap(seg => {
-          if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
-          const gaps = [];
-          if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
-          if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
-          return gaps;
-        });
-      });
-      return segments.filter(seg => differenceInMinutes(seg.end, seg.start) > 0);
-  };
-
-  const getStartDateTime = (item) => {
-      const dateStr = item.shift_date || item.start_date || item.req_start_date;
-      const timeStr = item.start_time || item.req_start_time || item.req_end_time || '00:00';
-
-      if (!dateStr) return null;
-
-      const composed = new Date(`${dateStr}T${timeStr}`);
-      if (!isNaN(composed)) return composed;
-
-      const fallback = new Date(dateStr);
-      return isNaN(fallback) ? null : fallback;
-  };
-
-  const getLatestActivityDate = (item) => {
-      const candidates = [item.updated_at, item.created_at, item.shift_date, item.req_start_date]
-        .map(val => val ? new Date(val) : null)
-        .filter(val => val && !isNaN(val));
-
-      return candidates[0] || null;
-  };
-
   const partialGapItems = useMemo(() => {
       if (!isOpen || !isPartialGapsView) return [];
       return shiftsAll.map((shift) => {
@@ -183,7 +183,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
             is_request_object: true,
           };
       }).filter(Boolean);
-  }, [authorizedUsers, coveragesAll, isOpen, isPartialGapsView, shiftsAll, swapRequestsAll, computeMissingSegments]);
+  }, [authorizedUsers, coveragesAll, isOpen, isPartialGapsView, shiftsAll, swapRequestsAll]);
 
   const futureShifts = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
