@@ -183,10 +183,10 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       }).filter(Boolean);
   }, [authorizedUsers, coveragesAll, isOpen, shiftsAll, swapRequestsAll]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const futureShifts = useMemo(() => 
-    shiftsAll.filter(s => s.original_user_id === currentUser?.serial_id && s.start_date >= todayStr),
-  [shiftsAll, currentUser, todayStr]);
+  const futureShifts = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return shiftsAll.filter(s => s.original_user_id === currentUser?.serial_id && s.start_date >= todayStr);
+  }, [shiftsAll, currentUser]);
 
   const baseData = useMemo(() => {
       const fullRequests = swapRequestsAll.filter(r => r.status === 'Open' && r.request_type === 'Full');
