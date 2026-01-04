@@ -7,6 +7,7 @@ export default function HelpSupportModal({ isOpen, onClose }) {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [infoMessage, setInfoMessage] = useState('');
   const [showVideo, setShowVideo] = useState(false);
+  const [showSupportOptions, setShowSupportOptions] = useState(false);
 
   if (!isOpen) return null;
 
@@ -50,30 +51,32 @@ export default function HelpSupportModal({ isOpen, onClose }) {
       accent: 'bg-white/20 text-white',
       onClick: () => {
         setShowVideo(false);
-        setInfoMessage('📘 בקרוב: מדריך שימוש מלא עם תסריטי עבודה לדסק ולמנהלים!');
+        setShowSupportOptions(false);
+        setInfoMessage('בקרוב יתווסף מדריך שימוש מלא במערכת');
       }
     },
     {
       icon: Video,
-      label: 'סרטוני הדרכה',
+      label: 'סרטון הדרכה',
       color: 'from-purple-500 to-indigo-600',
       shadow: 'shadow-purple-200',
       accent: 'bg-white/15 text-white',
       onClick: () => {
         setInfoMessage('');
         setShowVideo(true);
+        setShowSupportOptions(false);
       }
     },
     {
       icon: MessageCircle,
-      label: 'תמיכה טכנית',
+      label: 'תמיכה במערכת',
       color: 'from-emerald-500 to-teal-600',
       shadow: 'shadow-emerald-200',
       accent: 'bg-white/20 text-white',
       onClick: () => {
         setShowVideo(false);
         setInfoMessage('');
-        window.open('https://wa.me/972536221840', '_blank');
+        setShowSupportOptions((prev) => !prev);
       }
     }
   ];
@@ -142,9 +145,8 @@ export default function HelpSupportModal({ isOpen, onClose }) {
                     </div>
                     <div className="flex-1 md:flex md:flex-col md:items-center">
                       <p className="text-sm font-semibold drop-shadow-sm md:text-base">{link.label}</p>
-                      <span className="text-[11px] md:text-xs text-white/80 block mt-1">מותאם 100% למובייל ולדסקטופ</span>
                     </div>
-                    {link.label === 'סרטוני הדרכה' && (
+                    {link.label === 'סרטון הדרכה' && (
                       <span className="absolute top-2 right-2 text-[10px] font-semibold px-2 py-1 rounded-full bg-white/20 text-white/90">
                         חדש
                       </span>
@@ -153,6 +155,32 @@ export default function HelpSupportModal({ isOpen, onClose }) {
                 );
               })}
             </div>
+
+            <AnimatePresence>
+              {showSupportOptions && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="mb-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3" dir="rtl">
+                    <Button
+                      onClick={() => window.open('https://wa.me/972536221840', '_blank')}
+                      className="h-12 w-full justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      <MessageCircle className="ml-2 h-5 w-5" /> הצעות ובעיות במערכת
+                    </Button>
+                    <Button
+                      onClick={() => window.open('https://wa.me/972546881831', '_blank')}
+                      className="h-12 w-full justify-center rounded-xl bg-teal-600 text-white hover:bg-teal-700"
+                    >
+                      <MessageCircle className="ml-2 h-5 w-5" /> משתמשים והרשאות
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {showVideo && (
@@ -168,8 +196,7 @@ export default function HelpSupportModal({ isOpen, onClose }) {
                         <Play className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm md:text-base font-semibold text-gray-900">סרטון פתיחה מהיר</p>
-                        <p className="text-xs text-gray-600">מוכן להרצה מידית וללא פקדים מיותרים</p>
+                        <p className="text-sm md:text-base font-semibold text-gray-900">סרטון הצגת מערכת Razarto</p>
                       </div>
                     </div>
                     <button
@@ -183,7 +210,7 @@ export default function HelpSupportModal({ isOpen, onClose }) {
                   <div className="relative w-full aspect-[16/9] bg-black">
                     <iframe
                       className="absolute inset-0 h-full w-full"
-                      src="https://www.youtube.com/embed/9u12tJQ1KF4?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1"
+                      src="https://www.youtube.com/embed/9u12tJQ1KF4?autoplay=1&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&mute=0"
                       title="סרטון הדרכה"
                       allow="autoplay; encrypted-media; picture-in-picture"
                       allowFullScreen
