@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, isToday, isSameMonth } from 'date-fns';
+import { format, isToday, isSameMonth, addDays } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Clock, CheckCircle2, AlertCircle, ArrowLeftRight } from 'lucide-react';
 
@@ -66,23 +66,64 @@ export default function ShiftCell({
   const assignments = React.useMemo(() => {
     if (!shift) return [];
 
-    if (shift.coverages && shift.coverages.length > 0) {
-      return shift.coverages.map((cov, idx) => ({
-        key: `${cov.id || cov.cover_start_time}-${idx}`,
-        name: cov.covering_name || 'מחליף',
-        timeRange: cov.cover_start_time && cov.cover_end_time
-          ? `${cov.cover_start_time} - ${cov.cover_end_time}`
-          : ''
-      }));
-    }
+    const requestStartStr = shift.active_request?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
+    const requestEndStr = shift.active_request?.req_end_time || shift.swap_end_time || shift.end_time || '09:00';
+    const requestStartDate = shift.active_request?.req_start_date || shift.start_date;
+    const requestEndDate = shift.active_request?.req_end_date || shift.end_date || requestStartDate;
 
-    return [{
-      key: shift.id,
-      name: shift.user_name || 'לא ידוע',
-      timeRange: (shift.start_time !== '09:00' || shift.end_time !== '09:00')
-        ? `${shift.start_time} - ${shift.end_time}`
-        : ''
-    }];
+    const baseStart = new Date(`${requestStartDate}T${requestStartStr}`);
+    let baseEnd = new Date(`${requestEndDate}T${requestEndStr}`);
+    if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
+
+    const formatRange = (start, end) => {
+      const startText = format(start, 'HH:mm');
+      const endText = format(end, 'HH:mm');
+      return `${startText} - ${endText}`;
+    };
+
+    const coverageSegments = (shift.coverages || []).map((cov, idx) => {
+      const covStart = new Date(`${cov.cover_start_date || requestStartDate}T${cov.cover_start_time || requestStartStr}`);
+      let covEnd = new Date(`${cov.cover_end_date || requestEndDate}T${cov.cover_end_time || requestEndStr}`);
+      if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
+      return {
+        key: `${cov.id || idx}-${cov.cover_start_time || ''}`,
+        name: cov.covering_name || 'מחליף',
+        start: covStart,
+        end: covEnd,
+        timeRange: formatRange(covStart, covEnd),
+      };
+    });
+
+    let missing = [{ start: baseStart, end: baseEnd }];
+    coverageSegments.sort((a, b) => a.start - b.start).forEach(cov => {
+      missing = missing.flatMap(seg => {
+        if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+        const gaps = [];
+        if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
+        if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
+        return gaps;
+      });
+    });
+
+    const uniqueAssignments = [
+      {
+        key: shift.id,
+        name: shift.user_name || 'לא ידוע',
+        timeRange: formatRange(baseStart, baseEnd),
+        isOwner: true,
+      },
+      ...coverageSegments,
+      ...missing
+        .filter(seg => seg.end > seg.start)
+        .map((seg, idx) => ({
+          key: `gap-${idx}`,
+          name: 'שעות חסרות',
+          timeRange: formatRange(seg.start, seg.end),
+          isGap: true,
+        })),
+    ];
+
+    return uniqueAssignments;
   }, [shift]);
 
   return (
@@ -115,11 +156,11 @@ export default function ShiftCell({
           <div className="space-y-0.5">
             {assignments.map(item => (
               <div key={item.key} className="text-center">
-                <p className="font-normal md:font-semibold text-gray-800 text-[10px] leading-tight md:text-base break-words px-0.5">
+                <p className={`font-normal md:font-semibold text-[10px] leading-tight md:text-base break-words px-0.5 ${item.isGap ? 'text-red-700' : 'text-gray-800'}`}>
                   {item.name}
                 </p>
                 {item.timeRange && (
-                  <p className="text-[8px] md:text-xs text-gray-500 mt-0.5 text-center leading-tight">
+                  <p className={`text-[8px] md:text-xs mt-0.5 text-center leading-tight ${item.isGap ? 'text-red-600 font-semibold' : 'text-gray-500'}`} dir="ltr">
                     {item.timeRange}
                   </p>
                 )}
