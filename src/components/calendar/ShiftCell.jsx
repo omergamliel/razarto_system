@@ -24,8 +24,9 @@ export default function ShiftCell({
     if (!shift) return {};
 
     const status = shift.status || 'regular';
+    const coverageType = shift.coverageType || shift.swap_type;
 
-    if (status === 'partial') {
+    if (status === 'partial' || (status === 'requested' && coverageType === 'partial')) {
       return {
         bg: 'bg-yellow-50',
         border: 'border-yellow-300',
