@@ -29,10 +29,12 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     enabled: isOpen
   });
 
+  const shouldFetchCoverages = isOpen && type === 'partial_gaps';
+
   const { data: coveragesAll = [], isLoading: isCoveragesLoading } = useQuery({
     queryKey: ['kpi-coverages-all'],
     queryFn: () => base44.entities.ShiftCoverage.list(),
-    enabled: isOpen
+    enabled: shouldFetchCoverages
   });
 
   const { data: authorizedUsers = [], isLoading: isUsersLoading } = useQuery({
@@ -41,7 +43,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     enabled: isOpen
   });
 
-  const isLoading = isSwapRequestsLoading || isShiftsLoading || isUsersLoading || (type === 'partial_gaps' && isCoveragesLoading);
+  const isLoading = isSwapRequestsLoading || isShiftsLoading || isUsersLoading || (shouldFetchCoverages && isCoveragesLoading);
 
   // --- Helpers ---
   const enrichRequestsWithShiftInfo = useCallback((requests) => {
