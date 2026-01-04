@@ -197,11 +197,16 @@ export default function SwapRequestModal({
             
             {/* Current Assignment Card */}
             <div className="text-center space-y-4">
-                <div>
-                    <p className="text-sm text-gray-400 font-medium mb-1">משובץ כרגע למשמרת</p>
-                    <h3 className="text-3xl font-extrabold text-gray-800 leading-none font-sans">
+                <div className="space-y-2">
+                    <p className="text-sm text-gray-500 font-medium">משובץ כרגע למשמרת</p>
+                    <h3 className="text-2xl font-semibold text-gray-900 leading-none">
                         {shift.user_name || shift.role}
                     </h3>
+                    {shift?.department && (
+                      <span className="inline-flex items-center justify-center rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
+                        {shift.department}
+                      </span>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-1 border border-gray-100 shadow-sm">
