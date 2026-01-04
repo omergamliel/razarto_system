@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, ArrowLeftRight, ChevronDown, Send } from 'lucide-react';
+import { X, Calendar, ArrowRight, Clock, AlertCircle, CalendarPlus, ArrowLeftRight, ChevronDown, Send, MessageCircle, XCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { format, differenceInMinutes, addDays } from 'date-fns';
+import { format, differenceInMinutes, addDays, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -74,10 +74,20 @@ const getLatestActivityDate = (item) => {
   return candidates[0] || null;
 };
 
-export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onRequestSwap, actionsDisabled = false }) {
+const getDisplayDay = (dateStr) => {
+  if (!dateStr) return '';
+  const parsed = parseISO(dateStr);
+  if (isNaN(parsed)) return '';
+  return format(parsed, 'EEEE', { locale: he });
+};
+
+const isOpenStatus = (status) => ['Open', 'Partially_Covered'].includes(status);
+
+export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onRequestSwap, actionsDisabled = false, onCancelRequest }) {
   
   const [visibleCount, setVisibleCount] = useState(10);
   const isPartialGapsView = type === 'partial_gaps';
+  const [swapTab, setSwapTab] = useState('all');
 
   useEffect(() => {
     if (isOpen) setVisibleCount(10);
@@ -120,6 +130,14 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       return requests.map(req => {
           const shift = shiftsAll.find(s => s.id === req.shift_id);
           const user = authorizedUsers.find(u => u?.serial_id === shift?.original_user_id);
+          const coverageSegments = coveragesAll
+            .filter(c => c.shift_id === req.shift_id)
+            .map((c, idx) => {
+              const covStart = new Date(`${c.cover_start_date || shift?.start_date}T${c.cover_start_time || shift?.start_time || '09:00'}`);
+              let covEnd = new Date(`${c.cover_end_date || shift?.end_date || shift?.start_date}T${c.cover_end_time || shift?.end_time || '09:00'}`);
+              if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
+              return { key: c.id || idx, start: covStart, end: covEnd, covering_user_id: c.covering_user_id };
+            });
           return {
               ...req,
               shift_date: shift?.start_date,
@@ -128,74 +146,118 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
               user_name: user?.full_name || 'לא ידוע',
               department: user?.department,
               original_shift: shift,
-              is_request_object: true
+              is_request_object: true,
+              coverageSegments
           };
       });
-  }, [shiftsAll, authorizedUsers]);
+  }, [coveragesAll, shiftsAll, authorizedUsers]);
 
   const enrichShiftsWithUserInfo = useCallback((shifts) => {
-      return shifts.map(s => ({
+      return shifts.map(s => {
+        const activeRequest = swapRequestsAll.find(r => r.shift_id === s.id && isOpenStatus(r.status));
+        const coverageType = activeRequest?.request_type?.toLowerCase() || s.coverageType || s.swap_type;
+        let displayStatus = 'regular';
+
+        if (s.status === 'Covered' || s.cover_status === 'Approved' || s.ownership === 'covering') {
+          displayStatus = 'covered';
+        } else if (activeRequest || s.status === 'Swap_Requested') {
+          displayStatus = coverageType === 'partial' ? 'partial' : 'requested';
+        } else if (s.coverageType === 'partial') {
+          displayStatus = 'partial';
+        }
+
+        return {
           ...s,
-          user_name: currentUser?.full_name,
+          user_name: s.ownership === 'covering' ? (s.covering_name || currentUser?.full_name) : currentUser?.full_name,
           shift_date: s.start_date,
-          is_shift_object: true
-      }));
-  }, [currentUser]);
+          is_shift_object: true,
+          status: displayStatus,
+          coverageType,
+        };
+      });
+  }, [currentUser, swapRequestsAll]);
 
   const partialGapItems = useMemo(() => {
-      if (!isOpen || !isPartialGapsView) return [];
-      return shiftsAll.map((shift) => {
-          const activeRequest = swapRequestsAll.find(r => r.shift_id === shift.id && r.status !== 'Cancelled');
-          const coverageType = (activeRequest?.request_type || shift.coverageType || shift.swap_type || '').toLowerCase();
-          const user = authorizedUsers.find(u => u.serial_id === shift.original_user_id);
-          const startTime = activeRequest?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
-          const endTime = activeRequest?.req_end_time || shift.swap_end_time || shift.end_time || startTime;
-          const startDate = activeRequest?.req_start_date || shift.start_date;
-          const endDate = activeRequest?.req_end_date || shift.end_date || startDate;
-          const windowStart = new Date(`${startDate}T${startTime}`);
-          let windowEnd = new Date(`${endDate}T${endTime}`);
-          if (windowEnd <= windowStart) windowEnd = addDays(windowEnd, 1);
+    if (!isOpen || !isPartialGapsView) return [];
+    return shiftsAll.map((shift) => {
+      if (shift.status === 'Active') return null;
 
-          const coverageSegments = coveragesAll
-            .filter(c => c.shift_id === shift.id)
-            .map((c, idx) => {
-              const covStart = new Date(`${c.cover_start_date || startDate}T${c.cover_start_time || startTime}`);
-              let covEnd = new Date(`${c.cover_end_date || endDate}T${c.cover_end_time || endTime}`);
-              if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
-              return { key: c.id || idx, start: covStart, end: covEnd };
-            });
+      const activeRequest = swapRequestsAll.find(r => r.shift_id === shift.id && isOpenStatus(r.status));
+      const user = authorizedUsers.find(u => u.serial_id === shift.original_user_id);
 
-          const missing = computeMissingSegments(windowStart, windowEnd, coverageSegments);
-          const hasGap = missing.length > 0;
-          const partialState = coverageType === 'partial' || activeRequest?.status === 'Partially_Covered' || shift.status === 'partial';
+      const startTime = activeRequest?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
+      const endTime = activeRequest?.req_end_time || shift.swap_end_time || shift.end_time || startTime;
+      const startDate = activeRequest?.req_start_date || shift.start_date;
+      const endDate = activeRequest?.req_end_date || shift.end_date || startDate;
+      const windowStart = new Date(`${startDate}T${startTime}`);
+      let windowEnd = new Date(`${endDate}T${endTime}`);
+      if (windowEnd <= windowStart) windowEnd = addDays(windowEnd, 1);
 
-          if (!hasGap && !partialState) return null;
+      const coverageSegments = coveragesAll
+        .filter(c => c.shift_id === shift.id)
+        .map((c, idx) => {
+          const covStart = new Date(`${c.cover_start_date || startDate}T${c.cover_start_time || startTime}`);
+          let covEnd = new Date(`${c.cover_end_date || endDate}T${c.cover_end_time || endTime}`);
+          if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
+          return { key: c.id || idx, start: covStart, end: covEnd, covering_user_id: c.covering_user_id };
+        });
 
-          return {
-            ...activeRequest,
-            id: activeRequest?.id || `partial-${shift.id}`,
-            shift_id: shift.id,
-            user_name: user?.full_name || shift.user_name || 'לא ידוע',
-            req_start_time: startTime,
-            req_end_time: endTime,
-            shift_date: startDate,
-            request_type: 'Partial',
-            requesting_user_id: activeRequest?.requesting_user_id || shift.original_user_id,
-            missingSegments: missing,
-            is_request_object: true,
-          };
-      }).filter(Boolean);
+      const missing = computeMissingSegments(windowStart, windowEnd, coverageSegments);
+      const hasGap = missing.length > 0;
+      const hasPartialAssignment = coverageSegments.length > 0 && hasGap;
+
+      if (!hasGap || (!hasPartialAssignment && !activeRequest)) return null;
+
+      return {
+        ...activeRequest,
+        id: activeRequest?.id || `partial-${shift.id}`,
+        shift_id: shift.id,
+        user_name: user?.full_name || shift.user_name || 'לא ידוע',
+        req_start_time: startTime,
+        req_end_time: endTime,
+        shift_date: startDate,
+        request_type: 'Partial',
+        requesting_user_id: activeRequest?.requesting_user_id || shift.original_user_id,
+        missingSegments: missing,
+        coverageSegments,
+        is_request_object: true,
+      };
+    }).filter(Boolean);
   }, [authorizedUsers, coveragesAll, isOpen, isPartialGapsView, shiftsAll, swapRequestsAll]);
 
   const futureShifts = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    return shiftsAll.filter(s => s.original_user_id === currentUser?.serial_id && s.start_date >= todayStr);
-  }, [shiftsAll, currentUser]);
 
-  const baseData = useMemo(() => {
-      const fullRequests = swapRequestsAll.filter(r => r.status === 'Open' && r.request_type === 'Full');
-      const partialRequests = swapRequestsAll.filter(r => (r.status === 'Open' && r.request_type === 'Partial') || r.status === 'Partially_Covered');
-      const approvedReqs = swapRequestsAll.filter(r => ['Completed', 'Closed'].includes(r.status));
+    const owned = shiftsAll
+      .filter(s => s.original_user_id === currentUser?.serial_id && s.start_date >= todayStr)
+      .map(s => ({ ...s, ownership: 'mine' }));
+
+    const asCovering = coveragesAll
+      .filter(c => c.covering_user_id === currentUser?.serial_id && c.status !== 'Cancelled' && c.cover_start_date >= todayStr)
+      .map(cov => {
+        const shift = shiftsAll.find(s => s.id === cov.shift_id);
+        if (!shift) return null;
+        return {
+          ...shift,
+          start_date: cov.cover_start_date || shift.start_date,
+          end_date: cov.cover_end_date || shift.end_date || cov.cover_start_date,
+          start_time: cov.cover_start_time || shift.start_time,
+          end_time: cov.cover_end_time || shift.end_time,
+          ownership: 'covering',
+          covering_name: currentUser?.full_name,
+          cover_status: cov.status,
+        };
+      })
+      .filter(Boolean);
+
+    return [...owned, ...asCovering];
+  }, [coveragesAll, shiftsAll, currentUser]);
+
+    const baseData = useMemo(() => {
+        const openRequests = swapRequestsAll.filter(r => isOpenStatus(r.status));
+        const fullRequests = openRequests.filter(r => r.request_type === 'Full');
+        const partialRequests = openRequests.filter(r => r.request_type === 'Partial');
+        const approvedReqs = swapRequestsAll.filter(r => ['Completed', 'Closed'].includes(r.status));
 
       switch (type) {
         case 'swap_requests':
@@ -298,8 +360,13 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const { title, color, textColor } = getTitleAndColor();
   const secondaryHeaderText = type === 'my_shifts' ? 'text-[#0b3a5e]/80' : 'text-white/90';
   const isFutureShiftsView = type === 'my_shifts';
-  const displayedItems = sortedData.slice(0, visibleCount);
-  const hasMore = sortedData.length > visibleCount;
+  const filteredSwapItems = useMemo(() => {
+    if (type !== 'swap_requests') return sortedData;
+    return sortedData.filter(item => swapTab === 'all' ? true : item.requesting_user_id === currentUser?.serial_id);
+  }, [currentUser?.serial_id, sortedData, swapTab, type]);
+
+  const displayedItems = filteredSwapItems.slice(0, visibleCount);
+  const hasMore = filteredSwapItems.length > visibleCount;
 
   if (!isOpen) return null;
 
@@ -315,98 +382,183 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
             <p className={`${secondaryHeaderText} text-sm mt-1`}>{sortedData.length} רשומות</p>
           </div>
 
-          <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
-            {isLoading ? (
-              <div className="space-y-3" aria-label="טעינת נתונים">
-                <LoadingSkeleton className="h-16 w-full" />
-                <LoadingSkeleton className="h-16 w-full" />
-                <LoadingSkeleton className="h-16 w-full" />
-              </div>
-            ) : baseData.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <div className="mx-auto w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                  <AlertCircle className="w-6 h-6 text-gray-400" />
+            <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
+              {type === 'swap_requests' && (
+                <div className="flex items-center gap-2 mb-4">
+                  <Button variant={swapTab === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setSwapTab('all')} className="flex-1">
+                    כל הבקשות הפתוחות
+                  </Button>
+                  <Button variant={swapTab === 'mine' ? 'default' : 'outline'} size="sm" onClick={() => setSwapTab('mine')} className="flex-1">
+                    הבקשות שלי
+                  </Button>
                 </div>
-                <p className="font-semibold">אין נתונים להצגה</p>
-                <p className="text-sm text-gray-400">המשימות יופיעו כאן ברגע שיהיו</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
+              )}
+              {isLoading ? (
+                <div className="space-y-3" aria-label="טעינת נתונים">
+                  <LoadingSkeleton className="h-16 w-full" />
+                  <LoadingSkeleton className="h-16 w-full" />
+                  <LoadingSkeleton className="h-16 w-full" />
+                </div>
+              ) : filteredSwapItems.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                    <AlertCircle className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <p className="font-semibold">אין נתונים להצגה</p>
+                  <p className="text-sm text-gray-400">המשימות יופיעו כאן ברגע שיהיו</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
                 {displayedItems.map((item, idx) => {
                   const isMyRequest = item.requesting_user_id === currentUser?.serial_id;
+                  const isPartial = (item.request_type || '').toLowerCase() === 'partial';
+
+                  const startDate = item.start_date || item.shift_date || item.req_start_date;
+                  const endDate = item.end_date || item.req_end_date || startDate;
+                  const startTime = item.start_time || item.req_start_time || '09:00';
+                  const endTime = item.end_time || item.req_end_time || startTime;
+                  const dayName = getDisplayDay(startDate);
+                  const tone = (() => {
+                    if (type !== 'my_shifts') return { wrapper: '', label: '' };
+                    const normalizedStatus = (item.status || '').toLowerCase();
+                    const isPartialShift = normalizedStatus === 'partial' || item.coverageType === 'partial' || item.swap_type === 'partial';
+                    const isRequested = normalizedStatus === 'swap_requested' || normalizedStatus === 'requested';
+                    const isCovered = normalizedStatus === 'covered' || item.ownership === 'covering';
+
+                    if (isRequested) return { wrapper: 'bg-red-50 border-red-200', label: 'בקשת החלפה' };
+                    if (isPartialShift) return { wrapper: 'bg-yellow-50 border-yellow-200', label: 'כיסוי חלקי' };
+                    if (isCovered) return { wrapper: 'bg-green-50 border-green-200', label: 'כיסוי מלא' };
+                    if (item.ownership === 'mine') return { wrapper: 'bg-[#e6f4ff] border-[#a9def9]', label: 'המשמרת שלי' };
+                    return { wrapper: 'bg-white', label: '' };
+                  })();
 
                   return (
-                    <div key={item.id || idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all">
+                    <div key={item.id || idx} className={`bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all ${tone.wrapper}`}>
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <Calendar className="w-4 h-4 text-gray-500" />
-                            <span className="font-semibold text-gray-800">{item.shift_date ? format(new Date(item.shift_date), 'dd/MM/yyyy') : 'תאריך לא ידוע'}</span>
+                            <span className="font-semibold text-gray-800">{startDate ? format(new Date(startDate), 'dd/MM/yyyy') : 'תאריך לא ידוע'}</span>
+                            {dayName && <span className="text-xs text-gray-500">({dayName})</span>}
                           </div>
-                          
+
                           <p className="text-sm text-gray-800 font-medium">{item.user_name}</p>
 
-                          {/* Time display logic */}
-                          <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
-                             <Clock className="w-3 h-3" />
-                             {item.is_request_object ? (
-                                 <span>{item.req_start_time} - {item.req_end_time}</span>
-                             ) : (
-                                 <span>{getShiftTimeDisplay(item)}</span>
-                             )}
+                          {tone.label && (
+                            <span className="inline-block mt-1 text-[11px] px-2 py-1 rounded-full bg-white/70 text-gray-700 border border-gray-200">
+                              {tone.label}
+                            </span>
+                          )}
+
+                          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-600">
+                            <div className="flex items-center gap-1"><Clock className="w-3 h-3" /> {startTime}</div>
+                            <div className="flex items-center gap-1"><Clock className="w-3 h-3" /> {endTime}</div>
+                            <div className="text-[11px] text-gray-500">התחלה: {startDate}</div>
+                            <div className="text-[11px] text-gray-500">סיום: {endDate}</div>
                           </div>
+
+                          {type === 'partial_gaps' && item.missingSegments?.length > 0 && (
+                            <div className="mt-2 text-xs text-yellow-800 bg-yellow-100 border border-yellow-200 rounded-lg p-2">
+                              <p className="font-semibold mb-1">חלונות לא מכוסים</p>
+                              {item.missingSegments.map((seg, gapIdx) => (
+                                <p key={`gap-${gapIdx}`} dir="ltr">{format(seg.start, 'HH:mm')} - {format(seg.end, 'HH:mm')}</p>
+                              ))}
+                            </div>
+                          )}
+
+                          {type === 'approved' && item.original_shift && (
+                            <div className="mt-2 text-xs text-gray-600 space-y-1">
+                              <p className="font-semibold text-gray-700">יוזם: {item.user_name}</p>
+                              <p>סוג החלפה: {isPartial ? 'חלקית' : 'מלאה'}</p>
+                              {item.coverageSegments?.length ? (
+                                <div className="bg-gray-100 rounded-lg p-2">
+                                  <p className="font-semibold text-gray-700">משתתפים</p>
+                                  {item.coverageSegments.map((seg, segIdx) => {
+                                    const coveringUser = authorizedUsers.find(u => u.serial_id === seg.covering_user_id);
+                                    return (
+                                      <p key={`seg-${segIdx}`} className="flex justify-between" dir="ltr">
+                                        <span>{coveringUser?.full_name || 'מחליף'}</span>
+                                        <span>{format(seg.start, 'HH:mm')} - {format(seg.end, 'HH:mm')}</span>
+                                      </p>
+                                    );
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex flex-col gap-2 flex-shrink-0 items-end">
+                          {type === 'swap_requests' && isMyRequest && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="rounded-full"
+                                onClick={() => onCancelRequest && onCancelRequest(item)}
+                                disabled={actionsDisabled}
+                                title="בטל בקשה"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="rounded-full text-green-600 border-green-200"
+                                onClick={() => handleReshareWhatsapp(item)}
+                                disabled={actionsDisabled}
+                                title="שלח בוואטסאפ"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
 
-                             {/* If it's a request from someone else, show "I'll cover" */}
-                             {item.is_request_object && !isMyRequest && type !== 'approved' && (
-                                   <Button
-                                      onClick={() => { if (actionsDisabled) return; onClose(); onOfferCover(item); }}
-                                      size="sm"
-                                      disabled={actionsDisabled}
-                                      className={`bg-blue-500 text-white hover:bg-blue-600 px-3 h-9 ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                    >
-                                       אחליף <ArrowRight className="w-4 h-4 mr-1" />
-                                   </Button>
-                             )}
+                          {item.is_request_object && !isMyRequest && type !== 'approved' && (
+                            <Button
+                              onClick={() => { if (actionsDisabled) return; onClose(); onOfferCover(item); }}
+                              size="sm"
+                              disabled={actionsDisabled}
+                              className={`bg-blue-500 text-white hover:bg-blue-600 px-3 h-9 ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                              אחליף <ArrowRight className="w-4 h-4 mr-1" />
+                            </Button>
+                          )}
 
-                             {/* If it's my shift/request */}
-                            {(item.is_shift_object || isMyRequest) && (
-                               <>
-                                    <Button
-                                      onClick={() => handleAddToCalendar(item)}
-                                      size="icon"
-                                      variant={isFutureShiftsView ? 'default' : 'outline'}
-                                      disabled={actionsDisabled}
-                                      className={`rounded-full w-10 h-10 ${isFutureShiftsView ? 'bg-[#a9def9] text-[#0b3a5e] hover:bg-[#8cd3f6]' : 'border-blue-200 text-blue-600 hover:bg-blue-50'} transition-colors shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                    >
-                                        <CalendarPlus className="w-5 h-5" />
-                                    </Button>
-                                    {isFutureShiftsView && item.is_shift_object && (
-                                      <Button
-                                        onClick={() => handleReshareWhatsapp(item)}
-                                        size="icon"
-                                        disabled={actionsDisabled}
-                                        className={`rounded-full w-10 h-10 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                        title="שיתוף הבקשה מחדש בוואטסאפ"
-                                      >
-                                        <Send className="w-5 h-5" />
-                                      </Button>
-                                    )}
-                                    {item.is_shift_object && (
-                                      <Button
-                                        onClick={() => handleRequestSwap(item)}
-                                        size="icon"
-                                        disabled={actionsDisabled}
-                                        className={`rounded-full w-10 h-10 ${isFutureShiftsView ? 'bg-[#a9def9] text-[#0b3a5e] hover:bg-[#8cd3f6]' : 'bg-red-500 hover:bg-red-600 text-white'} shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                      >
-                                          <ArrowLeftRight className="w-5 h-5" />
-                                      </Button>
-                                    )}
-                                </>
-                             )}
+                          {(item.is_shift_object || isMyRequest) && (
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => handleAddToCalendar(item)}
+                                size="icon"
+                                variant={isFutureShiftsView ? 'default' : 'outline'}
+                                disabled={actionsDisabled}
+                                className={`rounded-full w-10 h-10 ${isFutureShiftsView ? 'bg-[#a9def9] text-[#0b3a5e] hover:bg-[#8cd3f6]' : 'border-blue-200 text-blue-600 hover:bg-blue-50'} transition-colors shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                              >
+                                <CalendarPlus className="w-5 h-5" />
+                              </Button>
+                              {isFutureShiftsView && item.is_shift_object && (
+                                <Button
+                                  onClick={() => handleReshareWhatsapp(item)}
+                                  size="icon"
+                                  disabled={actionsDisabled}
+                                  className={`rounded-full w-10 h-10 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                  title="שיתוף הבקשה מחדש בוואטסאפ"
+                                >
+                                  <Send className="w-5 h-5" />
+                                </Button>
+                              )}
+                              {item.is_shift_object && (
+                                <Button
+                                  onClick={() => handleRequestSwap(item)}
+                                  size="icon"
+                                  disabled={actionsDisabled}
+                                  className={`rounded-full w-10 h-10 ${isFutureShiftsView ? 'bg-[#a9def9] text-[#0b3a5e] hover:bg-[#8cd3f6]' : 'bg-red-500 hover:bg-red-600 text-white'} shadow-sm ${actionsDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                    <ArrowLeftRight className="w-5 h-5" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
