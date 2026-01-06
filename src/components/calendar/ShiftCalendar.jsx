@@ -170,6 +170,33 @@ export default function ShiftCalendar() {
     enabled: !!authorizedPerson
   });
 
+  // Fixed: Handle deep link via query param to open shift details directly
+  useEffect(() => {
+    if (typeof window === 'undefined' || !authorizedPerson) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const openShiftId = params.get('openShiftId');
+    if (!openShiftId) return;
+
+    const openDeepLinkedShift = async () => {
+      try {
+        const shiftData = await base44.entities.Shift.get(openShiftId);
+        if (shiftData) {
+          setSelectedShift(shiftData);
+          setShowDetailsModal(true);
+          window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash}`);
+        } else {
+          toast.error('המשמרת לא נמצאה');
+        }
+      } catch (error) {
+        console.error('❌ [ShiftCalendar] Failed to open shift from deep link', error);
+        toast.error('המשמרת לא נמצאה');
+      }
+    };
+
+    openDeepLinkedShift();
+  }, [authorizedPerson]);
+
   // Enrich shifts with user data and swap status
   const enrichedShifts = shifts.map(shift => {
     const user = allUsers.find(u => u.serial_id === shift.original_user_id);
