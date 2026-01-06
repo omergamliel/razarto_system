@@ -75,20 +75,28 @@ export default function ShiftCell({
   const assignments = React.useMemo(() => {
     if (!shift) return [];
 
+    const buildSafeDateTime = (dateStr, timeStr) => {
+      if (!dateStr || !timeStr) return null;
+      const dt = new Date(`${dateStr}T${timeStr}`);
+      return isNaN(dt.getTime()) ? null : dt;
+    };
+
     const requestStartStr = shift.active_request?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
     const requestEndStr = shift.active_request?.req_end_time || shift.swap_end_time || shift.end_time || '09:00';
     const requestStartDate = shift.active_request?.req_start_date || shift.start_date;
     const requestEndDate = shift.active_request?.req_end_date || shift.end_date || requestStartDate;
 
-    const baseStart = new Date(`${requestStartDate}T${requestStartStr}`);
-    let baseEnd = new Date(`${requestEndDate}T${requestEndStr}`);
+    const baseStart = buildSafeDateTime(requestStartDate, requestStartStr);
+    if (!baseStart) return [];
+    let baseEnd = buildSafeDateTime(requestEndDate, requestEndStr) || baseStart;
     if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
 
     const coverageSegments = (shift.coverages || [])
       .filter(cov => cov.status !== 'Cancelled')
       .map((cov, idx) => {
-        const covStart = new Date(`${cov.cover_start_date || requestStartDate}T${cov.cover_start_time || requestStartStr}`);
-        let covEnd = new Date(`${cov.cover_end_date || requestEndDate}T${cov.cover_end_time || requestEndStr}`);
+        const covStart = buildSafeDateTime(cov.cover_start_date || requestStartDate, cov.cover_start_time || requestStartStr);
+        let covEnd = buildSafeDateTime(cov.cover_end_date || requestEndDate, cov.cover_end_time || requestEndStr);
+        if (!covStart || !covEnd) return null;
         if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
         return {
           key: `${cov.id || idx}-${cov.cover_start_time || ''}`,
@@ -96,7 +104,8 @@ export default function ShiftCell({
           start: covStart,
           end: covEnd,
         };
-      });
+      })
+      .filter(Boolean);
 
     const mergedCoverages = coverageSegments
       .map(seg => ({ start: seg.start, end: seg.end }))
@@ -126,6 +135,7 @@ export default function ShiftCell({
     ownerSlots = ownerSlots.filter(seg => seg.end > seg.start);
 
     const formatRange = (start, end) => {
+      if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return null;
       const startText = format(start, 'HH:mm');
       const endText = format(end, 'HH:mm');
       return `${startText} - ${endText}`;
