@@ -19,7 +19,6 @@ import AcceptSwapModal from './AcceptSwapModal';
 import ShiftActionModal from './ShiftActionModal';
 import EditRoleModal from './EditRoleModal';
 import ShiftDetailsModal from './ShiftDetailsModal';
-import CoverSegmentModal from './CoverSegmentModal';
 import OnboardingModal from '../onboarding/OnboardingModal'; // מסך כניסה החדש
 import KPIHeader from '../dashboard/KPIHeader';
 import KPIListModal from '../dashboard/KPIListModal';
@@ -31,6 +30,91 @@ import HeadToHeadApprovalModal from './HeadToHeadApprovalModal';
 import HallOfFameModal from '../dashboard/HallOfFameModal';
 import HelpSupportModal from '../dashboard/HelpSupportModal';
 import LoadingSkeleton from '../LoadingSkeleton';
+
+// --- SWAP CONTEXT HELPERS (kept local to avoid new files) ---
+const resolveSwapType = (shift, activeRequest) => {
+  const explicit = activeRequest?.request_type || shift?.request_type || shift?.coverageType || shift?.swap_type;
+  if (explicit && String(explicit).toLowerCase() === 'partial') return 'partial';
+  if (explicit && String(explicit).toLowerCase() === 'full') return 'full';
+
+  // Fall back to time ranges (same start/end implies full-day slot in this system)
+  const start = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time;
+  const end = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time;
+  if (start && end && start !== end) return 'partial';
+  return 'full';
+};
+
+const resolveRequestWindow = (shift, activeRequest) => {
+  const startDate = activeRequest?.req_start_date || shift?.req_start_date || shift?.start_date || shift?.date;
+  const endDate = activeRequest?.req_end_date || shift?.req_end_date || shift?.end_date || startDate;
+  const startTime = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time || '09:00';
+  const endTime = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time || startTime;
+  return { startDate, endDate, startTime, endTime };
+};
+
+// Ensures every entry point (UI click + WhatsApp deep link) hydrates the same structure
+const normalizeShiftContext = (shift, { allUsers, swapRequests, coverages, currentUser }) => {
+  if (!shift) return null;
+
+  const activeRequest = shift.active_request || swapRequests?.find(sr => sr.shift_id === shift.id && sr.status !== 'Cancelled');
+  const requestType = resolveSwapType(shift, activeRequest);
+  const window = resolveRequestWindow(shift, activeRequest);
+
+  const originalUser = allUsers?.find(u => u.serial_id === shift.original_user_id) || shift.original_user_data;
+  const shiftCoverages = (coverages || [])
+    .filter(c => c.shift_id === shift.id)
+    .map(cov => {
+      const coveringUser = allUsers?.find(u => u.serial_id === cov.covering_user_id);
+      return {
+        ...cov,
+        covering_name: coveringUser?.full_name || cov.covering_name || 'מחליף',
+        covering_email: coveringUser?.email || cov.covering_email || '',
+        covering_department: coveringUser?.department || cov.covering_department || ''
+      };
+    });
+
+  let displayStatus = shift.status || 'regular';
+  const hasCoverages = shiftCoverages.length > 0;
+  if (activeRequest) {
+    if (activeRequest.status === 'Closed') displayStatus = 'covered';
+    else if (activeRequest.status === 'Partially_Covered' || (requestType === 'partial' && hasCoverages)) displayStatus = 'partial';
+    else if (activeRequest.status === 'Open' || shift.status === 'Swap_Requested') displayStatus = requestType === 'partial' ? 'partial' : 'requested';
+  }
+  if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
+    displayStatus = requestType === 'partial' ? 'partial' : 'covered';
+  }
+
+  return {
+    ...shift,
+    date: shift.start_date || shift.date,
+    role: originalUser?.full_name || shift.role || 'לא שובץ',
+    department: originalUser?.department || shift.department || '',
+    assigned_email: originalUser?.email || shift.assigned_email || '',
+    assigned_person: originalUser?.full_name || shift.assigned_person || '',
+    user_name: shift.user_name || originalUser?.full_name || shift.role,
+    status: displayStatus,
+    swap_start_time: window.startTime,
+    swap_end_time: window.endTime,
+    swap_type: requestType,
+    coverageType: requestType,
+    coverages: shiftCoverages,
+    shiftCoverages,
+    active_request: activeRequest,
+    request_type: activeRequest?.request_type || shift.request_type || (requestType === 'partial' ? 'Partial' : 'Full'),
+    original_user_data: originalUser,
+    isMine: currentUser ? shift.original_user_id === currentUser.serial_id : false,
+    isCovering: currentUser ? shiftCoverages.some(cov => cov.covering_user_id === currentUser.serial_id) : false,
+    start_time: shift.start_time || window.startTime,
+    end_time: shift.end_time || window.endTime,
+    start_date: shift.start_date || window.startDate,
+    end_date: shift.end_date || window.endDate
+  };
+};
+
+// --- Summary of swap flow fixes ---
+// 1) AcceptSwapModal replaces legacy CoverSegmentModal across all entry points.
+// 2) normalizeShiftContext + resolveSwapType/requestWindow standardize swap payloads for UI and WhatsApp deep links.
+// 3) Deep links now hydrate the same shape before rendering modals to avoid race conditions.
 
 export default function ShiftCalendar() {
   const queryClient = useQueryClient();
@@ -49,7 +133,6 @@ export default function ShiftCalendar() {
   const [showActionModal, setShowActionModal] = useState(false);
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showCoverSegmentModal, setShowCoverSegmentModal] = useState(false);
   const [showAdminSettings, setShowAdminSettings] = useState(false);
   const [showHallOfFame, setShowHallOfFame] = useState(false);
   const [showHelpSupport, setShowHelpSupport] = useState(false);
@@ -171,65 +254,13 @@ export default function ShiftCalendar() {
     enabled: !!authorizedPerson
   });
 
-  // Enrich shifts with user data and swap status
-  const enrichedShifts = shifts.map(shift => {
-    const user = allUsers.find(u => u.serial_id === shift.original_user_id);
-    const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status !== 'Cancelled');
-    const shiftCoverages = coverages
-      .filter(c => c.shift_id === shift.id)
-      .map(cov => {
-        const coveringUser = allUsers.find(u => u.serial_id === cov.covering_user_id);
-        return {
-          ...cov,
-          covering_name: coveringUser?.full_name || 'מחליף',
-          covering_email: coveringUser?.email || '',
-          covering_department: coveringUser?.department || ''
-        };
-      });
-
-    const coverageType = activeRequest?.request_type?.toLowerCase() || shift.coverageType || shift.swap_type || 'full';
-    let displayStatus = 'regular';
-
-    if (shift.status === 'Covered') {
-      displayStatus = 'covered';
-    }
-
-    if (activeRequest) {
-      const isPartialRequest = coverageType === 'partial';
-      const hasCoverages = shiftCoverages.length > 0;
-
-      if (activeRequest.status === 'Closed') {
-        displayStatus = 'covered';
-      } else if (activeRequest.status === 'Partially_Covered' || (isPartialRequest && hasCoverages)) {
-        displayStatus = 'partial';
-      } else if (activeRequest.status === 'Open' || shift.status === 'Swap_Requested') {
-        displayStatus = isPartialRequest ? 'partial' : 'requested';
-      }
-    }
-
-    if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
-      displayStatus = coverageType === 'partial' ? 'partial' : 'covered';
-    }
-
-    return {
-      ...shift,
-      date: shift.start_date, // Map to old structure for compatibility
-      role: user?.full_name || 'לא שובץ',
-      department: user?.department || '',
-      assigned_email: user?.email || '',
-      assigned_person: user?.full_name || '',
-      // Swap status mapping
-      status: displayStatus,
-      swap_start_time: activeRequest?.req_start_time,
-      swap_end_time: activeRequest?.req_end_time,
-      swap_type: activeRequest?.request_type?.toLowerCase(),
-      coverageType,
-      coverages: shiftCoverages,
-      active_request: activeRequest,
-      isMine: shift.original_user_id === authorizedPerson?.serial_id,
-      isCovering: shiftCoverages.some(cov => cov.covering_user_id === authorizedPerson?.serial_id)
-    };
-  });
+  // Enrich shifts with user data and swap status (shared across UI & deep links)
+  const enrichedShifts = shifts.map(shift => normalizeShiftContext(shift, {
+    allUsers,
+    swapRequests,
+    coverages,
+    currentUser: authorizedPerson
+  }));
 
   // Fixed: Handle deep link via query param to open shift details directly (using enriched context)
   useEffect(() => {
@@ -246,7 +277,7 @@ export default function ShiftCalendar() {
   useEffect(() => {
     if (!deepLinkShiftId || !authorizedPerson) return;
 
-    const hydratedFromList = enrichedShifts.find((s) => String(s.id) === String(deepLinkShiftId));
+    const hydratedFromList = enrichedShifts.find((s) => String(s?.id) === String(deepLinkShiftId));
     if (hydratedFromList) {
       setSelectedShift(hydratedFromList);
       setShowDetailsModal(true);
@@ -261,58 +292,12 @@ export default function ShiftCalendar() {
           return;
         }
 
-        const user = allUsers.find(u => u.serial_id === shiftData.original_user_id);
-        const activeRequest = swapRequests.find(sr => sr.shift_id === shiftData.id && sr.status !== 'Cancelled');
-        const shiftCoverages = coverages
-          .filter(c => c.shift_id === shiftData.id)
-          .map(cov => {
-            const coveringUser = allUsers.find(u => u.serial_id === cov.covering_user_id);
-            return {
-              ...cov,
-              covering_name: coveringUser?.full_name || 'מחליף',
-              covering_email: coveringUser?.email || '',
-              covering_department: coveringUser?.department || ''
-            };
-          });
-
-        const coverageType = activeRequest?.request_type?.toLowerCase() || shiftData.coverageType || shiftData.swap_type || 'full';
-        let displayStatus = shiftData.status === 'Covered' ? 'covered' : shiftData.status || 'regular';
-
-        if (activeRequest) {
-          const isPartialRequest = coverageType === 'partial';
-          const hasCoverages = shiftCoverages.length > 0;
-
-          if (activeRequest.status === 'Closed') {
-            displayStatus = 'covered';
-          } else if (activeRequest.status === 'Partially_Covered' || (isPartialRequest && hasCoverages)) {
-            displayStatus = 'partial';
-          } else if (activeRequest.status === 'Open' || shiftData.status === 'Swap_Requested') {
-            displayStatus = isPartialRequest ? 'partial' : 'requested';
-          }
-        }
-
-        if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
-          displayStatus = coverageType === 'partial' ? 'partial' : 'covered';
-        }
-
-        // Hydrate the shift to the same shape the calendar uses (keeps modal context consistent)
-        const hydratedShift = {
-          ...shiftData,
-          date: shiftData.start_date,
-          role: user?.full_name || 'לא שובץ',
-          department: user?.department || '',
-          assigned_email: user?.email || '',
-          assigned_person: user?.full_name || '',
-          status: displayStatus,
-          swap_start_time: activeRequest?.req_start_time,
-          swap_end_time: activeRequest?.req_end_time,
-          swap_type: activeRequest?.request_type?.toLowerCase(),
-          coverageType,
-          coverages: shiftCoverages,
-          active_request: activeRequest,
-          isMine: shiftData.original_user_id === authorizedPerson?.serial_id,
-          isCovering: shiftCoverages.some(cov => cov.covering_user_id === authorizedPerson?.serial_id)
-        };
+        const hydratedShift = normalizeShiftContext(shiftData, {
+          allUsers,
+          swapRequests,
+          coverages,
+          currentUser: authorizedPerson
+        });
 
         setSelectedShift(hydratedShift);
         setShowDetailsModal(true);
@@ -400,24 +385,27 @@ export default function ShiftCalendar() {
 
   const offerCoverMutation = useMutation({
     mutationFn: async ({ shift, coverData }) => {
+      const normalizedShift = normalizeShiftContext(shift, { allUsers, swapRequests, coverages, currentUser: authorizedPerson });
+
       // Find active swap request
-      const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
+      const activeRequest = normalizedShift?.active_request || swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
       if (!activeRequest) throw new Error('No active swap request found');
 
-      // Create Coverage Record
-      await base44.entities.ShiftCoverage.create({
+      const payload = {
         request_id: activeRequest.id,
         shift_id: shift.id,
         covering_user_id: authorizedPerson.serial_id,
-        cover_start_date: coverData.startDate || coverData.coverDate,
-        cover_end_date: coverData.endDate || coverData.coverDate,
-        cover_start_time: coverData.startTime,
-        cover_end_time: coverData.endTime,
+        cover_start_date: coverData.startDate || coverData.coverDate || normalizedShift.start_date,
+        cover_end_date: coverData.endDate || coverData.coverDate || normalizedShift.end_date,
+        cover_start_time: coverData.startTime || normalizedShift.start_time,
+        cover_end_time: coverData.endTime || normalizedShift.end_time,
         status: 'Approved'
-      });
+      };
+
+      await base44.entities.ShiftCoverage.create(payload);
 
       // Update SwapRequest status
-      const isFullCover = coverData.coverFull || coverData.type === 'full';
+      const isFullCover = coverData.coverFull || coverData.type === 'full' || coverData.type === 'Full';
       if (isFullCover) {
         await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
         await base44.entities.Shift.update(shift.id, { status: 'Covered' });
@@ -430,7 +418,7 @@ export default function ShiftCalendar() {
       queryClient.invalidateQueries(['swap-requests']);
       queryClient.invalidateQueries(['coverages']);
       toast.success('הצעת הכיסוי נשלחה בהצלחה!');
-      setShowCoverSegmentModal(false);
+      setShowAcceptSwapModal(false);
       setShowDetailsModal(false);
     }
   });
@@ -612,8 +600,9 @@ export default function ShiftCalendar() {
   };
 
   const handleOfferCover = (shift) => {
-    setSelectedShift(shift);
-    setShowCoverSegmentModal(true);
+    const normalized = normalizeShiftContext(shift, { allUsers, swapRequests, coverages, currentUser: authorizedPerson });
+    setSelectedShift(normalized);
+    setShowAcceptSwapModal(true);
   };
 
   const handleOpenSwapRequest = (shift) => {
@@ -798,7 +787,6 @@ export default function ShiftCalendar() {
         onClose={() => setShowDetailsModal(false)}
         shift={selectedShift}
         date={currentDate}
-        onCoverSegment={(shift) => handleOfferCover(shift)}
         onOfferCover={handleOfferCover}
         onHeadToHead={(shift) => {
             setSelectedShift(shift);
@@ -811,13 +799,13 @@ export default function ShiftCalendar() {
         isAdmin={isAdmin}
       />
 
-      <CoverSegmentModal
-        isOpen={showCoverSegmentModal}
-        onClose={() => setShowCoverSegmentModal(false)}
+      <AcceptSwapModal
+        isOpen={showAcceptSwapModal && !!selectedShift}
+        onClose={() => setShowAcceptSwapModal(false)}
         shift={selectedShift}
-        date={selectedShift?.date}
-        onSubmit={(segmentData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: segmentData })}
-        isSubmitting={offerCoverMutation.isPending}
+        existingCoverages={selectedShift?.shiftCoverages || selectedShift?.coverages || []}
+        onAccept={(segmentData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: segmentData })}
+        isAccepting={offerCoverMutation.isPending}
       />
 
       <SwapSuccessModal
