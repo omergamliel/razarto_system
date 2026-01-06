@@ -10,54 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { buildShiftDeepLink, buildSwapTemplate } from './whatsappTemplates';
+import { buildShiftDeepLink, buildSwapTemplate, calculateMissingSegments, resolveRequestWindow, resolveSwapType, buildDateTime } from './whatsappTemplates';
 import LoadingSkeleton from '../LoadingSkeleton';
-
-// Local helpers to keep swap logic consistent across modals
-const resolveSwapType = (shift, activeRequest) => {
-  const explicit = activeRequest?.request_type || shift?.request_type || shift?.coverageType || shift?.swap_type;
-  if (explicit && String(explicit).toLowerCase() === 'partial') return 'partial';
-  if (explicit && String(explicit).toLowerCase() === 'full') return 'full';
-  const start = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time;
-  const end = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time;
-  if (start && end && start !== end) return 'partial';
-  return 'full';
-};
-
-const resolveRequestWindow = (shift, activeRequest) => {
-  const startDate = activeRequest?.req_start_date || shift?.req_start_date || shift?.start_date || shift?.date;
-  const endDate = activeRequest?.req_end_date || shift?.req_end_date || shift?.end_date || startDate;
-  const startTime = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time || '09:00';
-  const endTime = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time || startTime;
-  return { startDate, endDate, startTime, endTime };
-};
-
-const buildDateTime = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}`);
-
-const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = []) => {
-  const orderedCoverages = [...coverageEntries]
-    .map((cov) => ({
-      ...cov,
-      start: buildDateTime(cov.cover_start_date, cov.cover_start_time),
-      end: buildDateTime(cov.cover_end_date, cov.cover_end_time)
-    }))
-    .filter((cov) => cov.start < cov.end)
-    .sort((a, b) => a.start - b.start);
-
-  let gaps = [{ start: baseStart, end: baseEnd }];
-
-  orderedCoverages.forEach((cov) => {
-    gaps = gaps.flatMap((seg) => {
-      if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
-      const pieces = [];
-      if (cov.start > seg.start) pieces.push({ start: seg.start, end: cov.start });
-      if (cov.end < seg.end) pieces.push({ start: cov.end, end: seg.end });
-      return pieces;
-    });
-  });
-
-  return gaps.filter((gap) => gap.end > gap.start);
-};
 
 export default function ShiftDetailsModal({
   isOpen,
@@ -69,6 +23,7 @@ export default function ShiftDetailsModal({
   onCancelRequest,
   onDelete,
   onApprove,
+  onRequestSwap,
   currentUser,
   isAdmin
 }) {
@@ -202,6 +157,7 @@ export default function ShiftDetailsModal({
 
   const coverageType = shift?.coverageType || shift?.swap_type || (isPartial ? 'partial' : 'full');
   const isCoveredSwap = (shift?.status === 'covered' || shift?.status === 'Covered') && coverages.length > 0;
+  const isFullyCovered = isCoveredSwap || String(shift?.status || '').toLowerCase() === 'covered';
   const statusLabelClasses = isPartial
     ? 'bg-yellow-100 text-yellow-900 border border-yellow-200'
     : 'bg-red-100 text-red-900 border border-red-200';
@@ -453,7 +409,7 @@ export default function ShiftDetailsModal({
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 justify-center">
-              {isSwapMode && isOwnShift && (
+              {isSwapMode && isOwnShift && !isFullyCovered && (
                 <Button
                   onClick={() => onCancelRequest?.(shift)}
                   className="min-w-[160px] flex-1 sm:flex-none h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg"
@@ -463,7 +419,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {isSwapMode && !isOwnShift && (
+              {isSwapMode && !isOwnShift && !isFullyCovered && (
                 <Button
                   onClick={() => {
                     onClose();
@@ -476,7 +432,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {isSwapMode && !isOwnShift && (
+              {isSwapMode && !isOwnShift && !isFullyCovered && (
                 <Button
                   onClick={() => {
                     onClose();
@@ -489,7 +445,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {!isSwapMode && !isAdmin && (
+              {!isSwapMode && !isAdmin && isOwnShift && (
                 <Button
                   onClick={handleAddToCalendar}
                   variant="outline"
@@ -497,6 +453,16 @@ export default function ShiftDetailsModal({
                 >
                   <CalendarPlus className="w-4 h-4 ml-2" />
                   הוסף ליומן
+                </Button>
+              )}
+
+              {!isSwapMode && isOwnShift && !isAdmin && !isFullyCovered && (
+                <Button
+                  onClick={() => onRequestSwap?.(shift)}
+                  className="min-w-[160px] flex-1 sm:flex-none h-12 bg-[#0ea5e9] hover:bg-[#0284c7] text-white rounded-xl shadow-lg"
+                >
+                  <Send className="w-4 h-4 ml-2" />
+                  בקשת החלפה
                 </Button>
               )}
 
