@@ -10,7 +10,8 @@ export default function SwapSuccessModal({ isOpen, onClose, shift }) {
   if (!isOpen || !shift) return null;
 
   const handleWhatsAppShare = () => {
-    const approvalUrl = typeof window !== 'undefined' ? `${window.location.origin}/approve/${shift.id}` : '';
+    // Fixed: Changed to Query Param for deep linking to home page
+    const approvalUrl = typeof window !== 'undefined' ? `${window.location.origin}?openShiftId=${shift.id}` : '';
     const message = buildSwapTemplate({
       employeeName: shift.user_name || shift.role,
       startDate: shift.start_date || shift.date,
