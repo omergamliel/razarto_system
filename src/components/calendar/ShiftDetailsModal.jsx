@@ -10,8 +10,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { buildSwapTemplate } from './whatsappTemplates';
+import { buildShiftDeepLink, buildSwapTemplate } from './whatsappTemplates';
 import LoadingSkeleton from '../LoadingSkeleton';
+
+// Local helpers to keep swap logic consistent across modals
+const resolveSwapType = (shift, activeRequest) => {
+  const explicit = activeRequest?.request_type || shift?.request_type || shift?.coverageType || shift?.swap_type;
+  if (explicit && String(explicit).toLowerCase() === 'partial') return 'partial';
+  if (explicit && String(explicit).toLowerCase() === 'full') return 'full';
+  const start = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time;
+  const end = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time;
+  if (start && end && start !== end) return 'partial';
+  return 'full';
+};
+
+const resolveRequestWindow = (shift, activeRequest) => {
+  const startDate = activeRequest?.req_start_date || shift?.req_start_date || shift?.start_date || shift?.date;
+  const endDate = activeRequest?.req_end_date || shift?.req_end_date || shift?.end_date || startDate;
+  const startTime = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time || '09:00';
+  const endTime = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time || startTime;
+  return { startDate, endDate, startTime, endTime };
+};
 
 export default function ShiftDetailsModal({
   isOpen,
@@ -82,6 +101,16 @@ export default function ShiftDetailsModal({
     }
   }, [isOpen, shift]);
 
+  const resolvedActiveRequest = useMemo(() => activeRequest || shift?.active_request || null, [activeRequest, shift]);
+  const requestWindow = useMemo(
+    () => resolveRequestWindow(shift, resolvedActiveRequest),
+    [resolvedActiveRequest, shift]
+  );
+  const resolvedSwapType = useMemo(
+    () => resolveSwapType(shift, resolvedActiveRequest),
+    [resolvedActiveRequest, shift]
+  );
+
   const departments = useMemo(() => {
     return [...new Set(authorizedUsers.map(u => u.department))].filter(Boolean).sort();
   }, [authorizedUsers]);
@@ -114,9 +143,9 @@ export default function ShiftDetailsModal({
   const shiftEndDate = shift?.end_date || shiftStartDate;
 
   // Determine State
-  const isSwapMode = !!activeRequest;
-  const isPartial = activeRequest?.request_type === 'Partial';
-  const isFull = activeRequest?.request_type === 'Full';
+  const isSwapMode = !!resolvedActiveRequest;
+  const isPartial = resolvedSwapType === 'partial';
+  const isFull = resolvedSwapType === 'full';
   const isPartialLike = isPartial || shift?.status === 'partial' || shift?.coverageType === 'partial';
   const isDetailsLoading = isActiveRequestLoading || isCoveragesLoading;
 
@@ -157,10 +186,10 @@ export default function ShiftDetailsModal({
     return { color: 'bg-gray-400', text: 'פתוחה' };
   }, [coverageType, shift?.status]);
 
-  const requestStartStr = activeRequest?.req_start_time || startTime;
-  const requestEndStr = activeRequest?.req_end_time || endTime;
-  const requestStartDate = activeRequest?.req_start_date || shiftStartDate;
-  const requestEndDate = activeRequest?.req_end_date || shiftEndDate || requestStartDate;
+  const requestStartStr = requestWindow.startTime;
+  const requestEndStr = requestWindow.endTime;
+  const requestStartDate = requestWindow.startDate || shiftStartDate;
+  const requestEndDate = requestWindow.endDate || shiftEndDate || requestStartDate;
 
   const coverageRows = useMemo(() => {
     return coverages.map((cov, idx) => {
@@ -228,16 +257,15 @@ export default function ShiftDetailsModal({
   };
 
   const handleWhatsAppShare = () => {
-     const approvalUrl = typeof window !== 'undefined'
-       ? `${window.location.origin}/approve/${shift.id}`
-       : '';
+     const approvalUrl = buildShiftDeepLink(shift.id);
      const message = buildSwapTemplate({
        employeeName: shift.user_name,
        startDate: requestStartDate,
        startTime: requestStartStr,
        endDate: requestEndDate,
        endTime: requestEndStr,
-       approvalUrl
+       approvalUrl,
+       shiftId: shift.id
      });
      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
      window.open(whatsappUrl, '_blank');
