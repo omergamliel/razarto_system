@@ -54,6 +54,7 @@ export default function ShiftCalendar() {
   const [showHallOfFame, setShowHallOfFame] = useState(false);
   const [showHelpSupport, setShowHelpSupport] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [deepLinkShiftId, setDeepLinkShiftId] = useState(null);
   
   // KPI & Success Modals
   const [showKPIListModal, setShowKPIListModal] = useState(false);
@@ -170,33 +171,6 @@ export default function ShiftCalendar() {
     enabled: !!authorizedPerson
   });
 
-  // Fixed: Handle deep link via query param to open shift details directly
-  useEffect(() => {
-    if (typeof window === 'undefined' || !authorizedPerson) return;
-
-    const params = new URLSearchParams(window.location.search);
-    const openShiftId = params.get('openShiftId');
-    if (!openShiftId) return;
-
-    const openDeepLinkedShift = async () => {
-      try {
-        const shiftData = await base44.entities.Shift.get(openShiftId);
-        if (shiftData) {
-          setSelectedShift(shiftData);
-          setShowDetailsModal(true);
-          window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash}`);
-        } else {
-          toast.error('המשמרת לא נמצאה');
-        }
-      } catch (error) {
-        console.error('❌ [ShiftCalendar] Failed to open shift from deep link', error);
-        toast.error('המשמרת לא נמצאה');
-      }
-    };
-
-    openDeepLinkedShift();
-  }, [authorizedPerson]);
-
   // Enrich shifts with user data and swap status
   const enrichedShifts = shifts.map(shift => {
     const user = allUsers.find(u => u.serial_id === shift.original_user_id);
@@ -256,6 +230,100 @@ export default function ShiftCalendar() {
       isCovering: shiftCoverages.some(cov => cov.covering_user_id === authorizedPerson?.serial_id)
     };
   });
+
+  // Fixed: Handle deep link via query param to open shift details directly (using enriched context)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !authorizedPerson) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const openShiftId = params.get('openShiftId');
+    if (!openShiftId) return;
+
+    setDeepLinkShiftId(openShiftId);
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash}`);
+  }, [authorizedPerson]);
+
+  useEffect(() => {
+    if (!deepLinkShiftId || !authorizedPerson) return;
+
+    const hydratedFromList = enrichedShifts.find((s) => String(s.id) === String(deepLinkShiftId));
+    if (hydratedFromList) {
+      setSelectedShift(hydratedFromList);
+      setShowDetailsModal(true);
+      return;
+    }
+
+    const fetchAndHydrate = async () => {
+      try {
+        const shiftData = await base44.entities.Shift.get(deepLinkShiftId);
+        if (!shiftData) {
+          toast.error('המשמרת לא נמצאה');
+          return;
+        }
+
+        const user = allUsers.find(u => u.serial_id === shiftData.original_user_id);
+        const activeRequest = swapRequests.find(sr => sr.shift_id === shiftData.id && sr.status !== 'Cancelled');
+        const shiftCoverages = coverages
+          .filter(c => c.shift_id === shiftData.id)
+          .map(cov => {
+            const coveringUser = allUsers.find(u => u.serial_id === cov.covering_user_id);
+            return {
+              ...cov,
+              covering_name: coveringUser?.full_name || 'מחליף',
+              covering_email: coveringUser?.email || '',
+              covering_department: coveringUser?.department || ''
+            };
+          });
+
+        const coverageType = activeRequest?.request_type?.toLowerCase() || shiftData.coverageType || shiftData.swap_type || 'full';
+        let displayStatus = shiftData.status === 'Covered' ? 'covered' : shiftData.status || 'regular';
+
+        if (activeRequest) {
+          const isPartialRequest = coverageType === 'partial';
+          const hasCoverages = shiftCoverages.length > 0;
+
+          if (activeRequest.status === 'Closed') {
+            displayStatus = 'covered';
+          } else if (activeRequest.status === 'Partially_Covered' || (isPartialRequest && hasCoverages)) {
+            displayStatus = 'partial';
+          } else if (activeRequest.status === 'Open' || shiftData.status === 'Swap_Requested') {
+            displayStatus = isPartialRequest ? 'partial' : 'requested';
+          }
+        }
+
+        if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
+          displayStatus = coverageType === 'partial' ? 'partial' : 'covered';
+        }
+
+        // Hydrate the shift to the same shape the calendar uses (keeps modal context consistent)
+        const hydratedShift = {
+          ...shiftData,
+          date: shiftData.start_date,
+          role: user?.full_name || 'לא שובץ',
+          department: user?.department || '',
+          assigned_email: user?.email || '',
+          assigned_person: user?.full_name || '',
+          status: displayStatus,
+          swap_start_time: activeRequest?.req_start_time,
+          swap_end_time: activeRequest?.req_end_time,
+          swap_type: activeRequest?.request_type?.toLowerCase(),
+          coverageType,
+          coverages: shiftCoverages,
+          active_request: activeRequest,
+          isMine: shiftData.original_user_id === authorizedPerson?.serial_id,
+          isCovering: shiftCoverages.some(cov => cov.covering_user_id === authorizedPerson?.serial_id)
+        };
+
+        setSelectedShift(hydratedShift);
+        setShowDetailsModal(true);
+      } catch (error) {
+        console.error('❌ [ShiftCalendar] Failed to open shift from deep link', error);
+        toast.error('המשמרת לא נמצאה');
+      }
+    };
+
+    fetchAndHydrate();
+  }, [allUsers, authorizedPerson, coverages, deepLinkShiftId, enrichedShifts, swapRequests]);
 
   // --- MUTATIONS (Shift Operations) ---
 
