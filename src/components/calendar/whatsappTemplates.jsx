@@ -21,16 +21,22 @@ export const resolveRequestWindow = (shift, activeRequest) => {
   return { startDate, endDate, startTime, endTime };
 };
 
-export const buildDateTime = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}`);
+export const buildDateTime = (dateStr, timeStr) => {
+  if (!dateStr || !timeStr) return null;
+  const dt = new Date(`${dateStr}T${timeStr}`);
+  return isNaN(dt.getTime()) ? null : dt;
+};
 
 export const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = []) => {
+  if (!baseStart || !baseEnd || isNaN(baseStart.getTime()) || isNaN(baseEnd.getTime())) return [];
+
   const orderedCoverages = [...coverageEntries]
     .map((cov) => ({
       ...cov,
       start: buildDateTime(cov.cover_start_date, cov.cover_start_time),
       end: buildDateTime(cov.cover_end_date, cov.cover_end_time),
     }))
-    .filter((cov) => cov.start < cov.end)
+    .filter((cov) => cov.start && cov.end && cov.start < cov.end)
     .sort((a, b) => a.start - b.start);
 
   let gaps = [{ start: baseStart, end: baseEnd }];
@@ -45,7 +51,7 @@ export const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = [
     });
   });
 
-  return gaps.filter((gap) => gap.end > gap.start);
+  return gaps.filter((gap) => gap.end > gap.start && !isNaN(gap.start.getTime()) && !isNaN(gap.end.getTime()));
 };
 
 // Centralized deep link builder so all WhatsApp templates open the same in-app flow
