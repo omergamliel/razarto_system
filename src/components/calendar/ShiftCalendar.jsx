@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { format, addDays, parseISO, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
+import { resolveSwapType, resolveRequestWindow, calculateMissingSegments, buildDateTime } from './whatsappTemplates';
 
 // Components
 import BackgroundShapes from './BackgroundShapes';
@@ -30,54 +31,6 @@ import HeadToHeadApprovalModal from './HeadToHeadApprovalModal';
 import HallOfFameModal from '../dashboard/HallOfFameModal';
 import HelpSupportModal from '../dashboard/HelpSupportModal';
 import LoadingSkeleton from '../LoadingSkeleton';
-
-// --- SWAP CONTEXT HELPERS (kept local to avoid new files) ---
-const resolveSwapType = (shift, activeRequest) => {
-  const explicit = activeRequest?.request_type || shift?.request_type || shift?.coverageType || shift?.swap_type;
-  if (explicit && String(explicit).toLowerCase() === 'partial') return 'partial';
-  if (explicit && String(explicit).toLowerCase() === 'full') return 'full';
-
-  // Fall back to time ranges (same start/end implies full-day slot in this system)
-  const start = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time;
-  const end = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time;
-  if (start && end && start !== end) return 'partial';
-  return 'full';
-};
-
-const resolveRequestWindow = (shift, activeRequest) => {
-  const startDate = activeRequest?.req_start_date || shift?.req_start_date || shift?.start_date || shift?.date;
-  const endDate = activeRequest?.req_end_date || shift?.req_end_date || shift?.end_date || startDate;
-  const startTime = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time || '09:00';
-  const endTime = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time || startTime;
-  return { startDate, endDate, startTime, endTime };
-};
-
-const buildDateTime = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}`);
-
-const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = []) => {
-  const orderedCoverages = [...coverageEntries]
-    .map((cov) => ({
-      ...cov,
-      start: buildDateTime(cov.cover_start_date, cov.cover_start_time),
-      end: buildDateTime(cov.cover_end_date, cov.cover_end_time)
-    }))
-    .filter((cov) => cov.start < cov.end)
-    .sort((a, b) => a.start - b.start);
-
-  let gaps = [{ start: baseStart, end: baseEnd }];
-
-  orderedCoverages.forEach((cov) => {
-    gaps = gaps.flatMap((seg) => {
-      if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
-      const pieces = [];
-      if (cov.start > seg.start) pieces.push({ start: seg.start, end: cov.start });
-      if (cov.end < seg.end) pieces.push({ start: cov.end, end: seg.end });
-      return pieces;
-    });
-  });
-
-  return gaps.filter((gap) => gap.end > gap.start);
-};
 
 // Ensures every entry point (UI click + WhatsApp deep link) hydrates the same structure
 const normalizeShiftContext = (shift, { allUsers, swapRequests, coverages, currentUser }) => {
@@ -830,6 +783,10 @@ export default function ShiftCalendar() {
         onCancelRequest={(shift) => cancelSwapMutation.mutate(shift.id)}
         onDelete={deleteShiftMutation.mutate}
         onApprove={() => approveSwapMutation.mutate(selectedShift)}
+        onRequestSwap={() => {
+          setShowDetailsModal(false);
+          setShowSwapRequestModal(true);
+        }}
         currentUser={authorizedPerson}
         isAdmin={isAdmin}
       />
