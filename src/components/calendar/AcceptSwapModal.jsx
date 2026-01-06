@@ -85,10 +85,17 @@ export default function AcceptSwapModal({
   const shiftStartDate = normalizedShift?.start_date || normalizedShift?.date;
   const shiftEndDate = normalizedShift?.end_date || shiftStartDate;
 
-  const baseStart = useMemo(() => buildDateTime(requestStartDate, requestStartTime), [requestStartDate, requestStartTime]);
+  const baseStart = useMemo(
+    () => buildDateTime(requestStartDate, requestStartTime),
+    [requestStartDate, requestStartTime]
+  );
+
   const baseEnd = useMemo(() => {
-    let end = buildDateTime(requestEndDate, requestEndTime);
-    if (isBefore(end, baseStart) || end.getTime() === baseStart.getTime()) {
+    const start = baseStart;
+    const rawEnd = buildDateTime(requestEndDate, requestEndTime);
+    if (!rawEnd || !start) return rawEnd || null;
+    let end = rawEnd;
+    if (isBefore(end, start) || end.getTime() === start.getTime()) {
       end = addDays(end, 1);
     }
     return end;
@@ -110,22 +117,25 @@ export default function AcceptSwapModal({
   );
 
   const selectableSegments = useMemo(
-    () => (missingSegments.length ? missingSegments : [{ start: baseStart, end: baseEnd }]),
+    () => {
+      if (!baseStart || !baseEnd) return [];
+      return missingSegments.length ? missingSegments : [{ start: baseStart, end: baseEnd }];
+    },
     [baseEnd, baseStart, missingSegments]
   );
 
   const shouldShowMissingBanner = !coverFull && missingSegments.length > 0;
 
   const fullRangeLabel = useMemo(() => {
-    try {
-      if (!shiftStartDate) return '';
-      const start = `${shiftStartDate}T${normalizedShift?.start_time || requestStartTime || '09:00'}`;
-      const endDateValue = shiftEndDate || shiftStartDate;
-      const end = `${endDateValue}T${normalizedShift?.end_time || requestEndTime || '09:00'}`;
-      const sameDay = shiftEndDate === shiftStartDate || !shiftEndDate;
+    const start = buildDateTime(shiftStartDate, normalizedShift?.start_time || requestStartTime || '09:00');
+    const endDateValue = shiftEndDate || shiftStartDate;
+    const end = buildDateTime(endDateValue, normalizedShift?.end_time || requestEndTime || '09:00');
+    if (!start || !end) return '';
+    const sameDay = shiftEndDate === shiftStartDate || !shiftEndDate;
 
-      const startText = format(new Date(start), "EEEE, d בMMMM HH:mm", { locale: he });
-      const endText = format(new Date(end), sameDay ? 'HH:mm' : "EEEE, d בMMMM HH:mm", { locale: he });
+    try {
+      const startText = format(start, "EEEE, d בMMMM HH:mm", { locale: he });
+      const endText = format(end, sameDay ? 'HH:mm' : "EEEE, d בMMMM HH:mm", { locale: he });
       return `${startText} - ${endText}`;
     } catch (err) {
       return '';
