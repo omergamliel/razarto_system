@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, Clock } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,21 +33,33 @@ export default function AcceptSwapModal({
   // Initialize and update values when modal opens or shift changes
   useEffect(() => {
     if (!shift || !isOpen) return;
-    
+
     // Default Dates
     const shiftStartDate = shift.start_date ? shift.start_date : format(new Date(), 'yyyy-MM-dd');
     const shiftEndDate = shift.end_date ? shift.end_date : format(addDays(new Date(shiftStartDate), 1), 'yyyy-MM-dd');
-    
+
     // Get original request times (from SwapRequest attached to shift object or defaults)
     const originalStartTime = shift.req_start_time || shift.start_time || '09:00';
     const originalEndTime = shift.req_end_time || shift.end_time || '09:00';
-    
+
+    // Full swap flow: always start in full coverage mode
+    if (isFullSwapRequest) {
+      setStartDate(shift.req_start_date || shiftStartDate);
+      setStartTime(originalStartTime);
+      setEndDate(shift.req_end_date || shiftEndDate);
+      setEndTime(originalEndTime);
+      setCoverFull(true);
+      setCoverageChoice('full');
+      setRemainingGap(null);
+      return;
+    }
+
     // --- GAP CALCULATION LOGIC ---
     // If there are existing coverages, find the gap
     if (existingCoverages && existingCoverages.length > 0) {
       // Filter out coverages by the requester (if any)
-      const validCoverages = existingCoverages; 
-      
+      const validCoverages = existingCoverages;
+
       if (validCoverages.length > 0) {
         // Sort by end time
         const sorted = [...validCoverages].sort((a, b) => {
@@ -55,23 +67,23 @@ export default function AcceptSwapModal({
           const bTime = new Date(`${b.cover_start_date}T${b.cover_start_time}:00`);
           return aTime - bTime;
         });
-        
+
         const latestCoverage = sorted[sorted.length - 1];
-        
+
         // Next start is where the last one ended
         const nextStartTime = latestCoverage.cover_end_time;
         const nextStartDate = latestCoverage.cover_end_date;
-        
+
         // Determine end (Original End)
         // Simple logic: Assuming original end is the target
-        const calculatedEndDate = shiftEndDate; 
-        
+        const calculatedEndDate = shiftEndDate;
+
         setStartDate(nextStartDate);
         setStartTime(nextStartTime);
         setEndDate(calculatedEndDate);
         setEndTime(originalEndTime);
         setCoverFull(false); // Force partial mode if there's already coverage
-        
+
         setRemainingGap({
           startTime: nextStartTime,
           endTime: originalEndTime,
@@ -103,7 +115,7 @@ export default function AcceptSwapModal({
        setCoverageChoice('full');
     }
 
-  }, [shift, isOpen, existingCoverages]);
+  }, [shift, isOpen, existingCoverages, isFullSwapRequest]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -185,7 +197,7 @@ export default function AcceptSwapModal({
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl text-right">
                   <p className="text-sm text-blue-900 font-semibold leading-relaxed">
-                    עלתה בקשה מהמשתמש/ת {shift.user_name || 'לא ידוע'} לכיסוי מלא של המשמרת, האם ברצונך לכסות משמרת מלאה?
+                    עלתה בקשה מהמשתמש/ת <span className="font-bold">{shift.user_name || 'לא ידוע'}</span> לכיסוי מלא של המשמרת, האם ברצונך לכסות משמרת מלאה?
                   </p>
                 </div>
 
@@ -193,14 +205,14 @@ export default function AcceptSwapModal({
                   <button
                     type="button"
                     onClick={() => { setCoverFull(true); setCoverageChoice('full'); }}
-                    className={`w-full p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${coverageChoice === 'full' ? 'bg-green-600 ring-4 ring-green-200 scale-[1.02]' : 'bg-green-500 hover:bg-green-600'}`}
+                    className={`w-full p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${coverFull ? 'bg-green-600 ring-4 ring-green-200 scale-[1.02]' : 'bg-green-500 hover:bg-green-600'}`}
                   >
                     כן, 24 שעות
                   </button>
                   <button
                     type="button"
                     onClick={() => { setCoverFull(false); setCoverageChoice('partial'); }}
-                    className={`w-full p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${coverageChoice === 'partial' ? 'bg-red-600 ring-4 ring-red-200 scale-[1.02]' : 'bg-red-500 hover:bg-red-600'}`}
+                    className={`w-full p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${!coverFull ? 'bg-red-600 ring-4 ring-red-200 scale-[1.02]' : 'bg-red-500 hover:bg-red-600'}`}
                   >
                     לא, כיסוי חלקי
                   </button>
@@ -272,8 +284,8 @@ export default function AcceptSwapModal({
             </AnimatePresence>
 
             {/* FIXED: Summary for full swap */}
-            {coverageChoice === 'full' && isFullSwapRequest && (
-              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 shadow-sm space-y-2">
+            {coverFull && isFullSwapRequest && (
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 shadow-sm space-y-2 text-right">
                 <p className="text-sm font-bold text-blue-900">סיכום השינויים</p>
                 <p className="text-sm text-blue-800 leading-relaxed">
                   תתבצע החלפה במשמרת זו בין המשתמשים <span className="font-bold">{shift.user_name || 'מקורי'}</span> (מקורי) לבין <span className="font-bold">{shift.current_user_name || shift.covering_user_name || 'את/ה'}</span> (המחליפ/ה)
