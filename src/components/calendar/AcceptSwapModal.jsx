@@ -8,6 +8,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 
+// Local helpers to normalize swap context across entry points
+const resolveSwapType = (shift, activeRequest) => {
+  const explicit = activeRequest?.request_type || shift?.request_type || shift?.coverageType || shift?.swap_type;
+  if (explicit && String(explicit).toLowerCase() === 'partial') return 'partial';
+  if (explicit && String(explicit).toLowerCase() === 'full') return 'full';
+  const start = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time;
+  const end = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time;
+  if (start && end && start !== end) return 'partial';
+  return 'full';
+};
+
+const resolveRequestWindow = (shift, activeRequest) => {
+  const startDate = activeRequest?.req_start_date || shift?.req_start_date || shift?.start_date || shift?.date;
+  const endDate = activeRequest?.req_end_date || shift?.req_end_date || shift?.end_date || startDate;
+  const startTime = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time || '09:00';
+  const endTime = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time || startTime;
+  return { startDate, endDate, startTime, endTime };
+};
+
+const normalizeShift = (shift) => {
+  if (!shift) return null;
+  const active_request = shift.active_request || shift.activeRequest || null;
+  const window = resolveRequestWindow(shift, active_request);
+  return {
+    ...shift,
+    active_request,
+    request_type: active_request?.request_type || shift.request_type || (resolveSwapType(shift, active_request) === 'partial' ? 'Partial' : 'Full'),
+    start_date: shift.start_date || window.startDate,
+    end_date: shift.end_date || window.endDate,
+    start_time: shift.start_time || window.startTime,
+    end_time: shift.end_time || window.endTime
+  };
+};
+
 export default function AcceptSwapModal({
   isOpen,
   onClose,
@@ -16,6 +50,7 @@ export default function AcceptSwapModal({
   isAccepting,
   existingCoverages = []
 }) {
+  const normalizedShift = useMemo(() => normalizeShift(shift), [shift]);
   const [coverFull, setCoverFull] = useState(true);
   const [coverageChoice, setCoverageChoice] = useState('full');
   const [startDate, setStartDate] = useState('');
@@ -24,47 +59,47 @@ export default function AcceptSwapModal({
   const [endTime, setEndTime] = useState('');
 
   // --- Derived Request Context (keeps logic aligned with ShiftDetailsModal) ---
-  const activeRequest = useMemo(() => shift?.active_request || shift?.activeRequest || null, [shift]);
-  const requestType = useMemo(() => activeRequest?.request_type || shift?.request_type, [activeRequest, shift]);
-
-  const requestStartDate = useMemo(() => activeRequest?.req_start_date || shift?.req_start_date || shift?.start_date, [activeRequest, shift]);
-  const requestEndDate = useMemo(() => activeRequest?.req_end_date || shift?.req_end_date || shift?.end_date || shift?.start_date, [activeRequest, shift]);
-  const requestStartTime = useMemo(() => activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time || '09:00', [activeRequest, shift]);
-  const requestEndTime = useMemo(() => activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time || requestStartTime, [activeRequest, shift, requestStartTime]);
+  const activeRequest = useMemo(() => normalizedShift?.active_request || normalizedShift?.activeRequest || null, [normalizedShift]);
+  const requestType = useMemo(() => resolveSwapType(normalizedShift, activeRequest), [activeRequest, normalizedShift]);
+  const requestWindow = useMemo(() => resolveRequestWindow(normalizedShift, activeRequest), [activeRequest, normalizedShift]);
+  const requestStartDate = requestWindow.startDate;
+  const requestEndDate = requestWindow.endDate;
+  const requestStartTime = requestWindow.startTime;
+  const requestEndTime = requestWindow.endTime;
 
   const isFullSwapRequest = useMemo(() => {
-    if (requestType === 'Full') return true;
+    if (requestType === 'Full' || requestType === 'full') return true;
     return (
-      (requestStartTime === shift?.start_time && requestEndTime === shift?.end_time) ||
+      (requestStartTime === normalizedShift?.start_time && requestEndTime === normalizedShift?.end_time) ||
       (!requestStartTime && !requestEndTime)
     );
-  }, [requestEndTime, requestStartTime, requestType, shift?.end_time, shift?.start_time]);
+  }, [normalizedShift?.end_time, normalizedShift?.start_time, requestEndTime, requestStartTime, requestType]);
 
   // --- Display helpers ---
   const originalUserName = useMemo(() => {
     return (
-      shift?.original_user_name ||
-      shift?.assigned_person ||
-      shift?.role ||
-      shift?.user_name ||
+      normalizedShift?.original_user_name ||
+      normalizedShift?.assigned_person ||
+      normalizedShift?.role ||
+      normalizedShift?.user_name ||
       'לא ידוע'
     );
-  }, [shift]);
+  }, [normalizedShift]);
 
   const coveringUserName = useMemo(() => {
-    return shift?.current_user_name || shift?.covering_user_name || shift?.covering_name || 'את/ה';
-  }, [shift]);
+    return normalizedShift?.current_user_name || normalizedShift?.covering_user_name || normalizedShift?.covering_name || 'את/ה';
+  }, [normalizedShift]);
 
-  const shiftDepartment = shift?.department || shift?.assigned_department || '';
-  const shiftStartDate = shift?.start_date || shift?.date;
-  const shiftEndDate = shift?.end_date || shiftStartDate;
+  const shiftDepartment = normalizedShift?.department || normalizedShift?.assigned_department || '';
+  const shiftStartDate = normalizedShift?.start_date || normalizedShift?.date;
+  const shiftEndDate = normalizedShift?.end_date || shiftStartDate;
 
   const fullRangeLabel = useMemo(() => {
     try {
       if (!shiftStartDate) return '';
-      const start = `${shiftStartDate}T${shift?.start_time || requestStartTime || '09:00'}`;
+      const start = `${shiftStartDate}T${normalizedShift?.start_time || requestStartTime || '09:00'}`;
       const endDateValue = shiftEndDate || shiftStartDate;
-      const end = `${endDateValue}T${shift?.end_time || requestEndTime || '09:00'}`;
+      const end = `${endDateValue}T${normalizedShift?.end_time || requestEndTime || '09:00'}`;
       const sameDay = shiftEndDate === shiftStartDate || !shiftEndDate;
 
       const startText = format(new Date(start), "EEEE, d בMMMM HH:mm", { locale: he });
@@ -77,15 +112,15 @@ export default function AcceptSwapModal({
 
   // Initialize and update values when modal opens or shift changes
   useEffect(() => {
-    if (!shift || !isOpen) return;
+    if (!normalizedShift || !isOpen) return;
 
     // Default Dates
     const defaultStartDate = shiftStartDate ? shiftStartDate : format(new Date(), 'yyyy-MM-dd');
     const defaultEndDate = shiftEndDate ? shiftEndDate : format(addDays(new Date(defaultStartDate), 1), 'yyyy-MM-dd');
 
     // Get original request times (aligned with ShiftDetailsModal logic)
-    const originalStartTime = requestStartTime || shift?.start_time || '09:00';
-    const originalEndTime = requestEndTime || shift?.end_time || '09:00';
+    const originalStartTime = requestStartTime || normalizedShift?.start_time || '09:00';
+    const originalEndTime = requestEndTime || normalizedShift?.end_time || '09:00';
 
     // Full swap flow: always start in full coverage mode (default YES for full swap requests)
     if (isFullSwapRequest) {
@@ -133,10 +168,10 @@ export default function AcceptSwapModal({
 
     // No existing coverages - clean slate
     const isPartialRequest =
-      requestType === 'Partial' ||
-      shift?.status === 'Partially_Covered' ||
-      shift?.status === 'partial' ||
-      shift?.coverageType === 'partial';
+      requestType === 'Partial' || requestType === 'partial' ||
+      normalizedShift?.status === 'Partially_Covered' ||
+      normalizedShift?.status === 'partial' ||
+      normalizedShift?.coverageType === 'partial';
 
     if (isPartialRequest) {
        // Pre-fill with requested partial times
@@ -165,7 +200,7 @@ export default function AcceptSwapModal({
     requestStartDate,
     requestStartTime,
     requestType,
-    shift,
+    normalizedShift,
     shiftEndDate,
     shiftStartDate
   ]);
@@ -178,10 +213,10 @@ export default function AcceptSwapModal({
     let submissionData = {
         type: wantsFull ? 'Full' : 'Partial',
         // If full, take defaults from shift, else take form inputs
-        startTime: wantsFull ? (shift.start_time || requestStartTime || '09:00') : startTime,
-        endTime: wantsFull ? (shift.end_time || requestEndTime || '09:00') : endTime,
-        startDate: wantsFull ? (shift.start_date || shiftStartDate) : startDate,
-        endDate: wantsFull ? (shift.end_date || shiftEndDate || shiftStartDate) : endDate
+        startTime: wantsFull ? (normalizedShift?.start_time || requestStartTime || '09:00') : startTime,
+        endTime: wantsFull ? (normalizedShift?.end_time || requestEndTime || '09:00') : endTime,
+        startDate: wantsFull ? (normalizedShift?.start_date || shiftStartDate) : startDate,
+        endDate: wantsFull ? (normalizedShift?.end_date || shiftEndDate || shiftStartDate) : endDate
     };
 
     // Validation for Partial
@@ -209,9 +244,9 @@ export default function AcceptSwapModal({
     }
   };
 
-  if (!isOpen || !shift) return null;
+  if (!isOpen || !normalizedShift) return null;
 
-  const displayDate = shift.date || shift.start_date; // Handle both key names
+  const displayDate = normalizedShift.date || normalizedShift.start_date; // Handle both key names
 
   return (
     <AnimatePresence>
@@ -298,11 +333,11 @@ export default function AcceptSwapModal({
                     <div className="flex flex-col sm:flex-row gap-3">
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">תאריך התחלה</Label>
-                        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="date" dir="ltr" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="text-center h-10 bg-white" />
                       </div>
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">שעת התחלה</Label>
-                        <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="time" dir="ltr" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="text-center h-10 bg-white" />
                       </div>
                     </div>
 
@@ -310,11 +345,11 @@ export default function AcceptSwapModal({
                     <div className="flex flex-col sm:flex-row gap-3">
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">תאריך סיום</Label>
-                        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="date" dir="ltr" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="text-center h-10 bg-white" />
                       </div>
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">שעת סיום</Label>
-                        <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="time" dir="ltr" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="text-center h-10 bg-white" />
                       </div>
                     </div>
 
