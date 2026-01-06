@@ -7,25 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
-
-// Local helpers to normalize swap context across entry points
-const resolveSwapType = (shift, activeRequest) => {
-  const explicit = activeRequest?.request_type || shift?.request_type || shift?.coverageType || shift?.swap_type;
-  if (explicit && String(explicit).toLowerCase() === 'partial') return 'partial';
-  if (explicit && String(explicit).toLowerCase() === 'full') return 'full';
-  const start = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time;
-  const end = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time;
-  if (start && end && start !== end) return 'partial';
-  return 'full';
-};
-
-const resolveRequestWindow = (shift, activeRequest) => {
-  const startDate = activeRequest?.req_start_date || shift?.req_start_date || shift?.start_date || shift?.date;
-  const endDate = activeRequest?.req_end_date || shift?.req_end_date || shift?.end_date || startDate;
-  const startTime = activeRequest?.req_start_time || shift?.req_start_time || shift?.start_time || '09:00';
-  const endTime = activeRequest?.req_end_time || shift?.req_end_time || shift?.end_time || startTime;
-  return { startDate, endDate, startTime, endTime };
-};
+import { buildDateTime, calculateMissingSegments, resolveRequestWindow, resolveSwapType } from './whatsappTemplates';
 
 const normalizeShift = (shift) => {
   if (!shift) return null;
@@ -40,34 +22,6 @@ const normalizeShift = (shift) => {
     start_time: shift.start_time || window.startTime,
     end_time: shift.end_time || window.endTime
   };
-};
-
-// Shared helper (kept local to avoid new files): calculates uncovered segments
-const buildDateTime = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}`);
-
-const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = []) => {
-  const orderedCoverages = [...coverageEntries]
-    .map((cov) => ({
-      ...cov,
-      start: buildDateTime(cov.cover_start_date, cov.cover_start_time),
-      end: buildDateTime(cov.cover_end_date, cov.cover_end_time),
-    }))
-    .filter((cov) => cov.start < cov.end)
-    .sort((a, b) => a.start - b.start);
-
-  let gaps = [{ start: baseStart, end: baseEnd }];
-
-  orderedCoverages.forEach((cov) => {
-    gaps = gaps.flatMap((seg) => {
-      if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
-      const pieces = [];
-      if (cov.start > seg.start) pieces.push({ start: seg.start, end: cov.start });
-      if (cov.end < seg.end) pieces.push({ start: cov.end, end: seg.end });
-      return pieces;
-    });
-  });
-
-  return gaps.filter((gap) => gap.end > gap.start);
 };
 
 const formatSegmentText = (segment) => {
@@ -155,7 +109,12 @@ export default function AcceptSwapModal({
     [baseEnd, baseStart, coverageRows]
   );
 
-  const selectableSegments = useMemo(() => (missingSegments.length ? missingSegments : [{ start: baseStart, end: baseEnd }]), [baseEnd, baseStart, missingSegments]);
+  const selectableSegments = useMemo(
+    () => (missingSegments.length ? missingSegments : [{ start: baseStart, end: baseEnd }]),
+    [baseEnd, baseStart, missingSegments]
+  );
+
+  const shouldShowMissingBanner = !coverFull && missingSegments.length > 0;
 
   const fullRangeLabel = useMemo(() => {
     try {
@@ -413,7 +372,7 @@ export default function AcceptSwapModal({
               </div>
             </div>
 
-            {missingSegments.length > 0 && (
+            {shouldShowMissingBanner && (
               <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-2 text-right shadow-sm">
                 <p className="text-sm font-semibold text-red-700">חלונות שלא כוסו עדיין</p>
                 <div className="space-y-2 text-[13px] text-red-800">
@@ -460,10 +419,14 @@ export default function AcceptSwapModal({
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">תאריך התחלה</Label>
                         <Input type="date" dir="ltr" value={startDate} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'yyyy-MM-dd')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'yyyy-MM-dd')} onChange={(e) => setStartDate(e.target.value)} className="text-center h-10 bg-white" />
+                        <p className="text-[11px] text-gray-500 mt-1" dir="rtl">
+                          {startDate ? format(new Date(startDate), 'EEEE, dd/MM', { locale: he }) : ''}
+                        </p>
                       </div>
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">שעת התחלה</Label>
                         <Input type="time" dir="ltr" value={startTime} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'HH:mm')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'HH:mm')} onChange={(e) => setStartTime(e.target.value)} className="text-center h-10 bg-white" />
+                        <p className="text-[11px] text-gray-500 mt-1" dir="ltr">{startTime || ''}</p>
                       </div>
                     </div>
 
@@ -472,11 +435,25 @@ export default function AcceptSwapModal({
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">תאריך סיום</Label>
                         <Input type="date" dir="ltr" value={endDate} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'yyyy-MM-dd')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'yyyy-MM-dd')} onChange={(e) => setEndDate(e.target.value)} className="text-center h-10 bg-white" />
+                        <p className="text-[11px] text-gray-500 mt-1" dir="rtl">
+                          {endDate ? format(new Date(endDate), 'EEEE, dd/MM', { locale: he }) : ''}
+                        </p>
                       </div>
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">שעת סיום</Label>
                         <Input type="time" dir="ltr" value={endTime} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'HH:mm')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'HH:mm')} onChange={(e) => setEndTime(e.target.value)} className="text-center h-10 bg-white" />
+                        <p className="text-[11px] text-gray-500 mt-1" dir="ltr">{endTime || ''}</p>
                       </div>
+                    </div>
+
+                    <div className="bg-white border border-blue-100 rounded-xl p-3 text-sm text-blue-900 space-y-1">
+                      <p className="font-semibold">סיכום בחירה</p>
+                      <p className="text-xs" dir="ltr">
+                        {startDate && startTime ? format(new Date(`${startDate}T${startTime}`), 'EEEE dd/MM HH:mm', { locale: he }) : ''}
+                        {` → `}
+                        {endDate && endTime ? format(new Date(`${endDate}T${endTime}`), 'EEEE dd/MM HH:mm', { locale: he }) : ''}
+                      </p>
+                      <p className="text-[11px] text-blue-800">נא לוודא שהזמנים מתוך החלון שבחרת</p>
                     </div>
 
                   </div>
