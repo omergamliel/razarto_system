@@ -175,19 +175,22 @@ export default function ShiftDetailsModal({
   const requestEndDate = requestWindow.endDate || shiftEndDate || requestStartDate;
 
   const coverageRows = useMemo(() => {
-    return coverages.map((cov, idx) => {
-      const user = coveringUsers.find(u => u.serial_id === cov.covering_user_id);
-      const start = `${cov.cover_start_date || requestStartDate}T${cov.cover_start_time}`;
-      const end = `${cov.cover_end_date || requestEndDate}T${cov.cover_end_time}`;
-      return {
-        id: cov.id || idx,
-        name: user?.full_name || 'מתנדב',
-        start: new Date(start),
-        end: new Date(end),
-        department: user?.department
-      };
-    });
-  }, [coverages, coveringUsers, requestEndDate, requestStartDate]);
+    return coverages
+      .map((cov, idx) => {
+        const user = coveringUsers.find(u => u.serial_id === cov.covering_user_id);
+        const start = buildDateTime(cov.cover_start_date || requestStartDate, cov.cover_start_time || requestStartStr);
+        const end = buildDateTime(cov.cover_end_date || requestEndDate, cov.cover_end_time || requestEndStr);
+        if (!start || !end) return null;
+        return {
+          id: cov.id || idx,
+          name: user?.full_name || 'מתנדב',
+          start,
+          end,
+          department: user?.department
+        };
+      })
+      .filter(Boolean);
+  }, [coverages, coveringUsers, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
 
   // FIXED: Identify covering user for full swap view
   const primaryCoverage = useMemo(() => {
@@ -210,6 +213,7 @@ export default function ShiftDetailsModal({
     if (!isPartialLike) return [];
     const baseStart = buildDateTime(requestStartDate, requestStartStr);
     let baseEnd = buildDateTime(requestEndDate, requestEndStr);
+    if (!baseStart || !baseEnd) return [];
     if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
     return calculateMissingSegments(baseStart, baseEnd, coverages);
   }, [coverages, isPartialLike, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
@@ -221,6 +225,7 @@ export default function ShiftDetailsModal({
 
   const shiftEndDateTime = useMemo(() => {
     const end = buildDateTime(shiftEndDate, endTime);
+    if (!end || !shiftStartDateTime) return end;
     return end <= shiftStartDateTime ? addDays(end, 1) : end;
   }, [endTime, shiftEndDate, shiftStartDateTime]);
 
@@ -231,6 +236,7 @@ export default function ShiftDetailsModal({
 
   const requestEndDateTime = useMemo(() => {
     const end = buildDateTime(requestEndDate, requestEndStr);
+    if (!end || !requestStartDateTime) return end;
     return end <= requestStartDateTime ? addDays(end, 1) : end;
   }, [requestEndDate, requestEndStr, requestStartDateTime]);
 
