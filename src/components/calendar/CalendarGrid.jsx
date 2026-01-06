@@ -66,9 +66,13 @@ export default function CalendarGrid({
   const days = getDaysToDisplay();
 
   const getShiftForDate = (date) => {
-    const rawShift = shifts.find(shift => 
-      isSameDay(new Date(shift.start_date), date)
-    );
+    const rawShift = shifts.find((shift) => {
+      const shiftDateStr = shift?.start_date || shift?.date;
+      if (!shiftDateStr) return false;
+      const shiftDate = new Date(shiftDateStr);
+      if (isNaN(shiftDate.getTime())) return false;
+      return isSameDay(shiftDate, date);
+    });
     return getEnrichedShift(rawShift);
   };
 
