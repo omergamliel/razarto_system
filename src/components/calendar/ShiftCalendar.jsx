@@ -52,6 +52,33 @@ const resolveRequestWindow = (shift, activeRequest) => {
   return { startDate, endDate, startTime, endTime };
 };
 
+const buildDateTime = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}`);
+
+const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = []) => {
+  const orderedCoverages = [...coverageEntries]
+    .map((cov) => ({
+      ...cov,
+      start: buildDateTime(cov.cover_start_date, cov.cover_start_time),
+      end: buildDateTime(cov.cover_end_date, cov.cover_end_time)
+    }))
+    .filter((cov) => cov.start < cov.end)
+    .sort((a, b) => a.start - b.start);
+
+  let gaps = [{ start: baseStart, end: baseEnd }];
+
+  orderedCoverages.forEach((cov) => {
+    gaps = gaps.flatMap((seg) => {
+      if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+      const pieces = [];
+      if (cov.start > seg.start) pieces.push({ start: seg.start, end: cov.start });
+      if (cov.end < seg.end) pieces.push({ start: cov.end, end: seg.end });
+      return pieces;
+    });
+  });
+
+  return gaps.filter((gap) => gap.end > gap.start);
+};
+
 // Ensures every entry point (UI click + WhatsApp deep link) hydrates the same structure
 const normalizeShiftContext = (shift, { allUsers, swapRequests, coverages, currentUser }) => {
   if (!shift) return null;
@@ -399,18 +426,26 @@ export default function ShiftCalendar() {
         cover_end_date: coverData.endDate || coverData.coverDate || normalizedShift.end_date,
         cover_start_time: coverData.startTime || normalizedShift.start_time,
         cover_end_time: coverData.endTime || normalizedShift.end_time,
+        type: coverData.type || (coverData.coverFull ? 'Full' : 'Partial'),
         status: 'Approved'
       };
 
       await base44.entities.ShiftCoverage.create(payload);
 
-      // Update SwapRequest status
-      const isFullCover = coverData.coverFull || coverData.type === 'full' || coverData.type === 'Full';
-      if (isFullCover) {
+      // Evaluate remaining gaps after this coverage to decide status updates
+      const baseStart = buildDateTime(normalizedShift.start_date, normalizedShift.start_time);
+      let baseEnd = buildDateTime(normalizedShift.end_date || normalizedShift.start_date, normalizedShift.end_time);
+      if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
+
+      const updatedCoverages = [...coverages.filter(c => c.shift_id === shift.id), payload];
+      const gaps = calculateMissingSegments(baseStart, baseEnd, updatedCoverages);
+
+      if (gaps.length === 0) {
         await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
         await base44.entities.Shift.update(shift.id, { status: 'Covered' });
       } else {
         await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Partially_Covered' });
+        await base44.entities.Shift.update(shift.id, { status: 'Swap_Requested' });
       }
     },
     onSuccess: () => {
