@@ -17,11 +17,18 @@ export default function AcceptSwapModal({
   existingCoverages = []
 }) {
   const [coverFull, setCoverFull] = useState(true);
+  const [coverageChoice, setCoverageChoice] = useState('full');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
   const [remainingGap, setRemainingGap] = useState(null);
+
+  // FIXED: Detect full swap context
+  const isFullSwapRequest = shift?.request_type === 'Full' || (
+    (shift?.req_start_time === shift?.start_time && shift?.req_end_time === shift?.end_time) ||
+    (!shift?.req_start_time && !shift?.req_end_time)
+  );
 
   // Initialize and update values when modal opens or shift changes
   useEffect(() => {
@@ -65,16 +72,16 @@ export default function AcceptSwapModal({
         setEndTime(originalEndTime);
         setCoverFull(false); // Force partial mode if there's already coverage
         
-        setRemainingGap({ 
-          startTime: nextStartTime, 
-          endTime: originalEndTime, 
-          startDate: nextStartDate, 
-          endDate: calculatedEndDate 
+        setRemainingGap({
+          startTime: nextStartTime,
+          endTime: originalEndTime,
+          startDate: nextStartDate,
+          endDate: calculatedEndDate
         });
         return;
       }
     }
-    
+
     // No existing coverages - clean slate
     const isPartialRequest = shift.status === 'Partially_Covered' || shift.request_type === 'Partial';
 
@@ -85,6 +92,7 @@ export default function AcceptSwapModal({
        setEndDate(shift.req_end_date || shiftEndDate);
        setEndTime(originalEndTime);
        setCoverFull(false);
+       setCoverageChoice('partial');
     } else {
        // Default Full
        setStartDate(shiftStartDate);
@@ -92,39 +100,48 @@ export default function AcceptSwapModal({
        setEndDate(shiftEndDate);
        setEndTime(originalEndTime);
        setCoverFull(true);
+       setCoverageChoice('full');
     }
 
   }, [shift, isOpen, existingCoverages]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Prepare Submission Data
+    const wantsFull = coverageChoice === 'full';
     let submissionData = {
-        type: coverFull ? 'Full' : 'Partial',
+        type: wantsFull ? 'Full' : 'Partial',
         // If full, take defaults from shift, else take form inputs
-        startTime: coverFull ? (shift.start_time || '09:00') : startTime,
-        endTime: coverFull ? (shift.end_time || '09:00') : endTime,
-        startDate: coverFull ? shift.start_date : startDate,
-        endDate: coverFull ? shift.end_date : endDate
+        startTime: wantsFull ? (shift.start_time || '09:00') : startTime,
+        endTime: wantsFull ? (shift.end_time || '09:00') : endTime,
+        startDate: wantsFull ? shift.start_date : startDate,
+        endDate: wantsFull ? shift.end_date : endDate
     };
 
     // Validation for Partial
-    if (!coverFull) {
+    if (!wantsFull) {
         if (!startDate || !startTime || !endDate || !endTime) {
             toast.error('נא למלא את כל השדות');
             return;
         }
         const start = new Date(`${startDate}T${startTime}`);
         const end = new Date(`${endDate}T${endTime}`);
-        
+
         if (start >= end) {
             toast.error('שעת הסיום חייבת להיות אחרי שעת ההתחלה');
             return;
         }
     }
 
-    onAccept(submissionData);
+    try {
+      await onAccept(submissionData);
+      if (wantsFull) {
+        toast.success('ההחלפה בוצעה בהצלחה!');
+      }
+    } catch (err) {
+      toast.error('אירעה שגיאה בעת שליחת הכיסוי');
+    }
   };
 
   if (!isOpen || !shift) return null;
@@ -163,28 +180,55 @@ export default function AcceptSwapModal({
               </div>
             </div>
 
-            {/* Coverage Type Selection */}
-            <div className="space-y-3">
-              <Label className="text-gray-700 font-medium text-lg">לכסות משמרת מלאה?</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCoverFull(true)}
-                  className={`p-4 rounded-xl border-2 transition-all text-center ${coverFull ? 'border-[#64B5F6] bg-[#E3F2FD] shadow-md' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <div className="font-semibold text-gray-800">כן</div>
-                  <div className="text-xs text-gray-500 mt-1">24 שעות</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCoverFull(false)}
-                  className={`p-4 rounded-xl border-2 transition-all text-center ${!coverFull ? 'border-[#64B5F6] bg-[#E3F2FD] shadow-md' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <div className="font-semibold text-gray-800">לא</div>
-                  <div className="text-xs text-gray-500 mt-1">כיסוי חלקי</div>
-                </button>
+            {/* FIXED: New Full Swap UI */}
+            {isFullSwapRequest ? (
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl text-right">
+                  <p className="text-sm text-blue-900 font-semibold leading-relaxed">
+                    עלתה בקשה מהמשתמש/ת {shift.user_name || 'לא ידוע'} לכיסוי מלא של המשמרת, האם ברצונך לכסות משמרת מלאה?
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setCoverFull(true); setCoverageChoice('full'); }}
+                    className={`w-full p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${coverageChoice === 'full' ? 'bg-green-600 ring-4 ring-green-200 scale-[1.02]' : 'bg-green-500 hover:bg-green-600'}`}
+                  >
+                    כן, 24 שעות
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCoverFull(false); setCoverageChoice('partial'); }}
+                    className={`w-full p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${coverageChoice === 'partial' ? 'bg-red-600 ring-4 ring-red-200 scale-[1.02]' : 'bg-red-500 hover:bg-red-600'}`}
+                  >
+                    לא, כיסוי חלקי
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <Label className="text-gray-700 font-medium text-lg">לכסות משמרת מלאה?</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setCoverFull(true); setCoverageChoice('full'); }}
+                    className={`p-4 rounded-xl border-2 transition-all text-center ${coverFull ? 'border-[#64B5F6] bg-[#E3F2FD] shadow-md' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <div className="font-semibold text-gray-800">כן</div>
+                    <div className="text-xs text-gray-500 mt-1">24 שעות</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCoverFull(false); setCoverageChoice('partial'); }}
+                    className={`p-4 rounded-xl border-2 transition-all text-center ${!coverFull ? 'border-[#64B5F6] bg-[#E3F2FD] shadow-md' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <div className="font-semibold text-gray-800">לא</div>
+                    <div className="text-xs text-gray-500 mt-1">כיסוי חלקי</div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Partial Coverage Form */}
             <AnimatePresence>
@@ -226,6 +270,16 @@ export default function AcceptSwapModal({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* FIXED: Summary for full swap */}
+            {coverageChoice === 'full' && isFullSwapRequest && (
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 shadow-sm space-y-2">
+                <p className="text-sm font-bold text-blue-900">סיכום השינויים</p>
+                <p className="text-sm text-blue-800 leading-relaxed">
+                  תתבצע החלפה במשמרת זו בין המשתמשים <span className="font-bold">{shift.user_name || 'מקורי'}</span> (מקורי) לבין <span className="font-bold">{shift.current_user_name || shift.covering_user_name || 'את/ה'}</span> (המחליפ/ה)
+                </p>
+              </div>
+            )}
 
             <Button
               type="submit"
