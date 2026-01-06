@@ -44,14 +44,14 @@ export default function ShiftDetailsModal({
     enabled: !!shift?.id && isOpen
   });
 
-  // --- Fetch Coverages ---
+  // --- Fetch Coverages (by shift to respect coverage ownership) ---
   const { data: coverages = [], isLoading: isCoveragesLoading } = useQuery({
-    queryKey: ['shift-coverages-details', activeRequest?.id],
+    queryKey: ['shift-coverages-details', shift?.id],
     queryFn: async () => {
-      if (!activeRequest?.id) return [];
-      return await base44.entities.ShiftCoverage.filter({ request_id: activeRequest.id });
+      if (!shift?.id) return [];
+      return await base44.entities.ShiftCoverage.filter({ shift_id: shift.id });
     },
-    enabled: !!activeRequest?.id && isOpen
+    enabled: !!shift?.id && isOpen
   });
 
   const { data: authorizedUsers = [] } = useQuery({
@@ -145,6 +145,7 @@ export default function ShiftDetailsModal({
   }
 
   const coverageType = shift?.coverageType || shift?.swap_type || (isPartial ? 'partial' : 'full');
+  const isCoveredSwap = (shift?.status === 'covered' || shift?.status === 'Covered') && coverages.length > 0;
   const statusLabelClasses = isPartial
     ? 'bg-yellow-100 text-yellow-900 border border-yellow-200'
     : 'bg-red-100 text-red-900 border border-red-200';
@@ -170,10 +171,28 @@ export default function ShiftDetailsModal({
         id: cov.id || idx,
         name: user?.full_name || 'מתנדב',
         start: new Date(start),
-        end: new Date(end)
+        end: new Date(end),
+        department: user?.department
       };
     });
   }, [coverages, coveringUsers, requestEndDate, requestStartDate]);
+
+  // FIXED: Identify covering user for full swap view
+  const primaryCoverage = useMemo(() => {
+    return coverages.find(cov => cov.type === 'Full') || coverages[0];
+  }, [coverages]);
+
+  const coveringUserName = useMemo(() => {
+    if (!primaryCoverage) return shift?.user_name;
+    const user = coveringUsers.find(u => u.serial_id === primaryCoverage.covering_user_id);
+    return user?.full_name || shift?.user_name;
+  }, [coveringUsers, primaryCoverage, shift?.user_name]);
+
+  const coveringDepartment = useMemo(() => {
+    if (!primaryCoverage) return shift?.department;
+    const user = coveringUsers.find(u => u.serial_id === primaryCoverage.covering_user_id);
+    return user?.department || shift?.department;
+  }, [coveringUsers, primaryCoverage, shift?.department]);
 
   const missingSegments = useMemo(() => {
     if (!isPartialLike) return [];
@@ -233,7 +252,7 @@ export default function ShiftDetailsModal({
         <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
           
           {/* Header */}
-          <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-6 text-white flex-shrink-0 relative">
+          <div className={`${isCoveredSwap ? 'bg-green-600' : 'bg-gradient-to-r from-gray-800 to-gray-900'} p-6 text-white flex-shrink-0 relative`}>
             <div className="absolute top-4 left-4 flex gap-2">
                 {isAdmin && (
                   <>
@@ -288,10 +307,10 @@ export default function ShiftDetailsModal({
             <div className="border rounded-2xl p-6 text-center shadow-sm space-y-4 bg-[#F4F4F6] border-gray-200">
               <div className="space-y-3">
                 <p className="text-sm text-gray-500 font-medium">משובץ כרגע למשמרת</p>
-                <h2 className="text-2xl font-semibold text-gray-900">{shift.user_name}</h2>
-                {shift.department && (
+                <h2 className="text-2xl font-semibold text-gray-900">{coveringUserName}</h2>
+                {coveringDepartment && (
                   <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
-                    {`מחלקה ${shift.department}`}
+                    {`מחלקה ${coveringDepartment}`}
                   </span>
                 )}
               </div>
@@ -366,6 +385,24 @@ export default function ShiftDetailsModal({
                         );
                     })}
                 </div>
+            )}
+
+            {/* FIXED: History logs */}
+            {isCoveredSwap && (
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <img src="https://cdn-icons-png.flaticon.com/128/4305/4305578.png" alt="תיעוד" className="w-5 h-5" />
+                  <h4 className="text-sm font-bold text-gray-800">תיעוד החלפות</h4>
+                </div>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+                    המשתמש/ת <span className="font-bold">{shift.user_name}</span> ביקש החלפה מלאה למשמרת
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+                    המשתמש <span className="font-bold">{shift.user_name}</span> הוחלף בצורה מלאה ע"י <span className="font-bold">{coveringUserName}</span>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Action Buttons */}
