@@ -214,6 +214,51 @@ export default function ShiftDetailsModal({
     return calculateMissingSegments(baseStart, baseEnd, coverages);
   }, [coverages, isPartialLike, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
 
+  const shiftStartDateTime = useMemo(
+    () => buildDateTime(shiftStartDate, startTime),
+    [shiftStartDate, startTime]
+  );
+
+  const shiftEndDateTime = useMemo(() => {
+    const end = buildDateTime(shiftEndDate, endTime);
+    return end <= shiftStartDateTime ? addDays(end, 1) : end;
+  }, [endTime, shiftEndDate, shiftStartDateTime]);
+
+  const requestStartDateTime = useMemo(
+    () => buildDateTime(requestStartDate, requestStartStr),
+    [requestStartDate, requestStartStr]
+  );
+
+  const requestEndDateTime = useMemo(() => {
+    const end = buildDateTime(requestEndDate, requestEndStr);
+    return end <= requestStartDateTime ? addDays(end, 1) : end;
+  }, [requestEndDate, requestEndStr, requestStartDateTime]);
+
+  const ownerExclusionEntries = useMemo(() => {
+    const entries = coverages.map((cov) => ({
+      cover_start_date: cov.cover_start_date || requestStartDate,
+      cover_start_time: cov.cover_start_time || requestStartStr,
+      cover_end_date: cov.cover_end_date || requestEndDate,
+      cover_end_time: cov.cover_end_time || requestEndStr,
+    }));
+
+    if (requestStartDateTime && requestEndDateTime) {
+      entries.push({
+        cover_start_date: format(requestStartDateTime, 'yyyy-MM-dd'),
+        cover_start_time: format(requestStartDateTime, 'HH:mm'),
+        cover_end_date: format(requestEndDateTime, 'yyyy-MM-dd'),
+        cover_end_time: format(requestEndDateTime, 'HH:mm'),
+      });
+    }
+
+    return entries;
+  }, [coverages, requestEndDate, requestEndStr, requestEndDateTime, requestStartDate, requestStartDateTime, requestStartStr]);
+
+  const ownerSegments = useMemo(() => {
+    if (!shiftStartDateTime || !shiftEndDateTime) return [];
+    return calculateMissingSegments(shiftStartDateTime, shiftEndDateTime, ownerExclusionEntries);
+  }, [ownerExclusionEntries, shiftEndDateTime, shiftStartDateTime]);
+
   const formatSegment = (start, end) => {
     const sameDay = format(start, 'dd/MM') === format(end, 'dd/MM');
     const datePart = sameDay ? format(start, 'dd/MM') : `${format(start, 'dd/MM')} → ${format(end, 'dd/MM')}`;
@@ -341,7 +386,15 @@ export default function ShiftDetailsModal({
                     <User className="w-4 h-4 text-gray-500" />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">{shift.user_name}</p>
-                      <p className="text-xs text-gray-600" dir="ltr">{formatSegment(startDateObj, endDateObj)}</p>
+                      {ownerSegments.length > 0 ? (
+                        ownerSegments.map((seg, idx) => (
+                          <p key={`owner-seg-${idx}`} className="text-xs text-gray-600" dir="ltr">
+                            {formatSegment(seg.start, seg.end)}
+                          </p>
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-600">אין חלון כיסוי פעיל לבעל המשמרת</p>
+                      )}
                       {shift.department && <p className="text-[11px] text-gray-500">מחלקה {shift.department}</p>}
                     </div>
                   </div>
