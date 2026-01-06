@@ -32,6 +32,33 @@ const resolveRequestWindow = (shift, activeRequest) => {
   return { startDate, endDate, startTime, endTime };
 };
 
+const buildDateTime = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}`);
+
+const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = []) => {
+  const orderedCoverages = [...coverageEntries]
+    .map((cov) => ({
+      ...cov,
+      start: buildDateTime(cov.cover_start_date, cov.cover_start_time),
+      end: buildDateTime(cov.cover_end_date, cov.cover_end_time)
+    }))
+    .filter((cov) => cov.start < cov.end)
+    .sort((a, b) => a.start - b.start);
+
+  let gaps = [{ start: baseStart, end: baseEnd }];
+
+  orderedCoverages.forEach((cov) => {
+    gaps = gaps.flatMap((seg) => {
+      if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
+      const pieces = [];
+      if (cov.start > seg.start) pieces.push({ start: seg.start, end: cov.start });
+      if (cov.end < seg.end) pieces.push({ start: cov.end, end: seg.end });
+      return pieces;
+    });
+  });
+
+  return gaps.filter((gap) => gap.end > gap.start);
+};
+
 export default function ShiftDetailsModal({
   isOpen,
   onClose,
@@ -225,23 +252,11 @@ export default function ShiftDetailsModal({
 
   const missingSegments = useMemo(() => {
     if (!isPartialLike) return [];
-    const baseStart = new Date(`${requestStartDate}T${requestStartStr}`);
-    let baseEnd = new Date(`${requestEndDate}T${requestEndStr}`);
+    const baseStart = buildDateTime(requestStartDate, requestStartStr);
+    let baseEnd = buildDateTime(requestEndDate, requestEndStr);
     if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
-
-    const ordered = [...coverageRows].sort((a, b) => a.start - b.start);
-    let segments = [{ start: baseStart, end: baseEnd }];
-    ordered.forEach(cov => {
-      segments = segments.flatMap(seg => {
-        if (cov.end <= seg.start || cov.start >= seg.end) return [seg];
-        const gaps = [];
-        if (cov.start > seg.start) gaps.push({ start: seg.start, end: cov.start });
-        if (cov.end < seg.end) gaps.push({ start: cov.end, end: seg.end });
-        return gaps;
-      });
-    });
-    return segments.filter(seg => seg.end > seg.start);
-  }, [coverageRows, isPartialLike, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
+    return calculateMissingSegments(baseStart, baseEnd, coverages);
+  }, [coverages, isPartialLike, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
 
   const formatSegment = (start, end) => {
     const sameDay = format(start, 'dd/MM') === format(end, 'dd/MM');
@@ -371,6 +386,7 @@ export default function ShiftDetailsModal({
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">{shift.user_name}</p>
                       <p className="text-xs text-gray-600" dir="ltr">{formatSegment(startDateObj, endDateObj)}</p>
+                      {shift.department && <p className="text-[11px] text-gray-500">מחלקה {shift.department}</p>}
                     </div>
                   </div>
 
@@ -379,6 +395,7 @@ export default function ShiftDetailsModal({
                       <CheckCircle className="w-4 h-4 text-green-600" />
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-green-800">{row.name}</p>
+                        {row.department && <p className="text-[11px] text-green-700">מחלקה {row.department}</p>}
                         <p className="text-xs text-green-700" dir="ltr">{formatSegment(row.start, row.end)}</p>
                       </div>
                     </div>
@@ -390,6 +407,7 @@ export default function ShiftDetailsModal({
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-red-700">שעות חסרות</p>
                         <p className="text-xs text-red-700" dir="ltr">{formatSegment(seg.start, seg.end)}</p>
+                        <p className="text-[11px] text-red-600">בעל המשמרת המקורי ({shift.user_name}) יישאר משויך עד שיושלם כיסוי</p>
                       </div>
                     </div>
                   ))}
