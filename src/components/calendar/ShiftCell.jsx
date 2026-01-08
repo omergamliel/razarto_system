@@ -133,35 +133,18 @@ export default function ShiftCell({
     });
 
     ownerSlots = ownerSlots.filter(seg => seg.end > seg.start);
-
-    const formatRange = (start, end) => {
-      if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return null;
-      const startText = format(start, 'HH:mm');
-      const endText = format(end, 'HH:mm');
-      return `${startText} - ${endText}`;
-    };
-
-    const hasMultipleCoverages = coverageSegments.length > 1;
     const hasOwnerCoverage = ownerSlots.length > 0;
-    const showTimeForPartial = coverageSegments.length > 0 && (
-      hasOwnerCoverage ||
-      hasMultipleCoverages ||
-      shift.coverageType === 'partial' ||
-      shift.status === 'partial'
-    );
 
     const coverageAssignments = coverageSegments.map(seg => ({
       key: seg.key,
-      name: seg.name,
-      timeRange: showTimeForPartial ? formatRange(seg.start, seg.end) : null,
+      name: seg.name
     }));
 
     const ownerName = shift.user_name || 'לא ידוע';
     const ownerAssignments = ownerSlots.map((seg, idx) => ({
       key: `owner-${shift.id}-${idx}`,
       name: ownerName,
-      timeRange: showTimeForPartial ? formatRange(seg.start, seg.end) : null,
-      isOwner: true,
+      isOwner: true
     }));
 
     const uniqueAssignments = [];
@@ -174,6 +157,19 @@ export default function ShiftCell({
 
     return uniqueAssignments;
   }, [shift]);
+
+  const nameLines = React.useMemo(() => {
+    const uniqueNames = [];
+    assignments.forEach((item) => {
+      if (item?.name && !uniqueNames.includes(item.name)) {
+        uniqueNames.push(item.name);
+      }
+    });
+    return uniqueNames;
+  }, [assignments]);
+
+  const mobileNames = nameLines.slice(0, 2);
+  const hiddenCount = Math.max(nameLines.length - mobileNames.length, 0);
 
   return (
     <motion.div
@@ -203,18 +199,23 @@ export default function ShiftCell({
         <div className="mt-6 md:mt-10 space-y-1 md:space-y-1.5">
           {/* Assignees / Covering Users */}
           <div className="space-y-0.5">
-            {assignments.map(item => (
-              <div key={item.key} className="text-center">
-                <p className={`font-normal md:font-semibold text-[10px] leading-tight md:text-base break-words px-0.5 ${item.isGap ? 'text-red-700' : 'text-gray-800'}`}>
-                  {item.name}
+            <div className="md:hidden space-y-0.5">
+              {mobileNames.map((name) => (
+                <p key={name} className="text-center font-normal text-[10px] leading-tight text-gray-800 break-words px-0.5">
+                  {name}
                 </p>
-                {item.timeRange && (
-                  <p className={`text-[8px] md:text-xs mt-0.5 text-center leading-tight ${item.isGap ? 'text-red-600 font-semibold' : 'text-gray-500'}`} dir="ltr">
-                    {item.timeRange}
-                  </p>
-                )}
-              </div>
-            ))}
+              ))}
+              {hiddenCount > 0 && (
+                <p className="text-center text-[9px] text-gray-500 font-medium">{`+${hiddenCount} נוספים`}</p>
+              )}
+            </div>
+            <div className="hidden md:block space-y-0.5">
+              {nameLines.map((name) => (
+                <p key={name} className="text-center font-semibold text-base text-gray-800 break-words px-0.5">
+                  {name}
+                </p>
+              ))}
+            </div>
           </div>
         </div>
       )}
