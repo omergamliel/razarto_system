@@ -55,18 +55,19 @@ export const calculateMissingSegments = (baseStart, baseEnd, coverageEntries = [
 };
 
 // Centralized deep link builder so all WhatsApp templates open the same in-app flow
-export const buildShiftDeepLink = (shiftId, origin) => {
+export const buildShiftDeepLink = (shiftId) => {
   if (!shiftId) return '';
-  const base = origin || (typeof window !== 'undefined' ? window.location.origin : '');
+  const base = 'https://razar-toran-b555aef5.base44.app';
   return `${base}?openShiftId=${shiftId}`;
 };
 
-export const buildSwapTemplate = ({ employeeName, startDate, startTime, endDate, endTime, approvalUrl, shiftId, origin }) => {
+export const buildSwapTemplate = ({ originalOwnerName, employeeName, startDate, startTime, endDate, endTime, approvalUrl, shiftId }) => {
   const safeStart = startDate ? format(new Date(startDate), 'dd/MM/yyyy', { locale: he }) : '';
   const safeEnd = endDate ? format(new Date(endDate), 'dd/MM/yyyy', { locale: he }) : safeStart;
-  const resolvedLink = approvalUrl || buildShiftDeepLink(shiftId, origin);
+  const resolvedLink = approvalUrl || buildShiftDeepLink(shiftId);
+  const ownerName = originalOwnerName || employeeName || '';
 
-  return `היי, פתחתי בקשה ב-Razarto להחלפה למשמרת *${employeeName || ''}* 👮‍♂️\nמתאריך ${safeStart} בשעה ${startTime || ''} ועד תאריך ${safeEnd} בשעה ${endTime || ''} ⏰\n\nמי יכול לעזור? 🙏\nאפשר לאשר כאן:\n${resolvedLink || ''}`;
+  return `היי, פתחתי בקשה ב-Razarto להחלפה למשמרת *${ownerName}* 👮‍♂️\nמתאריך ${safeStart} בשעה ${startTime || ''} ועד תאריך ${safeEnd} בשעה ${endTime || ''} ⏰\n\nמי יכול לעזור? 🙏\nאפשר לאשר כאן:\n${resolvedLink || ''}`;
 };
 
 export const buildHeadToHeadTemplate = ({ targetUserName, targetShiftOwner, targetShiftDate, myShiftOwner, myShiftDate, uniqueApprovalUrl }) => {
