@@ -32,6 +32,14 @@ import HallOfFameModal from '../dashboard/HallOfFameModal';
 import HelpSupportModal from '../dashboard/HelpSupportModal';
 import LoadingSkeleton from '../LoadingSkeleton';
 
+const normalizeCoverageEntry = (coverage, fallbackWindow) => ({
+  ...coverage,
+  cover_start_date: coverage.cover_start_date || coverage.start_date || fallbackWindow.startDate,
+  cover_end_date: coverage.cover_end_date || coverage.end_date || fallbackWindow.endDate,
+  cover_start_time: coverage.cover_start_time || coverage.start_time || fallbackWindow.startTime,
+  cover_end_time: coverage.cover_end_time || coverage.end_time || fallbackWindow.endTime
+});
+
 // Ensures every entry point (UI click + WhatsApp deep link) hydrates the same structure
 const normalizeShiftContext = (shift, { allUsers, swapRequests, coverages, currentUser }) => {
   if (!shift) return null;
@@ -53,15 +61,42 @@ const normalizeShiftContext = (shift, { allUsers, swapRequests, coverages, curre
       };
     });
 
+  const shiftStartDate = shift.start_date || window.startDate;
+  const shiftEndDate = shift.end_date || window.endDate || shiftStartDate;
+  const shiftStartTime = shift.start_time || window.startTime;
+  const shiftEndTime = shift.end_time || window.endTime || shiftStartTime;
+
+  const normalizedCoverages = shiftCoverages.map(cov =>
+    normalizeCoverageEntry(cov, {
+      startDate: shiftStartDate,
+      endDate: shiftEndDate,
+      startTime: shiftStartTime,
+      endTime: shiftEndTime
+    })
+  );
+  const approvedCoverages = normalizedCoverages.filter(
+    cov => cov.status === 'Approved' || !cov.status
+  );
+
+  const baseStart = buildDateTime(shiftStartDate, shiftStartTime);
+  let baseEnd = buildDateTime(shiftEndDate, shiftEndTime);
+  if (baseEnd && baseStart && baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
+  const missingSegments = baseStart && baseEnd
+    ? calculateMissingSegments(baseStart, baseEnd, approvedCoverages)
+    : [];
+  const hasCoverages = approvedCoverages.length > 0;
+  const isFullyCovered = hasCoverages && missingSegments.length === 0;
+
   let displayStatus = shift.status || 'regular';
-  const hasCoverages = shiftCoverages.length > 0;
   if (activeRequest) {
     if (activeRequest.status === 'Closed') displayStatus = 'covered';
-    else if (activeRequest.status === 'Partially_Covered' || (requestType === 'partial' && hasCoverages)) displayStatus = 'partial';
+    else if (activeRequest.status === 'Partially_Covered' || requestType === 'partial') displayStatus = 'partial';
     else if (activeRequest.status === 'Open' || shift.status === 'Swap_Requested') displayStatus = requestType === 'partial' ? 'partial' : 'requested';
   }
-  if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
-    displayStatus = requestType === 'partial' ? 'partial' : 'covered';
+  if (isFullyCovered) {
+    displayStatus = 'covered';
+  } else if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
+    displayStatus = requestType === 'partial' ? 'partial' : 'requested';
   }
 
   return {
@@ -77,17 +112,18 @@ const normalizeShiftContext = (shift, { allUsers, swapRequests, coverages, curre
     swap_end_time: window.endTime,
     swap_type: requestType,
     coverageType: requestType,
-    coverages: shiftCoverages,
-    shiftCoverages,
+    coverages: normalizedCoverages,
+    shiftCoverages: normalizedCoverages,
     active_request: activeRequest,
     request_type: activeRequest?.request_type || shift.request_type || (requestType === 'partial' ? 'Partial' : 'Full'),
     original_user_data: originalUser,
+    original_user_name: originalUser?.full_name || shift.original_user_name,
     isMine: currentUser ? shift.original_user_id === currentUser.serial_id : false,
     isCovering: currentUser ? shiftCoverages.some(cov => cov.covering_user_id === currentUser.serial_id) : false,
-    start_time: shift.start_time || window.startTime,
-    end_time: shift.end_time || window.endTime,
-    start_date: shift.start_date || window.startDate,
-    end_date: shift.end_date || window.endDate
+    start_time: shiftStartTime,
+    end_time: shiftEndTime,
+    start_date: shiftStartDate,
+    end_date: shiftEndDate
   };
 };
 
@@ -387,11 +423,24 @@ export default function ShiftCalendar() {
 
       // Evaluate remaining gaps after this coverage to decide status updates
       const baseStart = buildDateTime(normalizedShift.start_date, normalizedShift.start_time);
-      let baseEnd = buildDateTime(normalizedShift.end_date || normalizedShift.start_date, normalizedShift.end_time);
-      if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
+      let baseEnd = buildDateTime(normalizedShift.end_date || normalizedShift.start_date, normalizedShift.end_time || normalizedShift.start_time);
+      if (baseEnd && baseStart && baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
 
-      const updatedCoverages = [...coverages.filter(c => c.shift_id === shift.id), payload];
-      const gaps = calculateMissingSegments(baseStart, baseEnd, updatedCoverages);
+      const fallbackWindow = {
+        startDate: normalizedShift.start_date,
+        endDate: normalizedShift.end_date || normalizedShift.start_date,
+        startTime: normalizedShift.start_time,
+        endTime: normalizedShift.end_time || normalizedShift.start_time
+      };
+
+      const updatedCoverages = [
+        ...coverages
+          .filter(c => c.shift_id === shift.id && c.status !== 'Cancelled')
+          .map(cov => normalizeCoverageEntry(cov, fallbackWindow)),
+        normalizeCoverageEntry(payload, fallbackWindow)
+      ];
+
+      const gaps = baseStart && baseEnd ? calculateMissingSegments(baseStart, baseEnd, updatedCoverages) : [];
 
       if (gaps.length === 0) {
         await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
