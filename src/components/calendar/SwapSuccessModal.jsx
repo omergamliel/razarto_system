@@ -4,16 +4,16 @@ import { X, CheckCircle, Share2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { buildSwapTemplate } from './whatsappTemplates';
+import { buildShiftDeepLink, buildSwapTemplate } from './whatsappTemplates';
 
 export default function SwapSuccessModal({ isOpen, onClose, shift }) {
   if (!isOpen || !shift) return null;
 
   const handleWhatsAppShare = () => {
     // Fixed: Changed to Query Param for deep linking to home page
-    const approvalUrl = typeof window !== 'undefined' ? `${window.location.origin}?openShiftId=${shift.id}` : '';
+    const approvalUrl = buildShiftDeepLink(shift.id);
     const message = buildSwapTemplate({
-      employeeName: shift.user_name || shift.role,
+      originalOwnerName: shift.original_user_data?.full_name || shift.original_user_name || shift.user_name || shift.role,
       startDate: shift.start_date || shift.date,
       startTime: shift.swap_start_time || shift.start_time || '09:00',
       endDate: shift.end_date || shift.start_date,
