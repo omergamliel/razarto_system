@@ -156,18 +156,11 @@ export default function ShiftDetailsModal({
   }
 
   const coverageType = shift?.coverageType || shift?.swap_type || (isPartial ? 'partial' : 'full');
-  const isCoveredSwap = (shift?.status === 'covered' || shift?.status === 'Covered') && coverages.length > 0;
-  const isFullyCovered = isCoveredSwap || String(shift?.status || '').toLowerCase() === 'covered';
+  const hasCoverages = coverages.length > 0;
+  const isCoveredSwap = (shift?.status === 'covered' || shift?.status === 'Covered') && hasCoverages;
   const statusLabelClasses = isPartial
     ? 'bg-yellow-100 text-yellow-900 border border-yellow-200'
     : 'bg-red-100 text-red-900 border border-red-200';
-  const statusIndicator = useMemo(() => {
-    const status = shift?.status || 'regular';
-    if (status === 'covered') return { color: 'bg-green-400', text: 'מאוישת' };
-    if (coverageType === 'partial') return { color: 'bg-yellow-400', text: 'דורשת החלפה חלקית' };
-    if (status === 'requested') return { color: 'bg-red-500', text: 'דורשת החלפה' };
-    return { color: 'bg-gray-400', text: 'פתוחה' };
-  }, [coverageType, shift?.status]);
 
   const requestStartStr = requestWindow.startTime;
   const requestEndStr = requestWindow.endTime;
@@ -217,6 +210,24 @@ export default function ShiftDetailsModal({
     if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
     return calculateMissingSegments(baseStart, baseEnd, coverages);
   }, [coverages, isPartialLike, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
+
+  const isRequestFullyCovered = isPartialLike && hasCoverages && missingSegments.length === 0;
+  const derivedStatus = useMemo(() => {
+    const rawStatus = String(shift?.status || '').toLowerCase();
+    if (isCoveredSwap || rawStatus === 'covered' || isRequestFullyCovered) return 'covered';
+    if (coverageType === 'partial') return 'partial';
+    if (rawStatus === 'requested' || rawStatus === 'swap_requested') return 'requested';
+    return shift?.status || 'regular';
+  }, [coverageType, isCoveredSwap, isRequestFullyCovered, missingSegments.length, shift?.status]);
+
+  const isFullyCovered = derivedStatus === 'covered';
+
+  const statusIndicator = useMemo(() => {
+    if (derivedStatus === 'covered') return { color: 'bg-green-400', text: 'מאוישת' };
+    if (coverageType === 'partial') return { color: 'bg-yellow-400', text: 'דורשת החלפה חלקית' };
+    if (derivedStatus === 'requested') return { color: 'bg-red-500', text: 'דורשת החלפה' };
+    return { color: 'bg-gray-400', text: 'פתוחה' };
+  }, [coverageType, derivedStatus]);
 
   const shiftStartDateTime = useMemo(
     () => buildDateTime(shiftStartDate, startTime),
@@ -302,7 +313,7 @@ export default function ShiftDetailsModal({
         <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
           
           {/* Header */}
-          <div className={`${isCoveredSwap ? 'bg-green-600' : 'bg-gradient-to-r from-gray-800 to-gray-900'} p-6 text-white flex-shrink-0 relative`}>
+          <div className={`${isFullyCovered ? 'bg-green-600' : 'bg-gradient-to-r from-gray-800 to-gray-900'} p-6 text-white flex-shrink-0 relative`}>
             <div className="absolute top-4 left-4 flex gap-2">
                 {isAdmin && (
                   <>
@@ -387,37 +398,69 @@ export default function ShiftDetailsModal({
                   </p>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-2xl shadow-sm divide-y">
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <User className="w-4 h-4 text-gray-500" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-900">{shift.user_name}</p>
-                      {ownerSegments.length > 0 ? (
-                        ownerSegments.map((seg, idx) => (
-                          <p key={`owner-seg-${idx}`} className="text-xs text-gray-600" dir="ltr">
-                            {formatSegment(seg.start, seg.end)}
-                          </p>
-                        ))
-                      ) : (
-                        <p className="text-xs text-gray-600">אין חלון כיסוי פעיל לבעל המשמרת</p>
-                      )}
-                      {shift.department && <p className="text-[11px] text-gray-500">מחלקה {shift.department}</p>}
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-white text-gray-700 border border-gray-200">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-900">{shift.user_name}</p>
+                          <span className="px-2 py-0.5 rounded-full bg-gray-200 text-[11px] text-gray-700">בעל המשמרת</span>
+                        </div>
+                        {ownerSegments.length > 0 ? (
+                          ownerSegments.map((seg, idx) => (
+                            <p key={`owner-seg-${idx}`} className="text-xs text-gray-700" dir="ltr">
+                              {formatSegment(seg.start, seg.end)}
+                            </p>
+                          ))
+                        ) : (
+                          <p className="text-xs text-gray-600">אין חלון כיסוי פעיל לבעל המשמרת</p>
+                        )}
+                        {shift.department && <p className="text-[11px] text-gray-500">מחלקה {shift.department}</p>}
+                      </div>
                     </div>
                   </div>
 
-                  {coverageRows.map(row => (
-                    <div key={row.id} className="flex items-center gap-3 px-4 py-3 bg-green-50">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-green-800">{row.name}</p>
-                        {row.department && <p className="text-[11px] text-green-700">מחלקה {row.department}</p>}
-                        <p className="text-xs text-green-700" dir="ltr">{formatSegment(row.start, row.end)}</p>
+                  {hasCoverages && (
+                    <div className="rounded-2xl border border-green-200 bg-green-50 p-4 shadow-sm space-y-2">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <CheckCircle className="w-4 h-4" />
+                        <p className="text-sm font-semibold">מי מכסה?</p>
+                      </div>
+                      <div className="space-y-2">
+                        {coverageRows.map(row => (
+                          <div key={row.id} className="flex gap-3 rounded-xl bg-white border border-green-200 p-3 shadow-sm">
+                            <div className="h-10 w-10 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center">
+                              {row.name?.slice(0, 2) || 'מת'}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-green-900">{row.name}</p>
+                                <span className="text-xs text-green-700 font-mono" dir="ltr">{format(row.start, 'HH:mm')} - {format(row.end, 'HH:mm')}</span>
+                              </div>
+                              {row.department && <p className="text-[11px] text-green-700">מחלקה {row.department}</p>}
+                              <p className="text-xs text-green-700" dir="ltr">{formatSegment(row.start, row.end)}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {isRequestFullyCovered && (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl text-green-800 shadow-sm">
+                      <CheckCircle className="w-5 h-5" />
+                      <div className="space-y-1 text-sm">
+                        <p className="font-semibold">הבקשה מאוישת במלואה</p>
+                        <p className="text-xs">כל חלון ההחלפה כוסה בהצלחה על ידי המתנדבים.</p>
+                      </div>
+                    </div>
+                  )}
 
                   {missingSegments.map((seg, idx) => (
-                    <div key={`${seg.start}-${idx}`} className="flex items-center gap-3 px-4 py-3 bg-red-50">
+                    <div key={`${seg.start}-${idx}`} className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl shadow-sm">
                       <AlertCircle className="w-4 h-4 text-red-600" />
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-red-700">שעות חסרות</p>
@@ -428,24 +471,6 @@ export default function ShiftDetailsModal({
                   ))}
                 </div>
               </div>
-            )}
-
-            {/* Coverage List */}
-            {coverages.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-gray-500 border-b pb-2">מי מכסה?</h3>
-                    {coverages.map(cov => {
-                        const user = coveringUsers.find(u => u.serial_id === cov.covering_user_id);
-                        return (
-                            <div key={cov.id} className="flex justify-between items-center bg-green-50 p-3 rounded-xl border border-green-100">
-                                <span className="font-bold text-green-800">{user?.full_name || 'מתנדב'}</span>
-                                <span className="text-xs text-green-600 font-mono" dir="ltr">
-                                    {cov.cover_start_time} - {cov.cover_end_time}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </div>
             )}
 
             {/* FIXED: History logs */}
