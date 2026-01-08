@@ -18,7 +18,7 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     enabled: isOpen && !!currentUser?.serial_id
   });
 
-  // Filter Shifts: Only Mine, Future, and Active status
+  // Filter Shifts: Only Mine, Future, and eligible statuses (white or full request)
   const myFutureFullShifts = allShifts.filter(shift => {
     // 1. Is Mine? (Using ID)
     const isMyShift = shift.original_user_id === currentUser?.serial_id;
@@ -30,8 +30,16 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     today.setHours(0, 0, 0, 0);
     if (shiftDate < today) return false;
     
-    // 3. Status Active (Not already in swap)
-    if (shift.status !== 'Active') return false;
+    const status = String(shift.status || 'Active').toLowerCase();
+    const requestType = String(shift.request_type || shift.coverageType || shift.swap_type || '').toLowerCase();
+    const isPartialRequest = requestType === 'partial' || status === 'partial' || status === 'partially_covered';
+    const isCovered = status === 'covered';
+    const isWhiteShift = status === 'active' || status === 'regular';
+    const isRedFullRequest = (status === 'swap_requested' || status === 'requested') && !isPartialRequest;
+
+    // 3. Eligible for head-to-head: white shifts or full request (red), exclude partial and covered
+    if (isPartialRequest || isCovered) return false;
+    if (!isWhiteShift && !isRedFullRequest) return false;
 
     return true;
   }).sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
