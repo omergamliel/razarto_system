@@ -133,9 +133,10 @@ export default function ShiftDetailsModal({
 
   const userEmail = currentUser?.email || currentUser?.Email;
   const isOwnShift = Boolean(
-    (currentUser?.serial_id && shift?.original_user_id === currentUser.serial_id) ||
-    (userEmail && shift?.assigned_email === userEmail) ||
-    (currentUser?.full_name && shift?.user_name === currentUser.full_name)
+    currentUser?.serial_id
+      ? shift?.original_user_id === currentUser.serial_id
+      : (userEmail && shift?.assigned_email === userEmail) ||
+          (currentUser?.full_name && shift?.user_name === currentUser.full_name)
   );
 
   const startTime = shift?.start_time || '09:00';
@@ -221,6 +222,24 @@ export default function ShiftDetailsModal({
   }, [coverageType, isCoveredSwap, isRequestFullyCovered, missingSegments.length, shift?.status]);
 
   const isFullyCovered = derivedStatus === 'covered';
+  const requestStatus = resolvedActiveRequest?.status;
+  const hasAnyRequest = Boolean(resolvedActiveRequest);
+  const hasActiveRequest = requestStatus === 'Open';
+  const isPartialRequest = hasAnyRequest && resolvedSwapType === 'partial';
+  const isFullRequest = hasAnyRequest && resolvedSwapType === 'full';
+  const isRequestOwner = Boolean(
+    resolvedActiveRequest?.requesting_user_id &&
+      currentUser?.serial_id &&
+      resolvedActiveRequest.requesting_user_id === currentUser.serial_id
+  ) || (hasAnyRequest && !resolvedActiveRequest?.requesting_user_id && isOwnShift);
+  const isWhiteShift = !hasAnyRequest;
+  const isCoveredOrClosed = isFullyCovered || requestStatus === 'Closed' || String(shift?.status || '').toLowerCase() === 'covered';
+
+  const canOfferCover = hasActiveRequest && !isOwnShift && !isCoveredOrClosed;
+  const canHeadToHead = !isOwnShift && !isCoveredOrClosed && !isPartialRequest && (isWhiteShift || isFullRequest);
+  const canRequestSwap = isOwnShift && !hasActiveRequest;
+  const canWhatsappShare = hasActiveRequest && isRequestOwner;
+  const canAddToCalendarOrEmail = isOwnShift;
 
   const statusIndicator = useMemo(() => {
     if (derivedStatus === 'covered') return { color: 'bg-green-400', text: 'מאוישת' };
@@ -291,8 +310,9 @@ export default function ShiftDetailsModal({
 
   const handleWhatsAppShare = () => {
      const approvalUrl = buildShiftDeepLink(shift.id);
+     const originalOwnerName = shift?.original_user_data?.full_name || shift?.original_user_name || shift?.assigned_person || shift?.user_name;
      const message = buildSwapTemplate({
-       employeeName: shift.user_name,
+       originalOwnerName,
        startDate: requestStartDate,
        startTime: requestStartStr,
        endDate: requestEndDate,
@@ -493,7 +513,7 @@ export default function ShiftDetailsModal({
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 justify-center">
-              {isSwapMode && isOwnShift && !isFullyCovered && (
+              {hasActiveRequest && isOwnShift && !isCoveredOrClosed && (
                 <Button
                   onClick={() => onCancelRequest?.(shift)}
                   className="min-w-[160px] flex-1 sm:flex-none h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg"
@@ -503,7 +523,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {isSwapMode && !isOwnShift && !isFullyCovered && (
+              {canOfferCover && (
                 <Button
                   onClick={() => {
                     onClose();
@@ -516,7 +536,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {isSwapMode && !isOwnShift && !isFullyCovered && (
+              {canHeadToHead && (
                 <Button
                   onClick={() => {
                     onClose();
@@ -529,7 +549,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {!isSwapMode && !isAdmin && isOwnShift && (
+              {canAddToCalendarOrEmail && !isAdmin && (
                 <Button
                   onClick={handleAddToCalendar}
                   variant="outline"
@@ -540,7 +560,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {!isSwapMode && isOwnShift && !isAdmin && !isFullyCovered && (
+              {canRequestSwap && isOwnShift && !isAdmin && (
                 <Button
                   onClick={() => onRequestSwap?.(shift)}
                   className="min-w-[160px] flex-1 sm:flex-none h-12 bg-[#0ea5e9] hover:bg-[#0284c7] text-white rounded-xl shadow-lg"
@@ -550,7 +570,7 @@ export default function ShiftDetailsModal({
                 </Button>
               )}
 
-              {isOwnShift && !isAdmin && (
+              {canWhatsappShare && !isAdmin && (
                 <Button
                   onClick={handleWhatsAppShare}
                   className="min-w-[140px] flex-1 sm:flex-none h-12 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-xl shadow-lg"
