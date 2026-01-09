@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, isToday, isSameMonth, addDays } from 'date-fns';
+import { format, isToday, isSameMonth } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Clock, CheckCircle2, AlertCircle, ArrowLeftRight } from 'lucide-react';
 
@@ -72,101 +72,24 @@ export default function ShiftCell({
 
   const styles = getStatusStyles();
 
-  const assignments = React.useMemo(() => {
-    if (!shift) return [];
-
-    const buildSafeDateTime = (dateStr, timeStr) => {
-      if (!dateStr || !timeStr) return null;
-      const dt = new Date(`${dateStr}T${timeStr}`);
-      return isNaN(dt.getTime()) ? null : dt;
-    };
-
-    const requestStartStr = shift.active_request?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
-    const requestEndStr = shift.active_request?.req_end_time || shift.swap_end_time || shift.end_time || '09:00';
-    const requestStartDate = shift.active_request?.req_start_date || shift.start_date;
-    const requestEndDate = shift.active_request?.req_end_date || shift.end_date || requestStartDate;
-
-    const baseStart = buildSafeDateTime(requestStartDate, requestStartStr);
-    if (!baseStart) return [];
-    let baseEnd = buildSafeDateTime(requestEndDate, requestEndStr) || baseStart;
-    if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
-
-    const coverageSegments = (shift.coverages || [])
-      .filter(cov => cov.status !== 'Cancelled')
-      .map((cov, idx) => {
-        const covStart = buildSafeDateTime(cov.cover_start_date || requestStartDate, cov.cover_start_time || requestStartStr);
-        let covEnd = buildSafeDateTime(cov.cover_end_date || requestEndDate, cov.cover_end_time || requestEndStr);
-        if (!covStart || !covEnd) return null;
-        if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
-        return {
-          key: `${cov.id || idx}-${cov.cover_start_time || ''}`,
-          name: cov.covering_name || 'מחליף',
-          start: covStart,
-          end: covEnd,
-        };
-      })
-      .filter(Boolean);
-
-    const mergedCoverages = coverageSegments
-      .map(seg => ({ start: seg.start, end: seg.end }))
-      .sort((a, b) => a.start - b.start)
-      .reduce((acc, seg) => {
-        if (!acc.length) return [seg];
-        const last = acc[acc.length - 1];
-        if (seg.start <= last.end) {
-          last.end = new Date(Math.max(last.end, seg.end));
-          return acc;
-        }
-        return [...acc, seg];
-      }, []);
-
-    let ownerSlots = [{ start: baseStart, end: baseEnd }];
-
-    mergedCoverages.forEach(cov => {
-      ownerSlots = ownerSlots.flatMap(slot => {
-        if (cov.end <= slot.start || cov.start >= slot.end) return [slot];
-        const pieces = [];
-        if (cov.start > slot.start) pieces.push({ start: slot.start, end: cov.start });
-        if (cov.end < slot.end) pieces.push({ start: cov.end, end: slot.end });
-        return pieces;
-      });
-    });
-
-    ownerSlots = ownerSlots.filter(seg => seg.end > seg.start);
-    const hasOwnerCoverage = ownerSlots.length > 0;
-
-    const coverageAssignments = coverageSegments.map(seg => ({
-      key: seg.key,
-      name: seg.name
-    }));
-
-    const ownerName = shift.user_name || 'לא ידוע';
-    const ownerAssignments = ownerSlots.map((seg, idx) => ({
-      key: `owner-${shift.id}-${idx}`,
-      name: ownerName,
-      isOwner: true
-    }));
-
-    const uniqueAssignments = [];
-
-    if (shift.status === 'covered' && shift.coverageType !== 'partial' && coverageSegments.length && !hasOwnerCoverage) {
-      uniqueAssignments.push(...coverageAssignments);
-    } else {
-      uniqueAssignments.push(...ownerAssignments, ...coverageAssignments);
-    }
-
-    return uniqueAssignments;
-  }, [shift]);
-
   const nameLines = React.useMemo(() => {
+    if (!shift) return [];
+    const fallbackOwner = shift.user_name || shift.role || 'לא ידוע';
+    const coverageNames = (shift.coverages || [])
+      .filter(cov => cov.status !== 'Cancelled')
+      .map(cov => cov.covering_name || cov.covering_user_name)
+      .filter(Boolean);
+    const participants = shift.coverage_participants?.length
+      ? shift.coverage_participants
+      : [fallbackOwner, ...coverageNames];
     const uniqueNames = [];
-    assignments.forEach((item) => {
-      if (item?.name && !uniqueNames.includes(item.name)) {
-        uniqueNames.push(item.name);
+    participants.forEach((name) => {
+      if (name && !uniqueNames.includes(name)) {
+        uniqueNames.push(name);
       }
     });
     return uniqueNames;
-  }, [assignments]);
+  }, [shift]);
 
   const mobileNames = nameLines.slice(0, 2);
   const hiddenCount = Math.max(nameLines.length - mobileNames.length, 0);
