@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { format, addDays, parseISO, differenceInMinutes } from 'date-fns';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
-import { resolveSwapType, resolveRequestWindow, calculateMissingSegments, buildDateTime } from './whatsappTemplates';
+import {
+  normalizeShiftContext,
+  computeCoverageSummary
+} from './whatsappTemplates';
 
 // Components
 import BackgroundShapes from './BackgroundShapes';
@@ -31,101 +34,6 @@ import HeadToHeadApprovalModal from './HeadToHeadApprovalModal';
 import HallOfFameModal from '../dashboard/HallOfFameModal';
 import HelpSupportModal from '../dashboard/HelpSupportModal';
 import LoadingSkeleton from '../LoadingSkeleton';
-
-const normalizeCoverageEntry = (coverage, fallbackWindow) => ({
-  ...coverage,
-  cover_start_date: coverage.cover_start_date || coverage.start_date || fallbackWindow.startDate,
-  cover_end_date: coverage.cover_end_date || coverage.end_date || fallbackWindow.endDate,
-  cover_start_time: coverage.cover_start_time || coverage.start_time || fallbackWindow.startTime,
-  cover_end_time: coverage.cover_end_time || coverage.end_time || fallbackWindow.endTime
-});
-
-// Ensures every entry point (UI click + WhatsApp deep link) hydrates the same structure
-const normalizeShiftContext = (shift, { allUsers, swapRequests, coverages, currentUser }) => {
-  if (!shift) return null;
-
-  const activeRequest = shift.active_request || swapRequests?.find(sr => sr.shift_id === shift.id && sr.status !== 'Cancelled');
-  const requestType = resolveSwapType(shift, activeRequest);
-  const window = resolveRequestWindow(shift, activeRequest);
-
-  const originalUser = allUsers?.find(u => u.serial_id === shift.original_user_id) || shift.original_user_data;
-  const shiftCoverages = (coverages || [])
-    .filter(c => c.shift_id === shift.id)
-    .map(cov => {
-      const coveringUser = allUsers?.find(u => u.serial_id === cov.covering_user_id);
-      return {
-        ...cov,
-        covering_name: coveringUser?.full_name || cov.covering_name || 'מחליף',
-        covering_email: coveringUser?.email || cov.covering_email || '',
-        covering_department: coveringUser?.department || cov.covering_department || ''
-      };
-    });
-
-  const shiftStartDate = shift.start_date || window.startDate;
-  const shiftEndDate = shift.end_date || window.endDate || shiftStartDate;
-  const shiftStartTime = shift.start_time || window.startTime;
-  const shiftEndTime = shift.end_time || window.endTime || shiftStartTime;
-
-  const normalizedCoverages = shiftCoverages.map(cov =>
-    normalizeCoverageEntry(cov, {
-      startDate: shiftStartDate,
-      endDate: shiftEndDate,
-      startTime: shiftStartTime,
-      endTime: shiftEndTime
-    })
-  );
-  const approvedCoverages = normalizedCoverages.filter(
-    cov => cov.status === 'Approved' || !cov.status
-  );
-
-  const baseStart = buildDateTime(shiftStartDate, shiftStartTime);
-  let baseEnd = buildDateTime(shiftEndDate, shiftEndTime);
-  if (baseEnd && baseStart && baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
-  const missingSegments = baseStart && baseEnd
-    ? calculateMissingSegments(baseStart, baseEnd, approvedCoverages)
-    : [];
-  const hasCoverages = approvedCoverages.length > 0;
-  const isFullyCovered = hasCoverages && missingSegments.length === 0;
-
-  let displayStatus = shift.status || 'regular';
-  if (activeRequest) {
-    if (activeRequest.status === 'Closed') displayStatus = 'covered';
-    else if (activeRequest.status === 'Partially_Covered' || requestType === 'partial') displayStatus = 'partial';
-    else if (activeRequest.status === 'Open' || shift.status === 'Swap_Requested') displayStatus = requestType === 'partial' ? 'partial' : 'requested';
-  }
-  if (isFullyCovered) {
-    displayStatus = 'covered';
-  } else if (displayStatus === 'regular' && shiftCoverages.some(cov => cov.status === 'Approved')) {
-    displayStatus = requestType === 'partial' ? 'partial' : 'requested';
-  }
-
-  return {
-    ...shift,
-    date: shift.start_date || shift.date,
-    role: originalUser?.full_name || shift.role || 'לא שובץ',
-    department: originalUser?.department || shift.department || '',
-    assigned_email: originalUser?.email || shift.assigned_email || '',
-    assigned_person: originalUser?.full_name || shift.assigned_person || '',
-    user_name: shift.user_name || originalUser?.full_name || shift.role,
-    status: displayStatus,
-    swap_start_time: window.startTime,
-    swap_end_time: window.endTime,
-    swap_type: requestType,
-    coverageType: requestType,
-    coverages: normalizedCoverages,
-    shiftCoverages: normalizedCoverages,
-    active_request: activeRequest,
-    request_type: activeRequest?.request_type || shift.request_type || (requestType === 'partial' ? 'Partial' : 'Full'),
-    original_user_data: originalUser,
-    original_user_name: originalUser?.full_name || shift.original_user_name,
-    isMine: currentUser ? shift.original_user_id === currentUser.serial_id : false,
-    isCovering: currentUser ? shiftCoverages.some(cov => cov.covering_user_id === currentUser.serial_id) : false,
-    start_time: shiftStartTime,
-    end_time: shiftEndTime,
-    start_date: shiftStartDate,
-    end_date: shiftEndDate
-  };
-};
 
 // --- Summary of swap flow fixes ---
 // 1) AcceptSwapModal replaces legacy CoverSegmentModal across all entry points.
@@ -278,15 +186,28 @@ export default function ShiftCalendar() {
     currentUser: authorizedPerson
   }));
 
-  // Fixed: Handle deep link via query param to open shift details directly (using enriched context)
+  // Fixed: Handle deep link via query params to open shift details or head-to-head approval
   useEffect(() => {
     if (typeof window === 'undefined' || !authorizedPerson) return;
 
     const params = new URLSearchParams(window.location.search);
     const openShiftId = params.get('openShiftId');
-    if (!openShiftId) return;
+    const headToHeadTarget = params.get('headToHeadTarget');
+    const headToHeadOffer = params.get('headToHeadOffer');
 
-    setDeepLinkShiftId(openShiftId);
+    if (headToHeadTarget && headToHeadOffer) {
+      setDeepLinkShiftId(null);
+      setH2hTargetId(headToHeadTarget);
+      setH2hOfferId(headToHeadOffer);
+      setShowDetailsModal(false);
+      setShowHeadToHeadSelector(false);
+      setShowHeadToHeadApproval(true);
+    } else if (openShiftId) {
+      setDeepLinkShiftId(openShiftId);
+    } else {
+      return;
+    }
+
     window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash}`);
   }, [authorizedPerson]);
 
@@ -422,27 +343,19 @@ export default function ShiftCalendar() {
       await base44.entities.ShiftCoverage.create(payload);
 
       // Evaluate remaining gaps after this coverage to decide status updates
-      const baseStart = buildDateTime(normalizedShift.start_date, normalizedShift.start_time);
-      let baseEnd = buildDateTime(normalizedShift.end_date || normalizedShift.start_date, normalizedShift.end_time || normalizedShift.start_time);
-      if (baseEnd && baseStart && baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
-
-      const fallbackWindow = {
-        startDate: normalizedShift.start_date,
-        endDate: normalizedShift.end_date || normalizedShift.start_date,
-        startTime: normalizedShift.start_time,
-        endTime: normalizedShift.end_time || normalizedShift.start_time
-      };
-
-      const updatedCoverages = [
+      const shiftCoverages = [
         ...coverages
-          .filter(c => c.shift_id === shift.id && c.status !== 'Cancelled')
-          .map(cov => normalizeCoverageEntry(cov, fallbackWindow)),
-        normalizeCoverageEntry(payload, fallbackWindow)
+          .filter(c => c.shift_id === shift.id && c.status !== 'Cancelled'),
+        payload
       ];
 
-      const gaps = baseStart && baseEnd ? calculateMissingSegments(baseStart, baseEnd, updatedCoverages) : [];
+      const { missingSegments } = computeCoverageSummary({
+        shift: normalizedShift,
+        activeRequest,
+        coverages: shiftCoverages
+      });
 
-      if (gaps.length === 0) {
+      if (missingSegments.length === 0) {
         await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
         await base44.entities.Shift.update(shift.id, { status: 'Covered' });
       } else {
@@ -577,6 +490,25 @@ export default function ShiftCalendar() {
   });
 
   // --- HANDLERS ---
+  const closeAllModals = () => {
+    setShowSwapRequestModal(false);
+    setShowPendingRequestsModal(false);
+    setShowAddShiftModal(false);
+    setShowAcceptSwapModal(false);
+    setShowActionModal(false);
+    setShowEditRoleModal(false);
+    setShowDetailsModal(false);
+    setShowAdminSettings(false);
+    setShowHallOfFame(false);
+    setShowHelpSupport(false);
+    setShowLogoutConfirm(false);
+    setShowSuccessModal(false);
+    setShowHeadToHeadSelector(false);
+    setShowHeadToHeadApproval(false);
+    setH2hTargetId(null);
+    setH2hOfferId(null);
+    setShowKPIListModal(false);
+  };
 
   const handleCellClick = (date, shift) => {
     setClickedDate(date); // Fix: Save the clicked date for Add Modal
@@ -769,21 +701,21 @@ export default function ShiftCalendar() {
       {/* --- MODALS --- */}
       
       <AdminSettingsModal 
-        isOpen={showAdminSettings} 
-        onClose={() => setShowAdminSettings(false)} 
+        isOpen={showAdminSettings}
+        onClose={closeAllModals}
       />
 
       <ShiftActionModal
         isOpen={showActionModal}
-        onClose={() => setShowActionModal(false)}
+        onClose={closeAllModals}
         shift={selectedShift}
         date={currentDate}
         onRequestSwap={() => {
-            setShowActionModal(false);
+            closeAllModals();
             setShowSwapRequestModal(true);
         }}
         onEditRole={() => {
-            setShowActionModal(false);
+            closeAllModals();
             setShowEditRoleModal(true);
         }}
         onDelete={deleteShiftMutation.mutate}
@@ -792,7 +724,7 @@ export default function ShiftCalendar() {
 
       <SwapRequestModal
         isOpen={showSwapRequestModal}
-        onClose={() => setShowSwapRequestModal(false)}
+        onClose={closeAllModals}
         date={currentDate}
         shift={selectedShift}
         onSubmit={handleSwapSubmit}
@@ -801,7 +733,7 @@ export default function ShiftCalendar() {
 
       <AddShiftModal
         isOpen={showAddShiftModal}
-        onClose={() => setShowAddShiftModal(false)}
+        onClose={closeAllModals}
         date={clickedDate || currentDate}
         onSubmit={(data) => addShiftMutation.mutate({
             ...data,
@@ -812,7 +744,7 @@ export default function ShiftCalendar() {
 
       <EditRoleModal
         isOpen={showEditRoleModal}
-        onClose={() => setShowEditRoleModal(false)}
+        onClose={closeAllModals}
         shift={selectedShift}
         date={currentDate}
         onSubmit={(data) => editRoleMutation.mutate({ id: selectedShift.id, ...data })}
@@ -821,7 +753,7 @@ export default function ShiftCalendar() {
 
       <ShiftDetailsModal
         isOpen={showDetailsModal}
-        onClose={() => setShowDetailsModal(false)}
+        onClose={closeAllModals}
         shift={selectedShift}
         date={currentDate}
         onOfferCover={handleOfferCover}
@@ -833,7 +765,7 @@ export default function ShiftCalendar() {
         onDelete={deleteShiftMutation.mutate}
         onApprove={() => approveSwapMutation.mutate(selectedShift)}
         onRequestSwap={() => {
-          setShowDetailsModal(false);
+          closeAllModals();
           setShowSwapRequestModal(true);
         }}
         currentUser={authorizedPerson}
@@ -842,7 +774,7 @@ export default function ShiftCalendar() {
 
       <AcceptSwapModal
         isOpen={showAcceptSwapModal && !!selectedShift}
-        onClose={() => setShowAcceptSwapModal(false)}
+        onClose={closeAllModals}
         shift={selectedShift}
         existingCoverages={selectedShift?.shiftCoverages || selectedShift?.coverages || []}
         onAccept={(segmentData) => offerCoverMutation.mutate({ shift: selectedShift, coverData: segmentData })}
@@ -851,34 +783,34 @@ export default function ShiftCalendar() {
 
       <SwapSuccessModal
         isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
+        onClose={closeAllModals}
         shift={lastUpdatedShift}
       />
 
       <HeadToHeadSelectorModal
         isOpen={showHeadToHeadSelector}
-        onClose={() => setShowHeadToHeadSelector(false)}
+        onClose={closeAllModals}
         targetShift={selectedShift}
         currentUser={authorizedPerson}
       />
 
       <HeadToHeadApprovalModal
         isOpen={showHeadToHeadApproval}
-        onClose={() => setShowHeadToHeadApproval(false)}
+        onClose={closeAllModals}
         targetShiftId={h2hTargetId}
         offerShiftId={h2hOfferId}
         onApprove={() => headToHeadSwapMutation.mutate()}
-        onDecline={() => setShowHeadToHeadApproval(false)}
+        onDecline={closeAllModals}
       />
 
       <HallOfFameModal 
         isOpen={showHallOfFame}
-        onClose={() => setShowHallOfFame(false)}
+        onClose={closeAllModals}
       />
 
       <HelpSupportModal
         isOpen={showHelpSupport}
-        onClose={() => setShowHelpSupport(false)}
+        onClose={closeAllModals}
       />
 
       {showLogoutConfirm && (
@@ -919,7 +851,7 @@ export default function ShiftCalendar() {
       <KPIListModal
         key={kpiListType}
         isOpen={showKPIListModal}
-        onClose={() => setShowKPIListModal(false)}
+        onClose={closeAllModals}
         type={kpiListType}
         currentUser={authorizedPerson}
         onOfferCover={handleOfferCover}
