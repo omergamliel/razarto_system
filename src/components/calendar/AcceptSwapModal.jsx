@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { format, addDays, isBefore, isAfter } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, Building2 } from 'lucide-react';
@@ -7,22 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
-import { buildDateTime, calculateMissingSegments, resolveRequestWindow, resolveSwapType } from './whatsappTemplates';
-
-const normalizeShift = (shift) => {
-  if (!shift) return null;
-  const active_request = shift.active_request || shift.activeRequest || null;
-  const window = resolveRequestWindow(shift, active_request);
-  return {
-    ...shift,
-    active_request,
-    request_type: active_request?.request_type || shift.request_type || (resolveSwapType(shift, active_request) === 'partial' ? 'Partial' : 'Full'),
-    start_date: shift.start_date || window.startDate,
-    end_date: shift.end_date || window.endDate,
-    start_time: shift.start_time || window.startTime,
-    end_time: shift.end_time || window.endTime
-  };
-};
+import { buildDateTime, resolveSwapType, normalizeShiftContext, computeCoverageSummary, resolveShiftWindow } from './whatsappTemplates';
 
 const formatSegmentText = (segment) => {
   const sameDay = format(segment.start, 'dd/MM') === format(segment.end, 'dd/MM');
@@ -40,7 +25,14 @@ export default function AcceptSwapModal({
   isAccepting,
   existingCoverages = []
 }) {
-  const normalizedShift = useMemo(() => normalizeShift(shift), [shift]);
+  const normalizedShift = useMemo(
+    () =>
+      normalizeShiftContext(shift, {
+        coverages: existingCoverages,
+        activeRequest: shift?.active_request || shift?.activeRequest
+      }),
+    [existingCoverages, shift]
+  );
   const [coverFull, setCoverFull] = useState(true);
   const [coverageChoice, setCoverageChoice] = useState('full');
   const [startDate, setStartDate] = useState('');
@@ -52,19 +44,18 @@ export default function AcceptSwapModal({
   // --- Derived Request Context (keeps logic aligned with ShiftDetailsModal) ---
   const activeRequest = useMemo(() => normalizedShift?.active_request || normalizedShift?.activeRequest || null, [normalizedShift]);
   const requestType = useMemo(() => resolveSwapType(normalizedShift, activeRequest), [activeRequest, normalizedShift]);
-  const requestWindow = useMemo(() => resolveRequestWindow(normalizedShift, activeRequest), [activeRequest, normalizedShift]);
+  const coverageSummary = useMemo(
+    () => computeCoverageSummary({ shift: normalizedShift, activeRequest, coverages: existingCoverages }),
+    [activeRequest, existingCoverages, normalizedShift]
+  );
+  const requestWindow = coverageSummary.requestWindow;
   const requestStartDate = requestWindow.startDate;
   const requestEndDate = requestWindow.endDate;
   const requestStartTime = requestWindow.startTime;
   const requestEndTime = requestWindow.endTime;
 
-  const isFullSwapRequest = useMemo(() => {
-    if (requestType === 'Full' || requestType === 'full') return true;
-    return (
-      (requestStartTime === normalizedShift?.start_time && requestEndTime === normalizedShift?.end_time) ||
-      (!requestStartTime && !requestEndTime)
-    );
-  }, [normalizedShift?.end_time, normalizedShift?.start_time, requestEndTime, requestStartTime, requestType]);
+  const isPartialRequest = requestType === 'partial';
+  const isFullSwapRequest = requestType === 'full';
 
   // --- Display helpers ---
   const originalUserName = useMemo(() => {
@@ -82,39 +73,17 @@ export default function AcceptSwapModal({
   }, [normalizedShift]);
 
   const shiftDepartment = normalizedShift?.department || normalizedShift?.assigned_department || '';
-  const shiftStartDate = normalizedShift?.start_date || normalizedShift?.date;
-  const shiftEndDate = normalizedShift?.end_date || shiftStartDate;
-
-  const baseStart = useMemo(
-    () => buildDateTime(requestStartDate, requestStartTime),
-    [requestStartDate, requestStartTime]
+  const shiftWindow = useMemo(
+    () => resolveShiftWindow(normalizedShift, requestWindow),
+    [normalizedShift, requestWindow]
   );
+  const shiftStartDate = shiftWindow.startDate;
+  const shiftEndDate = shiftWindow.endDate;
+  const baseStart = coverageSummary.baseStart;
+  const baseEnd = coverageSummary.baseEnd;
 
-  const baseEnd = useMemo(() => {
-    const start = baseStart;
-    const rawEnd = buildDateTime(requestEndDate, requestEndTime);
-    if (!rawEnd || !start) return rawEnd || null;
-    let end = rawEnd;
-    if (isBefore(end, start) || end.getTime() === start.getTime()) {
-      end = addDays(end, 1);
-    }
-    return end;
-  }, [baseStart, requestEndDate, requestEndTime]);
-
-  const coverageRows = useMemo(() => {
-    return (existingCoverages || []).map((cov, idx) => ({
-      id: cov.id || idx,
-      cover_start_date: cov.cover_start_date || cov.start_date || requestStartDate,
-      cover_end_date: cov.cover_end_date || cov.end_date || requestEndDate,
-      cover_start_time: cov.cover_start_time || cov.start_time || requestStartTime,
-      cover_end_time: cov.cover_end_time || cov.end_time || requestEndTime,
-    }));
-  }, [existingCoverages, requestEndDate, requestEndTime, requestStartDate, requestStartTime]);
-
-  const missingSegments = useMemo(
-    () => calculateMissingSegments(baseStart, baseEnd, coverageRows),
-    [baseEnd, baseStart, coverageRows]
-  );
+  const coverageRows = coverageSummary.approvedCoverages;
+  const missingSegments = coverageSummary.missingSegments;
 
   const selectableSegments = useMemo(
     () => {
@@ -124,12 +93,26 @@ export default function AcceptSwapModal({
     [baseEnd, baseStart, missingSegments]
   );
 
+  const approvedCoverageSegments = useMemo(
+    () =>
+      coverageRows
+        .map((cov) => {
+          const start = buildDateTime(cov.cover_start_date, cov.cover_start_time);
+          let end = buildDateTime(cov.cover_end_date, cov.cover_end_time);
+          if (!start || !end) return null;
+          if (end <= start) end = addDays(end, 1);
+          return { start, end };
+        })
+        .filter(Boolean),
+    [coverageRows]
+  );
+
   const shouldShowMissingBanner = !coverFull && missingSegments.length > 0;
 
   const fullRangeLabel = useMemo(() => {
-    const start = buildDateTime(shiftStartDate, normalizedShift?.start_time || requestStartTime || '09:00');
+    const start = buildDateTime(shiftStartDate, shiftWindow.startTime || requestStartTime || '09:00');
     const endDateValue = shiftEndDate || shiftStartDate;
-    const end = buildDateTime(endDateValue, normalizedShift?.end_time || requestEndTime || '09:00');
+    const end = buildDateTime(endDateValue, shiftWindow.endTime || requestEndTime || '09:00');
     if (!start || !end) return '';
     const sameDay = shiftEndDate === shiftStartDate || !shiftEndDate;
 
@@ -154,81 +137,28 @@ export default function AcceptSwapModal({
     const originalStartTime = requestStartTime || normalizedShift?.start_time || '09:00';
     const originalEndTime = requestEndTime || normalizedShift?.end_time || '09:00';
 
-    // Full swap flow: always start in full coverage mode (default YES for full swap requests)
-    if (isFullSwapRequest) {
-      setStartDate(requestStartDate || defaultStartDate);
-      setStartTime(originalStartTime);
-      setEndDate(requestEndDate || defaultEndDate);
-      setEndTime(originalEndTime);
-      setCoverFull(true);
-      setCoverageChoice('full');
+    const defaultSegment = missingSegments[0] || (baseStart && baseEnd ? { start: baseStart, end: baseEnd } : null);
+    const shouldForcePartial = isPartialRequest || (existingCoverages && existingCoverages.length > 0);
+
+    if (shouldForcePartial) {
+      setStartDate(defaultSegment ? format(defaultSegment.start, 'yyyy-MM-dd') : (requestStartDate || defaultStartDate));
+      setStartTime(defaultSegment ? format(defaultSegment.start, 'HH:mm') : originalStartTime);
+      setEndDate(defaultSegment ? format(defaultSegment.end, 'yyyy-MM-dd') : (requestEndDate || defaultEndDate));
+      setEndTime(defaultSegment ? format(defaultSegment.end, 'HH:mm') : originalEndTime);
+      setCoverFull(false);
+      setCoverageChoice('partial');
       setSelectedSegmentIdx(0);
       return;
     }
 
-    // --- GAP CALCULATION LOGIC ---
-    // If there are existing coverages, find the gap
-    if (existingCoverages && existingCoverages.length > 0) {
-      // Filter out coverages by the requester (if any)
-      const validCoverages = existingCoverages;
-
-      if (validCoverages.length > 0) {
-        // Sort by end time
-        const sorted = [...validCoverages].sort((a, b) => {
-          const aTime = new Date(`${a.cover_start_date}T${a.cover_start_time}:00`);
-          const bTime = new Date(`${b.cover_start_date}T${b.cover_start_time}:00`);
-          return aTime - bTime;
-        });
-
-        const latestCoverage = sorted[sorted.length - 1];
-
-        // Next start is where the last one ended
-        const nextStartTime = latestCoverage.cover_end_time;
-        const nextStartDate = latestCoverage.cover_end_date;
-
-        // Determine end (Original End)
-        const calculatedEndDate = shiftEndDate || defaultEndDate;
-
-        const gapSegments = calculateMissingSegments(baseStart, baseEnd, validCoverages);
-        const initial = gapSegments[0];
-
-        setStartDate(initial ? format(initial.start, 'yyyy-MM-dd') : nextStartDate);
-        setStartTime(initial ? format(initial.start, 'HH:mm') : nextStartTime);
-        setEndDate(initial ? format(initial.end, 'yyyy-MM-dd') : calculatedEndDate);
-        setEndTime(initial ? format(initial.end, 'HH:mm') : originalEndTime);
-        setCoverFull(false); // Force partial mode if there's already coverage
-        setCoverageChoice('partial');
-        setSelectedSegmentIdx(0);
-
-        return;
-      }
-    }
-
-    // No existing coverages - clean slate
-    const isPartialRequest =
-      requestType === 'Partial' || requestType === 'partial' ||
-      normalizedShift?.status === 'Partially_Covered' ||
-      normalizedShift?.status === 'partial' ||
-      normalizedShift?.coverageType === 'partial';
-
-    if (isPartialRequest) {
-       // Pre-fill with requested partial times
-       setStartDate(requestStartDate || defaultStartDate);
-       setStartTime(originalStartTime);
-       setEndDate(requestEndDate || defaultEndDate);
-       setEndTime(originalEndTime);
-       setCoverFull(false);
-       setCoverageChoice('partial');
-       setSelectedSegmentIdx(0);
-    } else {
-       // Default Full
-       setStartDate(defaultStartDate);
-       setStartTime(originalStartTime);
-       setEndDate(defaultEndDate);
-       setEndTime(originalEndTime);
-       setCoverFull(true);
-       setCoverageChoice('full');
-       setSelectedSegmentIdx(0);
+    if (isFullSwapRequest) {
+      setStartDate(shiftWindow.startDate || defaultStartDate);
+      setStartTime(shiftWindow.startTime || originalStartTime);
+      setEndDate(shiftWindow.endDate || defaultEndDate);
+      setEndTime(shiftWindow.endTime || originalEndTime);
+      setCoverFull(true);
+      setCoverageChoice('full');
+      setSelectedSegmentIdx(0);
     }
 
   }, [
@@ -244,7 +174,10 @@ export default function AcceptSwapModal({
     shiftEndDate,
     shiftStartDate,
     baseEnd,
-    baseStart
+    baseStart,
+    missingSegments,
+    isPartialRequest,
+    shiftWindow
   ]);
 
   // When a user switches segment tabs, snap the inputs to the selected gap
@@ -261,7 +194,7 @@ export default function AcceptSwapModal({
     e.preventDefault();
 
     // Prepare Submission Data
-    const wantsFull = coverageChoice === 'full';
+    const wantsFull = !isPartialRequest && coverageChoice === 'full';
     let submissionData = {
         type: wantsFull ? 'Full' : 'Partial',
         // If full, take defaults from shift, else take form inputs
@@ -273,24 +206,50 @@ export default function AcceptSwapModal({
 
     // Validation for Partial
     if (!wantsFull) {
-        if (!startDate || !startTime || !endDate || !endTime) {
-            toast.error('נא למלא את כל השדות');
-            return;
-        }
-        const start = new Date(`${startDate}T${startTime}`);
-        const end = new Date(`${endDate}T${endTime}`);
+      if (!startDate || !startTime || !endDate || !endTime) {
+        toast.error('נא למלא את כל השדות');
+        return;
+      }
+      const start = buildDateTime(startDate, startTime);
+      const end = buildDateTime(endDate, endTime);
 
-        if (start >= end) {
-            toast.error('שעת הסיום חייבת להיות אחרי שעת ההתחלה');
-            return;
-        }
+      if (!start || !end || start >= end) {
+        toast.error('שעת הסיום חייבת להיות אחרי שעת ההתחלה');
+        return;
+      }
 
-        // Ensure chosen times reside within allowed uncovered segment
-        const segment = selectableSegments[selectedSegmentIdx];
-        if (!segment || isBefore(start, segment.start) || isAfter(end, segment.end)) {
-          toast.error('יש לבחור שעות מתוך החלון הפנוי שנותר במשמרת');
-          return;
-        }
+      if (!baseStart || !baseEnd) {
+        toast.error('אירעה שגיאה בטעינת גבולות המשמרת');
+        return;
+      }
+
+      if (missingSegments.length === 0) {
+        toast.error('כל חלונות הכיסוי כבר מאוישים');
+        return;
+      }
+
+      if (start < baseStart || end > baseEnd) {
+        toast.error('יש לבחור שעות בתוך טווח המשמרת');
+        return;
+      }
+
+      const selectedWindow = missingSegments.find(
+        (segment) => start >= segment.start && end <= segment.end
+      );
+
+      if (!selectedWindow) {
+        toast.error('יש לבחור טווח בתוך אחד החלונות הפנויים');
+        return;
+      }
+
+      const overlapsCoverage = approvedCoverageSegments.some(
+        (segment) => start < segment.end && end > segment.start
+      );
+
+      if (overlapsCoverage) {
+        toast.error('הטווח שבחרת חופף לכיסוי שכבר אושר');
+        return;
+      }
     }
 
     try {
@@ -364,20 +323,22 @@ export default function AcceptSwapModal({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setCoverFull(true); setCoverageChoice('full'); }}
-                  className={`w-full p-4 sm:p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${coverFull ? 'bg-green-600 ring-4 ring-green-200 scale-[1.02]' : 'bg-green-500 hover:bg-green-600'}`}
-                >
-                  כן, 24 שעות
-                </button>
+              <div className={`grid grid-cols-1 ${isPartialRequest ? '' : 'sm:grid-cols-2'} gap-3`}>
+                {!isPartialRequest && (
+                  <button
+                    type="button"
+                    onClick={() => { setCoverFull(true); setCoverageChoice('full'); }}
+                    className={`w-full p-4 sm:p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${coverFull ? 'bg-green-600 ring-4 ring-green-200 scale-[1.02]' : 'bg-green-500 hover:bg-green-600'}`}
+                  >
+                    כן, 24 שעות
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => { setCoverFull(false); setCoverageChoice('partial'); }}
                   className={`w-full p-4 sm:p-5 rounded-2xl text-white font-bold text-lg transition-all shadow-md ${!coverFull ? 'bg-red-600 ring-4 ring-red-200 scale-[1.02]' : 'bg-red-500 hover:bg-red-600'}`}
                 >
-                  לא, כיסוי חלקי
+                  {isPartialRequest ? 'כיסוי חלקי' : 'לא, כיסוי חלקי'}
                 </button>
               </div>
             </div>
@@ -409,6 +370,10 @@ export default function AcceptSwapModal({
                     <p className="text-xs text-gray-500">ניתן לבחור רק מתוך החלונות הפנויים</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <div className="rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-700">
+                      <p className="font-semibold text-gray-800 mb-1">גבולות המשמרת המלאים</p>
+                      <p className="text-[11px]" dir="ltr">{fullRangeLabel}</p>
+                    </div>
 
                     <div className="flex flex-wrap gap-2" role="list" aria-label="חלונות זמינים">
                       {selectableSegments.map((seg, idx) => (
@@ -428,14 +393,14 @@ export default function AcceptSwapModal({
                     <div className="flex flex-col sm:flex-row gap-3">
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">תאריך התחלה</Label>
-                        <Input type="date" dir="ltr" value={startDate} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'yyyy-MM-dd')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'yyyy-MM-dd')} onChange={(e) => setStartDate(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="date" dir="ltr" value={startDate} min={shiftWindow.startDate} max={shiftWindow.endDate} onChange={(e) => setStartDate(e.target.value)} className="text-center h-10 bg-white" />
                         <p className="text-[11px] text-gray-500 mt-1" dir="rtl">
                           {startDate ? format(new Date(startDate), 'EEEE, dd/MM', { locale: he }) : ''}
                         </p>
                       </div>
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">שעת התחלה</Label>
-                        <Input type="time" dir="ltr" value={startTime} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'HH:mm')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'HH:mm')} onChange={(e) => setStartTime(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="time" dir="ltr" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="text-center h-10 bg-white" />
                         <p className="text-[11px] text-gray-500 mt-1" dir="ltr">{startTime || ''}</p>
                       </div>
                     </div>
@@ -444,14 +409,14 @@ export default function AcceptSwapModal({
                     <div className="flex flex-col sm:flex-row gap-3">
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">תאריך סיום</Label>
-                        <Input type="date" dir="ltr" value={endDate} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'yyyy-MM-dd')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'yyyy-MM-dd')} onChange={(e) => setEndDate(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="date" dir="ltr" value={endDate} min={shiftWindow.startDate} max={shiftWindow.endDate} onChange={(e) => setEndDate(e.target.value)} className="text-center h-10 bg-white" />
                         <p className="text-[11px] text-gray-500 mt-1" dir="rtl">
                           {endDate ? format(new Date(endDate), 'EEEE, dd/MM', { locale: he }) : ''}
                         </p>
                       </div>
                       <div className="flex-1">
                         <Label className="text-xs text-gray-500 mb-1">שעת סיום</Label>
-                        <Input type="time" dir="ltr" value={endTime} min={format(selectableSegments[selectedSegmentIdx]?.start || baseStart, 'HH:mm')} max={format(selectableSegments[selectedSegmentIdx]?.end || baseEnd, 'HH:mm')} onChange={(e) => setEndTime(e.target.value)} className="text-center h-10 bg-white" />
+                        <Input type="time" dir="ltr" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="text-center h-10 bg-white" />
                         <p className="text-[11px] text-gray-500 mt-1" dir="ltr">{endTime || ''}</p>
                       </div>
                     </div>
