@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { buildShiftDeepLink, buildSwapTemplate, calculateMissingSegments, resolveRequestWindow, resolveSwapType, buildDateTime } from './whatsappTemplates';
+import { buildShiftDeepLink, buildSwapTemplate, calculateMissingSegments, resolveSwapType, buildDateTime, computeCoverageSummary } from './whatsappTemplates';
 import LoadingSkeleton from '../LoadingSkeleton';
 
 export default function ShiftDetailsModal({
@@ -84,14 +84,16 @@ export default function ShiftDetailsModal({
   }, [isOpen, shift]);
 
   const resolvedActiveRequest = useMemo(() => activeRequest || shift?.active_request || null, [activeRequest, shift]);
-  const requestWindow = useMemo(
-    () => resolveRequestWindow(shift, resolvedActiveRequest),
-    [resolvedActiveRequest, shift]
-  );
   const resolvedSwapType = useMemo(
     () => resolveSwapType(shift, resolvedActiveRequest),
     [resolvedActiveRequest, shift]
   );
+  const coverageSummary = useMemo(
+    () => computeCoverageSummary({ shift, activeRequest: resolvedActiveRequest, coverages }),
+    [coverages, resolvedActiveRequest, shift]
+  );
+  const requestWindow = coverageSummary.requestWindow;
+  const shiftWindow = coverageSummary.shiftWindow;
 
   const departments = useMemo(() => {
     return [...new Set(authorizedUsers.map(u => u.department))].filter(Boolean).sort();
@@ -121,8 +123,8 @@ export default function ShiftDetailsModal({
     setShowDeleteConfirm(false);
   };
 
-  const shiftStartDate = shift?.start_date || date;
-  const shiftEndDate = shift?.end_date || shiftStartDate;
+  const shiftStartDate = shiftWindow?.startDate || shift?.start_date || date;
+  const shiftEndDate = shiftWindow?.endDate || shift?.end_date || shiftStartDate;
 
   // Determine State
   const isSwapMode = !!resolvedActiveRequest;
@@ -138,9 +140,10 @@ export default function ShiftDetailsModal({
       : (userEmail && shift?.assigned_email === userEmail) ||
           (currentUser?.full_name && shift?.user_name === currentUser.full_name)
   );
+  const ownerDisplayName = shift?.original_user_name || shift?.user_name || shift?.assigned_person || 'לא ידוע';
 
-  const startTime = shift?.start_time || '09:00';
-  const endTime = shift?.end_time || '09:00';
+  const startTime = shiftWindow?.startTime || shift?.start_time || '09:00';
+  const endTime = shiftWindow?.endTime || shift?.end_time || '09:00';
   const startDateObj = shiftStartDate ? new Date(shiftStartDate) : new Date(date || new Date());
 
   let endDateObj;
@@ -157,7 +160,8 @@ export default function ShiftDetailsModal({
   }
 
   const coverageType = shift?.coverageType || shift?.swap_type || (isPartial ? 'partial' : 'full');
-  const hasCoverages = coverages.length > 0;
+  const approvedCoverages = coverageSummary.approvedCoverages;
+  const hasCoverages = approvedCoverages.length > 0;
   const isCoveredSwap = (shift?.status === 'covered' || shift?.status === 'Covered') && hasCoverages;
   const statusLabelClasses = isPartial
     ? 'bg-yellow-100 text-yellow-900 border border-yellow-200'
@@ -169,27 +173,28 @@ export default function ShiftDetailsModal({
   const requestEndDate = requestWindow.endDate || shiftEndDate || requestStartDate;
 
   const coverageRows = useMemo(() => {
-    return coverages
+    return approvedCoverages
       .map((cov, idx) => {
         const user = coveringUsers.find(u => u.serial_id === cov.covering_user_id);
         const start = buildDateTime(cov.cover_start_date || requestStartDate, cov.cover_start_time || requestStartStr);
-        const end = buildDateTime(cov.cover_end_date || requestEndDate, cov.cover_end_time || requestEndStr);
+        let end = buildDateTime(cov.cover_end_date || requestEndDate, cov.cover_end_time || requestEndStr);
         if (!start || !end) return null;
+        if (end <= start) end = addDays(end, 1);
         return {
           id: cov.id || idx,
-          name: user?.full_name || 'מתנדב',
+          name: user?.full_name || cov.covering_name || 'מתנדב',
           start,
           end,
-          department: user?.department
+          department: user?.department || cov.covering_department
         };
       })
       .filter(Boolean);
-  }, [coverages, coveringUsers, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
+  }, [approvedCoverages, coveringUsers, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
 
   // FIXED: Identify covering user for full swap view
   const primaryCoverage = useMemo(() => {
-    return coverages.find(cov => cov.type === 'Full') || coverages[0];
-  }, [coverages]);
+    return approvedCoverages.find(cov => cov.type === 'Full') || approvedCoverages[0];
+  }, [approvedCoverages]);
 
   const coveringUserName = useMemo(() => {
     if (!primaryCoverage) return shift?.user_name;
@@ -202,17 +207,16 @@ export default function ShiftDetailsModal({
     const user = coveringUsers.find(u => u.serial_id === primaryCoverage.covering_user_id);
     return user?.department || shift?.department;
   }, [coveringUsers, primaryCoverage, shift?.department]);
+  const ownerDepartment = shift?.department || shift?.original_user_data?.department || '';
+  const assignedDisplayName = resolvedSwapType === 'full' && primaryCoverage ? coveringUserName : ownerDisplayName;
+  const assignedDepartment = resolvedSwapType === 'full' && primaryCoverage ? coveringDepartment : ownerDepartment;
 
   const missingSegments = useMemo(() => {
     if (!isPartialLike) return [];
-    const baseStart = buildDateTime(requestStartDate, requestStartStr);
-    let baseEnd = buildDateTime(requestEndDate, requestEndStr);
-    if (!baseStart || !baseEnd) return [];
-    if (baseEnd <= baseStart) baseEnd = addDays(baseEnd, 1);
-    return calculateMissingSegments(baseStart, baseEnd, coverages);
-  }, [coverages, isPartialLike, requestEndDate, requestEndStr, requestStartDate, requestStartStr]);
+    return coverageSummary.missingSegments;
+  }, [coverageSummary.missingSegments, isPartialLike]);
 
-  const isRequestFullyCovered = isPartialLike && hasCoverages && missingSegments.length === 0;
+  const isRequestFullyCovered = isPartialLike && approvedCoverages.length > 0 && missingSegments.length === 0;
   const derivedStatus = useMemo(() => {
     const rawStatus = String(shift?.status || '').toLowerCase();
     if (isCoveredSwap || rawStatus === 'covered' || isRequestFullyCovered) return 'covered';
@@ -259,46 +263,23 @@ export default function ShiftDetailsModal({
     return end <= shiftStartDateTime ? addDays(end, 1) : end;
   }, [endTime, shiftEndDate, shiftStartDateTime]);
 
-  const requestStartDateTime = useMemo(
-    () => buildDateTime(requestStartDate, requestStartStr),
-    [requestStartDate, requestStartStr]
-  );
-
-  const requestEndDateTime = useMemo(() => {
-    const end = buildDateTime(requestEndDate, requestEndStr);
-    if (!end || !requestStartDateTime) return end;
-    return end <= requestStartDateTime ? addDays(end, 1) : end;
-  }, [requestEndDate, requestEndStr, requestStartDateTime]);
-
-  const ownerExclusionEntries = useMemo(() => {
-    const entries = coverages.map((cov) => ({
-      cover_start_date: cov.cover_start_date || requestStartDate,
-      cover_start_time: cov.cover_start_time || requestStartStr,
-      cover_end_date: cov.cover_end_date || requestEndDate,
-      cover_end_time: cov.cover_end_time || requestEndStr,
-    }));
-
-    if (requestStartDateTime && requestEndDateTime) {
-      entries.push({
-        cover_start_date: format(requestStartDateTime, 'yyyy-MM-dd'),
-        cover_start_time: format(requestStartDateTime, 'HH:mm'),
-        cover_end_date: format(requestEndDateTime, 'yyyy-MM-dd'),
-        cover_end_time: format(requestEndDateTime, 'HH:mm'),
-      });
-    }
-
-    return entries;
-  }, [coverages, requestEndDate, requestEndStr, requestEndDateTime, requestStartDate, requestStartDateTime, requestStartStr]);
-
   const ownerSegments = useMemo(() => {
     if (!shiftStartDateTime || !shiftEndDateTime) return [];
-    return calculateMissingSegments(shiftStartDateTime, shiftEndDateTime, ownerExclusionEntries);
-  }, [ownerExclusionEntries, shiftEndDateTime, shiftStartDateTime]);
+    return calculateMissingSegments(shiftStartDateTime, shiftEndDateTime, approvedCoverages);
+  }, [approvedCoverages, shiftEndDateTime, shiftStartDateTime]);
 
   const formatSegment = (start, end) => {
     const sameDay = format(start, 'dd/MM') === format(end, 'dd/MM');
     const datePart = sameDay ? format(start, 'dd/MM') : `${format(start, 'dd/MM')} → ${format(end, 'dd/MM')}`;
     return `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')} (${datePart})`;
+  };
+
+  const formatSegmentNarrative = (start, end) => {
+    const sameDay = format(start, 'dd/MM') === format(end, 'dd/MM');
+    if (sameDay) {
+      return `מ־${format(start, 'HH:mm')} עד ${format(end, 'HH:mm')} בתאריך ${format(start, 'dd/MM')}`;
+    }
+    return `מ־${format(start, 'HH:mm')} ${format(start, 'dd/MM')} עד ${format(end, 'HH:mm')} ${format(end, 'dd/MM')}`;
   };
 
   const handleAddToCalendar = () => {
@@ -328,7 +309,7 @@ export default function ShiftDetailsModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
         <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
           
@@ -388,10 +369,10 @@ export default function ShiftDetailsModal({
             <div className="border rounded-2xl p-6 text-center shadow-sm space-y-4 bg-[#F4F4F6] border-gray-200">
               <div className="space-y-3">
                 <p className="text-sm text-gray-500 font-medium">משובץ כרגע למשמרת</p>
-                <h2 className="text-2xl font-semibold text-gray-900">{coveringUserName}</h2>
-                {coveringDepartment && (
+                <h2 className="text-2xl font-semibold text-gray-900">{assignedDisplayName}</h2>
+                {assignedDepartment && (
                   <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
-                    {`מחלקה ${coveringDepartment}`}
+                    {`מחלקה ${assignedDepartment}`}
                   </span>
                 )}
               </div>
@@ -414,7 +395,7 @@ export default function ShiftDetailsModal({
               <div className="space-y-3">
                 <div className="rounded-2xl bg-yellow-50 border border-yellow-200 p-4 text-sm text-yellow-900 leading-relaxed shadow-sm">
                   <p>
-                    המשתמש {shift.user_name} ביקש סיוע בהחלפה חלקית בטווח השעות {requestStartStr}–{requestEndStr} בתאריך {format(new Date(requestStartDate), 'dd.MM.yyyy')}
+                    המשתמש {ownerDisplayName} ביקש סיוע בהחלפה חלקית בטווח השעות <span dir="ltr">{requestStartStr}–{requestEndStr}</span> בתאריך {format(new Date(requestStartDate), 'dd.MM.yyyy')}
                   </p>
                 </div>
 
@@ -426,13 +407,14 @@ export default function ShiftDetailsModal({
                       </div>
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold text-gray-900">{shift.user_name}</p>
+                          <p className="text-sm font-semibold text-gray-900">{ownerDisplayName}</p>
                           <span className="px-2 py-0.5 rounded-full bg-gray-200 text-[11px] text-gray-700">בעל המשמרת</span>
                         </div>
                         {ownerSegments.length > 0 ? (
                           ownerSegments.map((seg, idx) => (
-                            <p key={`owner-seg-${idx}`} className="text-xs text-gray-700" dir="ltr">
-                              {formatSegment(seg.start, seg.end)}
+                            <p key={`owner-seg-${idx}`} className="text-xs text-gray-700">
+                              <span className="font-semibold">בעל המשמרת עושה</span>{' '}
+                              <span dir="ltr">{formatSegmentNarrative(seg.start, seg.end)}</span>
                             </p>
                           ))
                         ) : (
@@ -461,7 +443,11 @@ export default function ShiftDetailsModal({
                                 <span className="text-xs text-green-700 font-mono" dir="ltr">{format(row.start, 'HH:mm')} - {format(row.end, 'HH:mm')}</span>
                               </div>
                               {row.department && <p className="text-[11px] text-green-700">מחלקה {row.department}</p>}
-                              <p className="text-xs text-green-700" dir="ltr">{formatSegment(row.start, row.end)}</p>
+                              <p className="text-xs text-green-700">
+                                <span className="font-semibold">{row.name}</span>{' '}
+                                עוזר/ת ל{ownerDisplayName}{' '}
+                                <span dir="ltr">{formatSegmentNarrative(row.start, row.end)}</span>
+                              </p>
                             </div>
                           </div>
                         ))}
@@ -485,7 +471,7 @@ export default function ShiftDetailsModal({
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-red-700">שעות חסרות</p>
                         <p className="text-xs text-red-700" dir="ltr">{formatSegment(seg.start, seg.end)}</p>
-                        <p className="text-[11px] text-red-600">בעל המשמרת המקורי ({shift.user_name}) יישאר משויך עד שיושלם כיסוי</p>
+                        <p className="text-[11px] text-red-600">בעל המשמרת המקורי ({ownerDisplayName}) יישאר משויך עד שיושלם כיסוי</p>
                       </div>
                     </div>
                   ))}
