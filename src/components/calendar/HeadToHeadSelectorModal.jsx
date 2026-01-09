@@ -7,7 +7,7 @@ import { he } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { buildHeadToHeadTemplate } from './whatsappTemplates';
+import { buildHeadToHeadDeepLink, buildHeadToHeadTemplate } from './whatsappTemplates';
 
 export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, currentUser }) {
   const [selectedShift, setSelectedShift] = useState(null);
@@ -56,7 +56,7 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     // Logic: Create H2H request in SwapRequest table (done via parent handler usually, or we do it here)
     // For now, simulating the message construction
     
-    const approvalLink = `${window.location.origin}/head-to-head?target=${targetShift.id}&offer=${selectedShift.id}`;
+    const approvalLink = buildHeadToHeadDeepLink(targetShift.id, selectedShift.id);
     const targetDate = format(new Date(targetShift.start_date), 'dd/MM', { locale: he });
     const offerDate = format(new Date(selectedShift.start_date), 'dd/MM', { locale: he });
     const targetName = targetShift.user_name || 'חבר';
