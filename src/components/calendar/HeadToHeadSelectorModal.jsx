@@ -48,32 +48,48 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     setSelectedShift(shift);
   };
 
-  const handleSendProposal = () => {
+  const handleSendProposal = async () => {
     if (!selectedShift) {
       toast.error('נא לבחור משמרת להחלפה');
       return;
     }
-    // Logic: Create H2H request in SwapRequest table (done via parent handler usually, or we do it here)
-    // For now, simulating the message construction
-    
-    const approvalLink = buildHeadToHeadDeepLink(targetShift.id, selectedShift.id);
-    const targetDate = format(new Date(targetShift.start_date), 'dd/MM', { locale: he });
-    const offerDate = format(new Date(selectedShift.start_date), 'dd/MM', { locale: he });
-    const targetName = targetShift.user_name || 'חבר';
 
-    const message = buildHeadToHeadTemplate({
-      targetUserName: targetName,
-      targetShiftOwner: targetShift.user_name,
-      targetShiftDate: targetDate,
-      myShiftOwner: currentUser?.full_name,
-      myShiftDate: offerDate,
-      uniqueApprovalUrl: approvalLink
-    });
+    try {
+      // Create SwapRequest with status 'Pending' for head-to-head
+      await base44.entities.SwapRequest.create({
+        shift_id: targetShift.id,
+        requesting_user_id: currentUser?.serial_id,
+        request_type: 'Head2Head',
+        req_start_date: targetShift.start_date,
+        req_end_date: targetShift.end_date || targetShift.start_date,
+        req_start_time: targetShift.start_time || '09:00',
+        req_end_time: targetShift.end_time || '09:00',
+        offered_shift_id: selectedShift.id,
+        status: 'Pending'
+      });
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-    toast.success('ההצעה נשלחה בהצלחה!');
-    onClose();
+      const approvalLink = buildHeadToHeadDeepLink(targetShift.id, selectedShift.id);
+      const targetDate = format(new Date(targetShift.start_date), 'dd/MM', { locale: he });
+      const offerDate = format(new Date(selectedShift.start_date), 'dd/MM', { locale: he });
+      const targetName = targetShift.user_name || 'חבר';
+
+      const message = buildHeadToHeadTemplate({
+        targetUserName: targetName,
+        targetShiftOwner: targetShift.user_name,
+        targetShiftDate: targetDate,
+        myShiftOwner: currentUser?.full_name,
+        myShiftDate: offerDate,
+        uniqueApprovalUrl: approvalLink
+      });
+
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+      toast.success('ההצעה נשלחה בהצלחה!');
+      onClose();
+    } catch (error) {
+      console.error('Error creating head-to-head request:', error);
+      toast.error('שגיאה ביצירת הבקשה');
+    }
   };
 
   if (!isOpen || !targetShift) return null;
