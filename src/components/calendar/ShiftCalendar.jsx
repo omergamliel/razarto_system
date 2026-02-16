@@ -349,19 +349,9 @@ export default function ShiftCalendar() {
         payload
       ];
 
-      const { missingSegments } = computeCoverageSummary({
-        shift: normalizedShift,
-        activeRequest,
-        coverages: shiftCoverages
-      });
-
-      if (missingSegments.length === 0) {
-        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
-        await base44.entities.Shift.update(shift.id, { status: 'Covered' });
-      } else {
-        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Partially_Covered' });
-        await base44.entities.Shift.update(shift.id, { status: 'Swap_Requested' });
-      }
+      // Full coverage always - update swap request and shift
+      await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
+      await base44.entities.Shift.update(shift.id, { status: 'Covered' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);

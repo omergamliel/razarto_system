@@ -403,14 +403,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                             <div className="text-[11px] text-gray-500">סיום: {endDate}</div>
                           </div>
 
-                          {type === 'partial_gaps' && item.missingSegments?.length > 0 && (
-                            <div className="mt-2 text-xs text-yellow-800 bg-yellow-100 border border-yellow-200 rounded-lg p-2">
-                              <p className="font-semibold mb-1">חלונות לא מכוסים</p>
-                              {item.missingSegments.map((seg, gapIdx) => (
-                                <p key={`gap-${gapIdx}`} dir="ltr">{format(seg.start, 'HH:mm')} - {format(seg.end, 'HH:mm')}</p>
-                              ))}
-                            </div>
-                          )}
+
 
                           {type === 'approved' && item.original_shift && (
                             <div className="mt-2 text-xs text-gray-600 space-y-1">
