@@ -66,13 +66,13 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
 
       // 3. בניית ההודעה בפורמט המדויק שביקשת
       const message = `היי *${targetName}*! 👋🏼
-אני מעוניין להחליף איתך משמרת רז״רתו ראש בראש:
+אני אשמח להחליף איתך משמרת רז״רתו ראש בראש:
 
 🫡 הצעת החלפה:
 🫵🏼 המשמרת שלך: *${targetName}* ${targetDateStr}
 🤞🏼 המשמרת שלי: *${myName}* ${myDateStr}
 
-✅ לחץ כאן לאישור ההחלפה בתוך המערכת:
+✅ לאישור ההחלפה בתוך המערכת יש ללחוץ כאן:
 https://razar-toran-b555aef5.base44.app?headToHeadTarget=${targetShift.id}&headToHeadOffer=${selectedShift.id}`;
 
       // 4. פתיחת WhatsApp בפורמט היציב ביותר לנייד
