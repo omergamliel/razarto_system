@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, ArrowLeftRight, Send } from 'lucide-react';
+import { X, Calendar, ArrowLeftRight, Send } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -12,7 +12,7 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
   const [selectedShift, setSelectedShift] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // שליפת המשמרות העתידיות שלי
+  // שליפת המשמרות העתידיות שלי לצורך בחירה
   const { data: allShifts = [], isLoading } = useQuery({
     queryKey: ['my-future-shifts-h2h', currentUser?.serial_id],
     queryFn: () => base44.entities.Shift.list(),
@@ -45,7 +45,7 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
     setIsSubmitting(true);
 
     try {
-      // 1. יצירת הבקשה במסד הנתונים
+      // 1. יצירת רשומת הבקשה בסטטוס Pending במסד הנתונים
       await base44.entities.SwapRequest.create({
         shift_id: targetShift.id,
         requesting_user_id: currentUser?.serial_id,
@@ -58,7 +58,7 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
         status: 'Pending'
       });
 
-      // 2. הכנת הנתונים להודעה (פורמט תאריך dd/MM)
+      // 2. הכנת הנתונים להודעה
       const targetDateStr = format(new Date(targetShift.start_date), 'dd/MM');
       const myDateStr = format(new Date(selectedShift.start_date), 'dd/MM');
       const targetName = targetShift.user_name || 'חבר';
@@ -75,15 +75,16 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
 ✅ לחץ כאן לאישור ההחלפה בתוך המערכת:
 https://razar-toran-b555aef5.base44.app?headToHeadTarget=${targetShift.id}&headToHeadOffer=${selectedShift.id}`;
 
-      // 4. פתיחת WhatsApp
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      // 4. פתיחת WhatsApp בפורמט היציב ביותר לנייד
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
       
       toast.success('הבקשה נוצרה! עובר ל-WhatsApp...');
       
+      // הפניה ישירה כדי למנוע את "חסימת הפופ-אפ"
       setTimeout(() => {
-        window.location.assign(whatsappUrl);
+        window.location.href = whatsappUrl;
         onClose();
-      }, 800);
+      }, 500);
 
     } catch (error) {
       console.error('Error:', error);
@@ -114,7 +115,7 @@ https://razar-toran-b555aef5.base44.app?headToHeadTarget=${targetShift.id}&headT
 
           <div className="p-6 space-y-4 flex-1 overflow-hidden flex flex-col">
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 shrink-0">
-              <p className="text-sm text-purple-700 font-medium mb-2">המשמרת שאתה רוצה לקחת:</p>
+              <p className="text-sm text-purple-700 font-medium mb-2">המשמרת שאת רוצה לקחת:</p>
               <p className="font-bold text-gray-800">{targetShift.user_name}</p>
               <p className="text-sm text-gray-600">{format(new Date(targetShift.start_date), 'EEEE, d בMMMM', { locale: he })}</p>
             </div>
@@ -134,9 +135,7 @@ https://razar-toran-b555aef5.base44.app?headToHeadTarget=${targetShift.id}&headT
                       key={shift.id}
                       onClick={() => handleSelectShift(shift)}
                       className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                        selectedShift?.id === shift.id
-                          ? 'border-purple-500 bg-purple-50 shadow-md ring-1 ring-purple-500'
-                          : 'border-gray-200 hover:border-purple-300 bg-white'
+                        selectedShift?.id === shift.id ? 'border-purple-500 bg-purple-50 shadow-md ring-1 ring-purple-500' : 'border-gray-100 hover:border-purple-300 bg-white'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -158,7 +157,7 @@ https://razar-toran-b555aef5.base44.app?headToHeadTarget=${targetShift.id}&headT
             <Button 
               onClick={handleSendProposal} 
               disabled={!selectedShift || isSubmitting} 
-              className={`flex-1 h-12 text-white rounded-xl shadow-md ${!selectedShift ? 'bg-gray-300' : 'bg-gradient-to-r from-purple-500 to-purple-600'}`}
+              className={`flex-1 h-12 text-white rounded-xl shadow-md ${!selectedShift || isSubmitting ? 'bg-gray-300' : 'bg-gradient-to-r from-purple-500 to-purple-600'}`}
             >
               {isSubmitting ? 'מעבד...' : 'שלח הצעה ב-WhatsApp'}
             </Button>
