@@ -206,11 +206,14 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
 
     const baseData = useMemo(() => {
         const openRequests = swapRequestsAll.filter(r => isOpenStatus(r.status));
+        const pendingRequests = swapRequestsAll.filter(r => r.status === 'Pending');
         const approvedReqs = swapRequestsAll.filter(r => ['Completed', 'Closed'].includes(r.status));
 
       switch (type) {
         case 'swap_requests':
           return enrichRequestsWithShiftInfo(openRequests);
+        case 'head_to_head_pending':
+          return enrichRequestsWithShiftInfo(pendingRequests);
         case 'approved':
           return enrichRequestsWithShiftInfo(approvedReqs);
         case 'my_shifts':
@@ -297,6 +300,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const getTitleAndColor = () => {
     switch (type) {
       case 'swap_requests': return { title: 'בקשות להחלפה', color: 'from-red-500 to-red-600', textColor: 'text-white' };
+      case 'head_to_head_pending': return { title: 'ראש בראש בהמתנה', color: 'from-yellow-500 to-yellow-600', textColor: 'text-white' };
       case 'approved': return { title: 'החלפות שבוצעו', color: 'from-green-500 to-green-600', textColor: 'text-white' };
       case 'my_shifts': return { title: 'המשמרות העתידיות שלי', color: 'from-[#a9def9] to-[#a9def9]', textColor: 'text-[#0b3a5e]' };
       default: return { title: '', color: '', textColor: 'text-white' };
@@ -306,6 +310,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const { title, color, textColor } = getTitleAndColor();
   const secondaryHeaderText = type === 'my_shifts' ? 'text-[#0b3a5e]/80' : 'text-white/90';
   const isFutureShiftsView = type === 'my_shifts';
+  const isHeadToHeadView = type === 'head_to_head_pending';
   const filteredSwapItems = useMemo(() => {
     if (type !== 'swap_requests') return sortedData;
     return sortedData.filter(item => swapTab === 'all' ? true : item.requesting_user_id === currentUser?.serial_id);
@@ -367,12 +372,10 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                   const tone = (() => {
                     if (type !== 'my_shifts') return { wrapper: '', label: '' };
                     const normalizedStatus = (item.status || '').toLowerCase();
-                    const isPartialShift = normalizedStatus === 'partial' || item.coverageType === 'partial' || item.swap_type === 'partial';
                     const isRequested = normalizedStatus === 'swap_requested' || normalizedStatus === 'requested';
                     const isCovered = normalizedStatus === 'covered' || item.ownership === 'covering';
 
                     if (isRequested) return { wrapper: 'bg-red-50 border-red-200', label: 'בקשת החלפה' };
-                    if (isPartialShift) return { wrapper: 'bg-yellow-50 border-yellow-200', label: 'כיסוי חלקי' };
                     if (isCovered) return { wrapper: 'bg-green-50 border-green-200', label: 'כיסוי מלא' };
                     if (item.ownership === 'mine') return { wrapper: 'bg-[#e6f4ff] border-[#a9def9]', label: 'המשמרת שלי' };
                     return { wrapper: 'bg-white', label: '' };
@@ -408,7 +411,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                           {type === 'approved' && item.original_shift && (
                             <div className="mt-2 text-xs text-gray-600 space-y-1">
                               <p className="font-semibold text-gray-700">יוזם: {item.user_name}</p>
-                              <p>סוג החלפה: {isPartial ? 'חלקית' : 'מלאה'}</p>
+                              <p>סוג החלפה: מלאה</p>
                               {item.coverageSegments?.length ? (
                                 <div className="bg-gray-100 rounded-lg p-2">
                                   <p className="font-semibold text-gray-700">משתתפים</p>
