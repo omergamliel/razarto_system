@@ -35,15 +35,6 @@ export default function ShiftCell({
       };
     }
 
-    if (status === 'partial' || (status === 'requested' && coverageType === 'partial')) {
-      return {
-        bg: 'bg-yellow-50',
-        border: 'border-yellow-300',
-        badge: 'bg-yellow-500',
-        icon: AlertCircle
-      };
-    }
-
     if (status === 'covered') {
       return {
         bg: 'bg-green-50',

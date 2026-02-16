@@ -86,7 +86,6 @@ const isOpenStatus = (status) => ['Open', 'Partially_Covered'].includes(status);
 export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onRequestSwap, actionsDisabled = false, onCancelRequest }) {
   
   const [visibleCount, setVisibleCount] = useState(10);
-  const isPartialGapsView = type === 'partial_gaps';
   const [swapTab, setSwapTab] = useState('all');
 
   useEffect(() => {
@@ -108,8 +107,6 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const { data: coveragesAll = [], isLoading: isCoveragesLoading } = useQuery({
     queryKey: ['kpi-coverages-all'],
     queryFn: () => base44.entities.ShiftCoverage.list(),
-    // Keep this hook active for every type while the modal is mounted to avoid
-    // changing the hook graph when switching KPI views mid-session.
     enabled: isOpen
   });
 
@@ -123,7 +120,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     isSwapRequestsLoading ||
     isShiftsLoading ||
     isUsersLoading ||
-    (isPartialGapsView && isCoveragesLoading);
+    isCoveragesLoading;
 
   // --- Helpers ---
   const enrichRequestsWithShiftInfo = useCallback((requests) => {
@@ -177,53 +174,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
       });
   }, [currentUser, swapRequestsAll]);
 
-  const partialGapItems = useMemo(() => {
-    if (!isOpen || !isPartialGapsView) return [];
-    return shiftsAll.map((shift) => {
-      if (shift.status === 'Active') return null;
-
-      const activeRequest = swapRequestsAll.find(r => r.shift_id === shift.id && isOpenStatus(r.status));
-      const user = authorizedUsers.find(u => u.serial_id === shift.original_user_id);
-
-      const startTime = activeRequest?.req_start_time || shift.swap_start_time || shift.start_time || '09:00';
-      const endTime = activeRequest?.req_end_time || shift.swap_end_time || shift.end_time || startTime;
-      const startDate = activeRequest?.req_start_date || shift.start_date;
-      const endDate = activeRequest?.req_end_date || shift.end_date || startDate;
-      const windowStart = new Date(`${startDate}T${startTime}`);
-      let windowEnd = new Date(`${endDate}T${endTime}`);
-      if (windowEnd <= windowStart) windowEnd = addDays(windowEnd, 1);
-
-      const coverageSegments = coveragesAll
-        .filter(c => c.shift_id === shift.id)
-        .map((c, idx) => {
-          const covStart = new Date(`${c.cover_start_date || startDate}T${c.cover_start_time || startTime}`);
-          let covEnd = new Date(`${c.cover_end_date || endDate}T${c.cover_end_time || endTime}`);
-          if (covEnd <= covStart) covEnd = addDays(covEnd, 1);
-          return { key: c.id || idx, start: covStart, end: covEnd, covering_user_id: c.covering_user_id };
-        });
-
-      const missing = computeMissingSegments(windowStart, windowEnd, coverageSegments);
-      const hasGap = missing.length > 0;
-      const hasPartialAssignment = coverageSegments.length > 0 && hasGap;
-
-      if (!hasGap || (!hasPartialAssignment && !activeRequest)) return null;
-
-      return {
-        ...activeRequest,
-        id: activeRequest?.id || `partial-${shift.id}`,
-        shift_id: shift.id,
-        user_name: user?.full_name || shift.user_name || 'לא ידוע',
-        req_start_time: startTime,
-        req_end_time: endTime,
-        shift_date: startDate,
-        request_type: 'Partial',
-        requesting_user_id: activeRequest?.requesting_user_id || shift.original_user_id,
-        missingSegments: missing,
-        coverageSegments,
-        is_request_object: true,
-      };
-    }).filter(Boolean);
-  }, [authorizedUsers, coveragesAll, isOpen, isPartialGapsView, shiftsAll, swapRequestsAll]);
+  // Removed partial gaps logic - full swaps only
 
   const futureShifts = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -255,15 +206,11 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
 
     const baseData = useMemo(() => {
         const openRequests = swapRequestsAll.filter(r => isOpenStatus(r.status));
-        const fullRequests = openRequests.filter(r => r.request_type === 'Full');
-        const partialRequests = openRequests.filter(r => r.request_type === 'Partial');
         const approvedReqs = swapRequestsAll.filter(r => ['Completed', 'Closed'].includes(r.status));
 
       switch (type) {
         case 'swap_requests':
-          return enrichRequestsWithShiftInfo(fullRequests);
-        case 'partial_gaps':
-          return partialGapItems.length ? partialGapItems : enrichRequestsWithShiftInfo(partialRequests);
+          return enrichRequestsWithShiftInfo(openRequests);
         case 'approved':
           return enrichRequestsWithShiftInfo(approvedReqs);
         case 'my_shifts':
@@ -271,7 +218,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
         default:
           return [];
         }
-        }, [enrichRequestsWithShiftInfo, enrichShiftsWithUserInfo, futureShifts, partialGapItems, swapRequestsAll, type]);
+        }, [enrichRequestsWithShiftInfo, enrichShiftsWithUserInfo, futureShifts, swapRequestsAll, type]);
 
   const sortedData = useMemo(() => {
       const items = [...baseData];
@@ -350,7 +297,6 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
   const getTitleAndColor = () => {
     switch (type) {
       case 'swap_requests': return { title: 'בקשות להחלפה', color: 'from-red-500 to-red-600', textColor: 'text-white' };
-      case 'partial_gaps': return { title: 'משמרות בפער חלקי', color: 'from-yellow-500 to-yellow-600', textColor: 'text-white' };
       case 'approved': return { title: 'החלפות שבוצעו', color: 'from-green-500 to-green-600', textColor: 'text-white' };
       case 'my_shifts': return { title: 'המשמרות העתידיות שלי', color: 'from-[#a9def9] to-[#a9def9]', textColor: 'text-[#0b3a5e]' };
       default: return { title: '', color: '', textColor: 'text-white' };

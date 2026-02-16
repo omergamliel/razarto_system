@@ -16,110 +16,11 @@ export default function SwapRequestModal({
   onSubmit,
   isSubmitting
 }) {
-  const [swapType, setSwapType] = useState('full');
-  
-  // Shift Limits
-  const shiftStartStr = shift?.start_time || '09:00';
-  const shiftEndStr = shift?.end_time || '09:00';
-  
-  // State for raw values
-  const [startDate, setStartDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [endTime, setEndTime] = useState('');
+  // Always full swap - no partial option
 
-  // Slider State
-  const [range, setRange] = useState([0, 0]); 
-  const sliderRef = useRef(null);
+  // No initialization needed - always full swap
 
-  // Derived Values
-  const totalDurationRef = useRef(0);
-  const shiftStartObjRef = useRef(null);
-  const shiftEndObjRef = useRef(null);
-
-  // Initialize
-  useEffect(() => {
-    if (isOpen && date && shift) {
-      // 1. קביעת תאריך התחלה וסיום לפי ה-DB
-      const sDateStr = shift.start_date || format(new Date(date), 'yyyy-MM-dd');
-      
-      const sH = parseInt(shiftStartStr.split(':')[0]);
-      const eH = parseInt(shiftEndStr.split(':')[0]);
-      
-      const startObj = new Date(sDateStr + 'T' + shiftStartStr);
-      
-      // חישוב תאריך סיום (אם לא קיים, מחשבים לפי השעות)
-      let endObj;
-      if (shift.end_date) {
-           endObj = new Date(shift.end_date + 'T' + shiftEndStr);
-      } else {
-           // אם סיום קטן מהתחלה או שזה 09:00-09:00, זה יום למחרת
-           const isNextDay = eH < sH || (sH === 9 && eH === 9);
-           const eDateStr = isNextDay ? format(addDays(new Date(sDateStr), 1), 'yyyy-MM-dd') : sDateStr;
-           endObj = new Date(eDateStr + 'T' + shiftEndStr);
-      }
-
-      shiftStartObjRef.current = startObj;
-      shiftEndObjRef.current = endObj;
-      const duration = differenceInMinutes(endObj, startObj);
-      totalDurationRef.current = duration;
-
-      setStartDate(format(startObj, 'yyyy-MM-dd'));
-      setStartTime(shiftStartStr);
-      setEndDate(format(endObj, 'yyyy-MM-dd'));
-      setEndTime(shiftEndStr);
-      
-      setRange([0, duration]);
-    }
-  }, [isOpen, date, shift]);
-
-  // --- SLIDER LOGIC ---
-  const handleSliderDrag = (e, handleIndex) => {
-      if (!sliderRef.current || totalDurationRef.current === 0) return;
-      
-      const rect = sliderRef.current.getBoundingClientRect();
-      const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-      
-      // RTL Calculation
-      const distanceFromRight = rect.right - clientX;
-      let percentage = (distanceFromRight / rect.width);
-      percentage = Math.max(0, Math.min(1, percentage));
-
-      let minutes = Math.round(percentage * totalDurationRef.current);
-      
-      // Snap to 30 minutes
-      const step = 30; 
-      minutes = Math.round(minutes / step) * step;
-
-      const newRange = [...range];
-      newRange[handleIndex] = minutes;
-
-      if (handleIndex === 0) { // Moving Start
-          if (newRange[0] >= newRange[1]) newRange[0] = newRange[1] - 30;
-      } else { // Moving End
-          if (newRange[1] <= newRange[0]) newRange[1] = newRange[0] + 30;
-      }
-
-      setRange(newRange);
-      updateInputsFromRange(newRange);
-  };
-
-  const updateInputsFromRange = (newRange) => {
-      if (!shiftStartObjRef.current) return;
-
-      const sTime = addMinutes(shiftStartObjRef.current, newRange[0]);
-      const eTime = addMinutes(shiftStartObjRef.current, newRange[1]);
-
-      setStartDate(format(sTime, 'yyyy-MM-dd'));
-      setStartTime(format(sTime, 'HH:mm'));
-      setEndDate(format(eTime, 'yyyy-MM-dd'));
-      setEndTime(format(eTime, 'HH:mm'));
-  };
-
-  const handleManualInputChange = (type, val) => {
-      if (type === 'startTime') setStartTime(val);
-      if (type === 'endTime') setEndTime(val);
-  };
+  // No slider logic needed - always full swap
 
   // --- SUBMISSION LOGIC ---
   const handleSubmit = (e) => {
@@ -132,42 +33,25 @@ export default function SwapRequestModal({
       return;
     }
 
-    const fallbackStartDate = shift?.start_date || startDate;
-    const fallbackEndDate = shift?.end_date || endDate || fallbackStartDate;
-
-    const finalStartDate = swapType === 'partial' ? startDate || fallbackStartDate : fallbackStartDate;
-    const finalStartTime = swapType === 'partial' ? startTime || shiftStartStr : shiftStartStr;
-    const finalEndDate = swapType === 'partial' ? endDate || fallbackEndDate : fallbackEndDate;
-    const finalEndTime = swapType === 'partial' ? endTime || shiftEndStr : shiftEndStr;
-
+    // Always full swap
     const payload = {
-      type: swapType, // 'full' or 'partial'
-      range: [...range],
-      startDate: finalStartDate,
-      startTime: finalStartTime,
-      endDate: finalEndDate,
-      endTime: finalEndTime
+      type: 'full',
+      startDate: shift?.start_date,
+      startTime: shift?.start_time || '09:00',
+      endDate: shift?.end_date || shift?.start_date,
+      endTime: shift?.end_time || '09:00'
     };
 
-    console.log('Modal submitting payload:', payload);
-    console.log('📤 [SwapRequestModal] Submitting Request Payload:', payload);
+    console.log('📤 [SwapRequestModal] Submitting Full Swap Request:', payload);
     onSubmit(payload);
   };
   
   if (!isOpen || !shift) return null;
 
-  const startPercent = (range[0] / totalDurationRef.current) * 100;
-  const endPercent = (range[1] / totalDurationRef.current) * 100;
-  const widthPercent = endPercent - startPercent;
-
-  const selectedDurationMinutes = range[1] - range[0];
-  const selectedDurationHours = selectedDurationMinutes / 60;
-  const isFullDuration = selectedDurationMinutes === totalDurationRef.current;
-
-  const formatDisplayDate = (isoDateStr) => {
-      if (!isoDateStr) return '';
-      return format(new Date(isoDateStr), 'dd/MM/yyyy');
-  };
+  const shiftStartDate = shift?.start_date || format(new Date(date), 'yyyy-MM-dd');
+  const shiftEndDate = shift?.end_date || shiftStartDate;
+  const shiftStartTime = shift?.start_time || '09:00';
+  const shiftEndTime = shift?.end_time || '09:00';
 
   return (
     <AnimatePresence>
@@ -212,13 +96,13 @@ export default function SwapRequestModal({
                     {/* Start Time Block */}
                     <div className="flex-1 text-center py-3">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                            {shiftStartObjRef.current && format(shiftStartObjRef.current, 'EEEE', { locale: he })}
+                            {shiftStartDate && format(new Date(shiftStartDate), 'EEEE', { locale: he })}
                         </p>
                         <p className="text-xl font-bold text-gray-800 leading-none mb-1 font-mono">
-                            {shiftStartStr}
+                            {shiftStartTime}
                         </p>
                         <p className="text-[11px] text-gray-400">
-                            {shiftStartObjRef.current && format(shiftStartObjRef.current, 'dd/MM/yyyy')}
+                            {shiftStartDate && format(new Date(shiftStartDate), 'dd/MM/yyyy')}
                         </p>
                     </div>
 
@@ -231,13 +115,13 @@ export default function SwapRequestModal({
                     {/* End Time Block */}
                     <div className="flex-1 text-center py-3">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                            {shiftEndObjRef.current && format(shiftEndObjRef.current, 'EEEE', { locale: he })}
+                            {shiftEndDate && format(new Date(shiftEndDate), 'EEEE', { locale: he })}
                         </p>
                         <p className="text-xl font-bold text-gray-800 leading-none mb-1 font-mono">
-                            {shiftEndStr}
+                            {shiftEndTime}
                         </p>
                         <p className="text-[11px] text-gray-400">
-                            {shiftEndObjRef.current && format(shiftEndObjRef.current, 'dd/MM/yyyy')}
+                            {shiftEndDate && format(new Date(shiftEndDate), 'dd/MM/yyyy')}
                         </p>
                     </div>
                 </div>
@@ -245,177 +129,14 @@ export default function SwapRequestModal({
 
             <div className="relative flex items-center justify-center my-5">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-                <div className="relative bg-white px-4 text-sm font-medium text-gray-500">יש לבחור את סוג ההחלפה</div>
+                <div className="relative bg-white px-4 text-sm font-medium text-gray-500">בקשה להחלפת משמרת מלאה</div>
             </div>
 
-            <RadioGroup value={swapType} onValueChange={setSwapType} className="grid grid-cols-2 gap-4">
-                <label className={`relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 cursor-pointer transition-all h-28 ${swapType === 'full' ? 'border-[#EF5350] bg-red-50 text-[#EF5350]' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
-                    <RadioGroupItem value="full" className="sr-only" />
-                    <Clock className="w-6 h-6 mb-2" />
-                    <span className="font-bold">משמרת מלאה</span>
-                    <span className="text-xs opacity-70 mt-1">כל השעות</span>
-                    {swapType === 'full' && <div className="absolute top-2 right-2 text-[#EF5350]"><CheckCircle2 className="w-5 h-5" /></div>}
-                </label>
-                <label className={`relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 cursor-pointer transition-all h-28 ${swapType === 'partial' ? 'border-[#EF5350] bg-red-50 text-[#EF5350]' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
-                    <RadioGroupItem value="partial" className="sr-only" />
-                    <AlertCircle className="w-6 h-6 mb-2" />
-                    <span className="font-bold">החלפה חלקית</span>
-                    <span className="text-xs opacity-70 mt-1">שעות מסוימות</span>
-                    {swapType === 'partial' && <div className="absolute top-2 right-2 text-[#EF5350]"><CheckCircle2 className="w-5 h-5" /></div>}
-                </label>
-            </RadioGroup>
-
-            <AnimatePresence>
-              {swapType === 'partial' && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-6">
-                  
-                  <div className="text-center mt-6 mb-2">
-                    <p className="text-sm font-bold text-[#EF5350] mb-1">בחירת שעות ההחלפה</p>
-                    <p className="text-xs text-gray-500">ניתן לבחור באמצעות הזזת הסליידר או הזנה ידנית במלבן שמתחת</p>
-                  </div>
-
-                  {/* --- PROFESSIONAL RANGE SLIDER --- */}
-                  <div className="px-4 py-8 select-none touch-none bg-gray-50 rounded-2xl border border-gray-100 shadow-sm relative">
-                      
-                      {/* Top Labels */}
-                      <div className="flex justify-between text-xs font-bold text-gray-600 mb-3 px-1">
-                          <div className="text-center">
-                              <span>התחלה</span>
-                              <div className="text-[10px] font-normal text-gray-400 mt-0.5">{startDate && formatDisplayDate(startDate)}</div>
-                          </div>
-                          <div className="text-center">
-                              <span>סיום</span>
-                              <div className="text-[10px] font-normal text-gray-400 mt-0.5">{endDate && formatDisplayDate(endDate)}</div>
-                          </div>
-                      </div>
-
-                      <div 
-                        ref={sliderRef}
-                        className="relative h-3 bg-gray-200 rounded-full cursor-pointer"
-                      >
-                          {/* Selected Range Bar */}
-                          <div 
-                              className="absolute h-full bg-[#EF5350] rounded-full opacity-90 shadow-sm"
-                              style={{ 
-                                  right: `${startPercent}%`, 
-                                  width: `${widthPercent}%` 
-                              }}
-                          />
-
-                          {/* Start Handle */}
-                          <div 
-                              className="absolute w-7 h-7 bg-white border-[3px] border-[#EF5350] rounded-full -top-2 shadow-md cursor-grab active:cursor-grabbing flex items-center justify-center z-10 hover:scale-110 transition-transform outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF5350]"
-                              style={{ right: `${startPercent}%`, transform: 'translateX(50%)' }}
-                              tabIndex={0}
-                              onMouseDown={(e) => {
-                                  const moveHandler = (moveEvent) => handleSliderDrag(moveEvent, 0);
-                                  const upHandler = () => {
-                                      window.removeEventListener('mousemove', moveHandler);
-                                      window.removeEventListener('mouseup', upHandler);
-                                  };
-                                  window.addEventListener('mousemove', moveHandler);
-                                  window.addEventListener('mouseup', upHandler);
-                              }}
-                              onTouchStart={(e) => {
-                                  const moveHandler = (moveEvent) => handleSliderDrag(moveEvent, 0);
-                                  const upHandler = () => {
-                                      window.removeEventListener('touchmove', moveHandler);
-                                      window.removeEventListener('touchend', upHandler);
-                                  };
-                                  window.addEventListener('touchmove', moveHandler);
-                                  window.addEventListener('touchend', upHandler);
-                              }}
-                          >
-                              <div className="absolute -top-9 bg-[#EF5350] text-white text-xs font-bold py-1 px-2 rounded-md shadow-sm whitespace-nowrap after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-[#EF5350]">
-                                  {startTime}
-                              </div>
-                          </div>
-
-                          {/* End Handle */}
-                          <div 
-                              className="absolute w-7 h-7 bg-white border-[3px] border-[#EF5350] rounded-full -top-2 shadow-md cursor-grab active:cursor-grabbing flex items-center justify-center z-10 hover:scale-110 transition-transform outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF5350]"
-                              style={{ right: `${endPercent}%`, transform: 'translateX(50%)' }}
-                              tabIndex={0}
-                              onMouseDown={(e) => {
-                                  const moveHandler = (moveEvent) => handleSliderDrag(moveEvent, 1);
-                                  const upHandler = () => {
-                                      window.removeEventListener('mousemove', moveHandler);
-                                      window.removeEventListener('mouseup', upHandler);
-                                  };
-                                  window.addEventListener('mousemove', moveHandler);
-                                  window.addEventListener('mouseup', upHandler);
-                              }}
-                              onTouchStart={(e) => {
-                                  const moveHandler = (moveEvent) => handleSliderDrag(moveEvent, 1);
-                                  const upHandler = () => {
-                                      window.removeEventListener('touchmove', moveHandler);
-                                      window.removeEventListener('touchend', upHandler);
-                                  };
-                                  window.addEventListener('touchmove', moveHandler);
-                                  window.addEventListener('touchend', upHandler);
-                              }}
-                          >
-                              <div className="absolute -top-9 bg-[#EF5350] text-white text-xs font-bold py-1 px-2 rounded-md shadow-sm whitespace-nowrap after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-[#EF5350]">
-                                  {endTime}
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* Dynamic Duration Labels */}
-                  {!isFullDuration && (
-                      <div className="flex justify-center -mt-3">
-                          <motion.div 
-                            initial={{ opacity: 0, y: -10 }} 
-                            animate={{ opacity: 1, y: 0 }} 
-                            className="bg-orange-100 text-orange-700 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 shadow-sm border border-orange-200"
-                          >
-                              <Timer className="w-4 h-4" />
-                              הטווח הנבחר: {selectedDurationHours} שעות במצטבר
-                          </motion.div>
-                      </div>
-                  )}
-
-                  {/* Manual Inputs */}
-                  <div className="bg-white rounded-2xl p-5 grid grid-cols-2 gap-6 border border-gray-100 shadow-sm">
-                    <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-gray-400" />
-                            התחלה
-                        </Label>
-                        <div className="relative">
-                            <Input type="time" value={startTime} onChange={(e) => handleManualInputChange('startTime', e.target.value)} className="pl-10 text-center h-14 font-mono text-xl border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
-                                <span className="text-gray-400 text-xs">🕒</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1.5 rounded-md">
-                            <CalendarDays className="w-3 h-3" />
-                            {startDate && formatDisplayDate(startDate)}
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-gray-400" />
-                            סיום
-                        </Label>
-                        <div className="relative">
-                            <Input type="time" value={endTime} onChange={(e) => handleManualInputChange('endTime', e.target.value)} className="pl-10 text-center h-14 font-mono text-xl border-gray-200 focus:border-[#EF5350] focus:ring-[#EF5350]" dir="ltr" />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center pointer-events-none">
-                                <span className="text-gray-400 text-xs">🕒</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 mt-1 bg-gray-50 py-1.5 rounded-md">
-                            <CalendarDays className="w-3 h-3" />
-                            {endDate && formatDisplayDate(endDate)}
-                        </div>
-                    </div>
-                  </div>
-
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-center">
+                <Clock className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                <p className="text-sm font-bold text-blue-900">משמרת מלאה בלבד</p>
+                <p className="text-xs text-blue-700 mt-1">הבקשה תכלול את כל שעות המשמרת</p>
+            </div>
 
             {/* Hidden submit for form enter key */}
             <button type="submit" className="hidden" />
