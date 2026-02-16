@@ -363,22 +363,16 @@ export default function ShiftCalendar() {
     }
   });
 
-  const headToHeadSwapMutation = useMutation({
+const headToHeadSwapMutation = useMutation({
     mutationFn: async () => {
       if (!h2hTargetId || !h2hOfferId) return;
 
-      // 1. Get Shifts
       const targetShift = shifts.find(s => s.id === h2hTargetId);
       const offerShift = shifts.find(s => s.id === h2hOfferId);
 
-      if (!targetShift || !offerShift) throw new Error('Shifts not found');
+      if (!targetShift || !offerShift) throw new Error('המשמרות לא נמצאו');
 
-      // 2. Find the pending SwapRequest for this head-to-head
-      const h2hRequest = swapRequests.find(
-        sr => sr.shift_id === h2hTargetId && sr.offered_shift_id === h2hOfferId && sr.status === 'Pending'
-      );
-
-      // 3. Swap original_user_id (ownership)
+      // 1. החלפת הבעלים בטבלה
       await base44.entities.Shift.update(h2hTargetId, {
         original_user_id: offerShift.original_user_id,
         status: 'Active'
@@ -389,7 +383,10 @@ export default function ShiftCalendar() {
         status: 'Active'
       });
 
-      // 4. Update SwapRequest status to 'Approved'
+      // 2. סגירת הבקשה ב-KPI הצהוב
+      const h2hRequest = swapRequests.find(
+        sr => sr.shift_id === h2hTargetId && sr.offered_shift_id === h2hOfferId && sr.status === 'Pending'
+      );
       if (h2hRequest) {
         await base44.entities.SwapRequest.update(h2hRequest.id, { status: 'Approved' });
       }
@@ -397,10 +394,8 @@ export default function ShiftCalendar() {
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
       queryClient.invalidateQueries(['swap-requests']);
-      toast.success('החלפה ראש בראש בוצעה בהצלחה!');
-      setShowHeadToHeadApproval(false);
-      setH2hTargetId(null);
-      setH2hOfferId(null);
+      toast.success('ההחלפה בוצעה בהצלחה!');
+      closeAllModals();
     }
   });
 
