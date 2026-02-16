@@ -7,33 +7,22 @@ import { base44 } from '@/api/base44Client';
 export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
 
   // --- 1. Swap Requests Count (Red) ---
-  // Count ALL open SwapRequests that are of type 'Full'
+  // Count ALL open SwapRequests
   const { data: fullRequestsCount = 0 } = useQuery({
     queryKey: ['count-full-swap-requests'],
     queryFn: async () => {
-        const reqs = await base44.entities.SwapRequest.filter({ 
-            status: 'Open',
-            request_type: 'Full'
-        });
+        const reqs = await base44.entities.SwapRequest.filter({ status: 'Open' });
         return reqs.length;
     }
   });
 
-  // --- 2. Partial Gaps Count (Yellow) ---
-  // Count ALL open SwapRequests that are of type 'Partial'
-  const { data: partialRequestsCount = 0 } = useQuery({
-    queryKey: ['count-partial-swap-requests'],
+  // --- 2. Head to Head Pending Count (Yellow) ---
+  // Count ALL pending head-to-head SwapRequests
+  const { data: headToHeadPendingCount = 0 } = useQuery({
+    queryKey: ['count-head-to-head-pending'],
     queryFn: async () => {
-        const reqs = await base44.entities.SwapRequest.filter({ 
-            status: 'Open',
-            request_type: 'Partial'
-        });
-        // Also count Partially_Covered status as relevant
-        const partialStatusReqs = await base44.entities.SwapRequest.filter({ 
-            status: 'Partially_Covered'
-        });
-        
-        return reqs.length + partialStatusReqs.length;
+        const reqs = await base44.entities.SwapRequest.filter({ status: 'Pending' });
+        return reqs.length;
     }
   });
 
@@ -83,8 +72,8 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
   const kpis = [
     {
       id: 'swap_requests',
-      mobileTitle: 'בקשות למלאה',
-      desktopTitle: 'בקשות להחלפה מלאה',
+      mobileTitle: 'בקשות להחלפה',
+      desktopTitle: 'בקשות להחלפה',
       count: fullRequestsCount,
       icon: AlertCircle,
       gradient: 'from-red-500 to-red-600',
@@ -93,10 +82,10 @@ export default function KPIHeader({ shifts, currentUser, onKPIClick }) {
       borderColor: 'border-red-200'
     },
     {
-      id: 'partial_gaps',
-      mobileTitle: 'בקשות לחלקית',
-      desktopTitle: 'בקשות להחלפה חלקית',
-      count: partialRequestsCount,
+      id: 'head_to_head_pending',
+      mobileTitle: 'ראש בראש',
+      desktopTitle: 'ראש בראש בהמתנה',
+      count: headToHeadPendingCount,
       icon: Clock,
       gradient: 'from-yellow-500 to-yellow-600',
       bgColor: 'bg-yellow-50',
