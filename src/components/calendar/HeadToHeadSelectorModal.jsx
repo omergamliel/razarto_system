@@ -7,12 +7,12 @@ import { he } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import { buildHeadToHeadDeepLink, buildHeadToHeadTemplate } from './whatsappTemplates';
 
 export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, currentUser }) {
   const [selectedShift, setSelectedShift] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // שליפת המשמרות העתידיות שלי
   const { data: allShifts = [], isLoading } = useQuery({
     queryKey: ['my-future-shifts-h2h', currentUser?.serial_id],
     queryFn: () => base44.entities.Shift.list(),
@@ -58,24 +58,28 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
         status: 'Pending'
       });
 
-      // 2. הכנת הנתונים להודעה
-      const approvalLink = buildHeadToHeadDeepLink(targetShift.id, selectedShift.id);
-      const targetDate = format(new Date(targetShift.start_date), 'dd/MM', { locale: he });
-      const offerDate = format(new Date(selectedShift.start_date), 'dd/MM', { locale: he });
-      
-      const message = buildHeadToHeadTemplate({
-        targetUserName: targetShift.user_name || 'חבר',
-        targetShiftDate: targetDate,
-        myShiftDate: offerDate,
-        uniqueApprovalUrl: approvalLink
-      });
+      // 2. הכנת הנתונים להודעה (פורמט תאריך dd/MM)
+      const targetDateStr = format(new Date(targetShift.start_date), 'dd/MM');
+      const myDateStr = format(new Date(selectedShift.start_date), 'dd/MM');
+      const targetName = targetShift.user_name || 'חבר';
+      const myName = currentUser?.full_name || 'חבר';
 
-      // 3. פתיחת WhatsApp בצורה שלא נחסמת
+      // 3. בניית ההודעה בפורמט המדויק שביקשת
+      const message = `היי *${targetName}*! 👋🏼
+אני מעוניין להחליף איתך משמרת רז״רתו ראש בראש:
+
+🫡 הצעת החלפה:
+🫵🏼 המשמרת שלך: *${targetName}* ${targetDateStr}
+🤞🏼 המשמרת שלי: *${myName}* ${myDateStr}
+
+✅ לחץ כאן לאישור ההחלפה בתוך המערכת:
+https://razar-toran-b555aef5.base44.app?headToHeadTarget=${targetShift.id}&headToHeadOffer=${selectedShift.id}`;
+
+      // 4. פתיחת WhatsApp
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
       
       toast.success('הבקשה נוצרה! עובר ל-WhatsApp...');
       
-      // השהייה קלה כדי לוודא שה-Toast מופיע והבקשה נשמרה
       setTimeout(() => {
         window.location.assign(whatsappUrl);
         onClose();
@@ -96,7 +100,8 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
         <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-          <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white">
+          
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white shrink-0">
             <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20 transition-colors"><X className="w-5 h-5" /></button>
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/20 rounded-xl"><ArrowLeftRight className="w-6 h-6" /></div>
@@ -108,30 +113,39 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
           </div>
 
           <div className="p-6 space-y-4 flex-1 overflow-hidden flex flex-col">
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-              <p className="text-sm text-purple-700 font-medium mb-2">המשמרת שאת רוצה לקחת:</p>
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 shrink-0">
+              <p className="text-sm text-purple-700 font-medium mb-2">המשמרת שאתה רוצה לקחת:</p>
               <p className="font-bold text-gray-800">{targetShift.user_name}</p>
               <p className="text-sm text-gray-600">{format(new Date(targetShift.start_date), 'EEEE, d בMMMM', { locale: he })}</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto border-t pt-4">
-              <h3 className="font-bold text-gray-700 mb-3">בחר משמרת שלך להחלפה:</h3>
+            <div className="flex-1 overflow-hidden flex flex-col min-h-0 border-t pt-4">
+              <h3 className="font-bold text-gray-700 mb-3 shrink-0">בחר משמרת שלך להחלפה:</h3>
               {isLoading ? (
-                <div className="text-center py-8">טוען...</div>
+                <div className="text-center py-8 text-gray-500">טוען משמרות...</div>
               ) : myFutureFullShifts.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">לא נמצאו משמרות עתידיות שלך</div>
+                <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                  <p className="text-gray-500 font-medium mb-1">לא נמצאו משמרות מתאימות</p>
+                </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 overflow-y-auto pr-1">
                   {myFutureFullShifts.map((shift) => (
                     <div
                       key={shift.id}
                       onClick={() => handleSelectShift(shift)}
                       className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                        selectedShift?.id === shift.id ? 'border-purple-500 bg-purple-50' : 'border-gray-100 hover:border-purple-200'
+                        selectedShift?.id === shift.id
+                          ? 'border-purple-500 bg-purple-50 shadow-md ring-1 ring-purple-500'
+                          : 'border-gray-200 hover:border-purple-300 bg-white'
                       }`}
                     >
-                      <p className="font-bold">המשמרת שלי</p>
-                      <p className="text-sm text-gray-600">{format(new Date(shift.start_date), 'd בMMMM (EEEE)', { locale: he })}</p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-gray-800">המשמרת שלי</p>
+                          <p className="text-sm text-gray-600">{format(new Date(shift.start_date), 'd בMMMM (EEEE)', { locale: he })}</p>
+                        </div>
+                        {selectedShift?.id === shift.id && <Send className="w-4 h-4 text-purple-500" />}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -139,12 +153,12 @@ export default function HeadToHeadSelectorModal({ isOpen, onClose, targetShift, 
             </div>
           </div>
 
-          <div className="p-6 pt-0 flex gap-3 bg-white border-t">
+          <div className="p-6 pt-0 flex gap-3 shrink-0 bg-white border-t border-gray-100 mt-auto">
             <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-xl">ביטול</Button>
             <Button 
               onClick={handleSendProposal} 
               disabled={!selectedShift || isSubmitting} 
-              className="flex-1 h-12 bg-purple-600 text-white rounded-xl shadow-md"
+              className={`flex-1 h-12 text-white rounded-xl shadow-md ${!selectedShift ? 'bg-gray-300' : 'bg-gradient-to-r from-purple-500 to-purple-600'}`}
             >
               {isSubmitting ? 'מעבד...' : 'שלח הצעה ב-WhatsApp'}
             </Button>
