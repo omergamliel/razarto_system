@@ -1,164 +1,127 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
+import React, { useState, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Calendar, ArrowRight, ArrowLeftRight, CheckCircle, XCircle, MessageCircle, CalendarPlus, Send } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { normalizeShiftContext } from './whatsappTemplates';
-
-// Components & Modals
-import BackgroundShapes from './BackgroundShapes';
-import CalendarHeader from './CalendarHeader';
-import CalendarGrid from './CalendarGrid';
-import UserNotRegisteredError from '../UserNotRegisteredError';
-import SwapRequestModal from './SwapRequestModal';
-import AddShiftModal from './AddShiftModal';
-import AcceptSwapModal from './AcceptSwapModal';
-import ShiftActionModal from './ShiftActionModal';
-import EditRoleModal from './EditRoleModal';
-import ShiftDetailsModal from './ShiftDetailsModal';
-import OnboardingModal from '../onboarding/OnboardingModal';
-import KPIHeader from '../dashboard/KPIHeader';
-import KPIListModal from '../dashboard/KPIListModal';
-import AdminSettingsModal from '../admin/AdminSettingsModal';
-import SwapSuccessModal from './SwapSuccessModal';
-import SeedRolesData from '../admin/SeedRolesData';
-import HeadToHeadSelectorModal from './HeadToHeadSelectorModal';
-import HeadToHeadApprovalModal from './HeadToHeadApprovalModal';
-import HallOfFameModal from '../dashboard/HallOfFameModal';
-import HelpSupportModal from '../dashboard/HelpSupportModal';
+import { format, parseISO } from 'date-fns';
+import { he } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import LoadingSkeleton from '../LoadingSkeleton';
+// תיקון נתיב הייבוא
+import { buildSwapTemplate } from '../calendar/whatsappTemplates';
 
-export default function ShiftCalendar() {
-  const queryClient = useQueryClient();
-  
-  // --- STATES ---
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [clickedDate, setClickedDate] = useState(null);
-  const [viewMode, setViewMode] = useState('month');
-  const [selectedShift, setSelectedShift] = useState(null);
-  const [showSwapRequestModal, setShowSwapRequestModal] = useState(false);
-  const [showAddShiftModal, setShowAddShiftModal] = useState(false);
-  const [showAcceptSwapModal, setShowAcceptSwapModal] = useState(false);
-  const [showActionModal, setShowActionModal] = useState(false);
-  const [showEditRoleModal, setShowEditRoleModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showAdminSettings, setShowAdminSettings] = useState(false);
-  const [showKPIListModal, setShowKPIListModal] = useState(false);
-  const [kpiListType, setKpiListType] = useState('swap_requests');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastUpdatedShift, setLastUpdatedShift] = useState(null);
-  const [showHeadToHeadSelector, setShowHeadToHeadSelector] = useState(false);
-  const [showHeadToHeadApproval, setShowHeadToHeadApproval] = useState(false);
-  const [h2hTargetId, setH2hTargetId] = useState(null);
-  const [h2hOfferId, setH2hOfferId] = useState(null);
+export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onCancelRequest, onApproveHeadToHead, onRequestSwap }) {
+  const [visibleCount, setVisibleCount] = useState(10);
 
-  // --- AUTH ---
-  const { data: currentUser, isLoading: isUserLoading } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: async () => await base44.auth.me(),
-  });
+  const { data: swapRequestsAll = [], isLoading: isSwapLoading } = useQuery({ queryKey: ['kpi-swap-reqs'], queryFn: () => base44.entities.SwapRequest.list(), enabled: isOpen });
+  const { data: shiftsAll = [] } = useQuery({ queryKey: ['kpi-shifts-list'], queryFn: () => base44.entities.Shift.list(), enabled: isOpen });
+  const { data: usersAll = [] } = useQuery({ queryKey: ['kpi-users-list'], queryFn: () => base44.entities.AuthorizedPerson.list(), enabled: isOpen });
 
-  const { data: authorizedPerson, isLoading: isAuthCheckLoading, refetch: refreshAuthCheck } = useQuery({
-    queryKey: ['check-authorization', currentUser?.email],
-    queryFn: async () => {
-      if (!currentUser?.email) return null;
-      const all = await base44.entities.AuthorizedPerson.list();
-      return all.find(p => p.email?.toLowerCase() === currentUser.email.toLowerCase()) || null;
-    },
-    enabled: !!currentUser?.email
-  });
+  const enrichData = useCallback((data) => {
+    return data.map(req => {
+      const shift = shiftsAll.find(s => s.id === req.shift_id);
+      const user = usersAll.find(u => u.serial_id === (shift?.original_user_id || req.requesting_user_id));
+      
+      if (req.request_type === 'Head2Head') {
+        const targetS = shiftsAll.find(s => s.id === req.shift_id);
+        const offerS = shiftsAll.find(s => s.id === req.offered_shift_id);
+        return {
+          ...req, is_h2h: true,
+          target_name: usersAll.find(u => u.serial_id === targetS?.original_user_id)?.full_name || 'לא ידוע',
+          target_date: targetS?.start_date,
+          offered_name: usersAll.find(u => u.serial_id === offerS?.original_user_id)?.full_name || 'לא ידוע',
+          offered_date: offerS?.start_date,
+          recipient_id: targetS?.original_user_id
+        };
+      }
+      return { ...req, user_name: user?.full_name || 'לא ידוע', shift_date: shift?.start_date, start_time: shift?.start_time || '09:00', end_time: shift?.end_time || '09:00' };
+    });
+  }, [shiftsAll, usersAll]);
 
-  // --- DATA QUERIES ---
-  const { data: shifts = [], isLoading: isShiftsLoading } = useQuery({ queryKey: ['shifts'], queryFn: () => base44.entities.Shift.list(), enabled: !!authorizedPerson });
-  const { data: allUsers = [] } = useQuery({ queryKey: ['all-users'], queryFn: () => base44.entities.AuthorizedPerson.list(), enabled: !!authorizedPerson });
-  const { data: swapRequests = [] } = useQuery({ queryKey: ['swap-requests'], queryFn: () => base44.entities.SwapRequest.list(), enabled: !!authorizedPerson });
-  const { data: coverages = [] } = useQuery({ queryKey: ['coverages'], queryFn: () => base44.entities.ShiftCoverage.list(), enabled: !!authorizedPerson });
+  const baseData = useMemo(() => {
+    switch (type) {
+      case 'swap_requests':
+        return enrichData(swapRequestsAll.filter(r => r.status === 'Open' && r.request_type !== 'Head2Head'));
+      case 'head_to_head_pending':
+        return enrichData(swapRequestsAll.filter(r => r.status === 'Pending' && r.request_type === 'Head2Head'));
+      case 'approved':
+        return enrichData(swapRequestsAll.filter(r => ['Completed', 'Closed', 'Approved'].includes(r.status)));
+      case 'my_shifts':
+        const today = new Date().toISOString().split('T')[0];
+        return shiftsAll.filter(s => s.original_user_id === currentUser?.serial_id && s.start_date >= today).map(s => ({ ...s, is_shift: true, user_name: currentUser?.full_name, shift_date: s.start_date }));
+      default: return [];
+    }
+  }, [type, swapRequestsAll, shiftsAll, currentUser, enrichData]);
 
-  const enrichedShifts = shifts.map(s => normalizeShiftContext(s, { allUsers, swapRequests, coverages, currentUser: authorizedPerson }));
-
-  // --- MUTATIONS ---
-  const deleteShiftMutation = useMutation({
-    mutationFn: async (id) => await base44.entities.Shift.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries(['shifts']); toast.success('המשמרת נמחקה'); closeAllModals(); }
-  });
-
-  const cancelSwapMutation = useMutation({
-    mutationFn: async (shiftId) => {
-      const req = swapRequests.find(sr => sr.shift_id === shiftId && sr.status === 'Open');
-      if (req) await base44.entities.SwapRequest.update(req.id, { status: 'Cancelled' });
-      return await base44.entities.Shift.update(shiftId, { status: 'Active' });
-    },
-    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('הבקשה בוטלה'); closeAllModals(); }
-  });
-
-  const headToHeadSwapMutation = useMutation({
-    mutationFn: async () => {
-      if (!h2hTargetId || !h2hOfferId) return;
-      const target = shifts.find(s => s.id === h2hTargetId);
-      const offer = shifts.find(s => s.id === h2hOfferId);
-      if (authorizedPerson.serial_id !== target.original_user_id) throw new Error("רק הנמען יכול לאשר");
-      await base44.entities.Shift.update(h2hTargetId, { original_user_id: offer.original_user_id, status: 'Active' });
-      await base44.entities.Shift.update(h2hOfferId, { original_user_id: target.original_user_id, status: 'Active' });
-      const req = swapRequests.find(r => r.shift_id === h2hTargetId && r.offered_shift_id === h2hOfferId && r.status === 'Pending');
-      if (req) await base44.entities.SwapRequest.update(req.id, { status: 'Approved' });
-    },
-    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('ההחלפה בוצעה!'); closeAllModals(); }
-  });
-
-  // (שאר המוטציות קיימות כרגיל...)
-  const requestSwapMutation = useMutation({
-    mutationFn: async ({ shiftId, type, dates }) => {
-      const shift = shifts.find(s => s.id === shiftId);
-      const isFull = type === 'full';
-      await base44.entities.SwapRequest.create({
-        shift_id: shiftId, requesting_user_id: authorizedPerson.serial_id, request_type: isFull ? 'Full' : 'Partial',
-        req_start_date: isFull ? shift.start_date : dates.startDate, req_end_date: isFull ? shift.start_date : dates.endDate,
-        req_start_time: '09:00', req_end_time: '09:00', status: 'Open'
-      });
-      return await base44.entities.Shift.update(shiftId, { status: 'Swap_Requested' });
-    },
-    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('בקשה נשלחה'); closeAllModals(); setShowSuccessModal(true); }
-  });
-
-  // --- HANDLERS ---
-  const closeAllModals = () => {
-    setShowSwapRequestModal(false); setShowAddShiftModal(false); setShowAcceptSwapModal(false);
-    setShowActionModal(false); setShowEditRoleModal(false); setShowDetailsModal(false);
-    setShowAdminSettings(false); setShowHeadToHeadSelector(false); setShowHeadToHeadApproval(false);
-    setShowKPIListModal(false); setShowSuccessModal(false);
+  const handleWhatsapp = (item) => {
+    const msg = buildSwapTemplate({ employeeName: item.user_name, startDate: item.shift_date, startTime: item.start_time, endDate: item.shift_date, endTime: item.end_time, approvalUrl: window.location.origin });
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  const handleOpenH2HApprovalFromList = (request) => {
-    setH2hTargetId(request.shift_id);
-    setH2hOfferId(request.offered_shift_id);
-    setShowKPIListModal(false);
-    setShowHeadToHeadApproval(true);
-  };
+  if (!isOpen) return null;
 
-  if (isUserLoading || isAuthCheckLoading || isShiftsLoading) return <LoadingSkeleton className="h-screen w-full" />;
-  if (!authorizedPerson) return <UserNotRegisteredError onRefresh={refreshAuthCheck} />;
-
-  const isAdmin = authorizedPerson.permissions === 'Admin' || authorizedPerson.permissions === 'Manager';
+  const headerColors = { swap_requests: 'from-red-500 to-red-600', head_to_head_pending: 'from-yellow-500 to-yellow-600', approved: 'from-green-500 to-green-600', my_shifts: 'from-blue-500 to-blue-600' };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] relative" dir="rtl">
-      <BackgroundShapes />
-      <div className="max-w-7xl mx-auto px-4 py-8 relative z-10">
-        <CalendarHeader currentDate={currentDate} setCurrentDate={setCurrentDate} viewMode={viewMode} setViewMode={setViewMode} isAdmin={isAdmin} onLogout={() => base44.auth.logout()} currentUser={authorizedPerson} />
-        <KPIHeader shifts={enrichedShifts} currentUser={authorizedPerson} onKPIClick={(type) => { setKpiListType(type); setShowKPIListModal(true); }} />
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 mt-4 shadow-xl">
-          <CalendarGrid currentDate={currentDate} viewMode={viewMode} shifts={enrichedShifts} onCellClick={(d, s) => { setSelectedShift(s); if (s?.original_user_id === authorizedPerson.serial_id) setShowActionModal(true); else setShowDetailsModal(true); }} currentUserEmail={authorizedPerson.email} isAdmin={isAdmin} />
-        </div>
-      </div>
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm text-right" dir="rtl">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <div className={`p-6 text-white bg-gradient-to-r ${headerColors[type]}`}>
+            <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20"><X className="w-5 h-5" /></button>
+            <h2 className="text-2xl font-bold">{type === 'swap_requests' ? 'בקשות להחלפה' : type === 'head_to_head_pending' ? 'ראש בראש בהמתנה' : type === 'approved' ? 'היסטוריית החלפות' : 'המשמרות שלי'}</h2>
+          </div>
 
-      {/* MODALS */}
-      <KPIListModal isOpen={showKPIListModal} onClose={closeAllModals} type={kpiListType} currentUser={authorizedPerson} onCancelRequest={(s) => cancelSwapMutation.mutate(s.id)} onDeleteShift={(id) => deleteShiftMutation.mutate(id)} onApproveHeadToHead={handleOpenH2HApprovalFromList} onOfferCover={(s) => { setSelectedShift(s); setShowAcceptSwapModal(true); }} />
-      <HeadToHeadApprovalModal isOpen={showHeadToHeadApproval} onClose={closeAllModals} targetShiftId={h2hTargetId} offerShiftId={h2hOfferId} currentUser={authorizedPerson} onApprove={() => headToHeadSwapMutation.mutate()} onDecline={closeAllModals} />
-      <ShiftDetailsModal isOpen={showDetailsModal} onClose={closeAllModals} shift={selectedShift} onHeadToHead={(s) => { setSelectedShift(s); setShowHeadToHeadSelector(true); }} onCancelRequest={(s) => cancelSwapMutation.mutate(s.id)} currentUser={authorizedPerson} isAdmin={isAdmin} />
-      <HeadToHeadSelectorModal isOpen={showHeadToHeadSelector} onClose={closeAllModals} targetShift={selectedShift} currentUser={authorizedPerson} />
-      <ShiftActionModal isOpen={showActionModal} onClose={closeAllModals} shift={selectedShift} onDelete={(id) => deleteShiftMutation.mutate(id)} onRequestSwap={() => setShowSwapRequestModal(true)} isAdmin={isAdmin} />
-      <SwapRequestModal isOpen={showSwapRequestModal} onClose={closeAllModals} shift={selectedShift} onSubmit={(data) => requestSwapMutation.mutate({ shiftId: selectedShift.id, type: data.type, dates: data })} />
-    </div>
+          <div className="flex-1 p-6 overflow-y-auto space-y-3">
+            {baseData.length === 0 ? <p className="text-center py-10 text-gray-400">אין נתונים להצגה</p> : baseData.slice(0, visibleCount).map((item, idx) => (
+              <div key={item.id || idx} className={`p-4 rounded-2xl border ${item.is_h2h ? 'bg-yellow-50 border-yellow-100' : 'bg-gray-50 border-gray-200'}`}>
+                {item.is_h2h ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="bg-white p-2 rounded-lg border">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">מציע</p>
+                        <p className="font-bold">{item.offered_name}</p>
+                        <p className="text-gray-500">{item.offered_date}</p>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">צריך לאשר</p>
+                        <p className="font-bold">{item.target_name}</p>
+                        <p className="text-gray-500">{item.target_date}</p>
+                      </div>
+                    </div>
+                    {currentUser?.serial_id === item.recipient_id && (
+                      <Button onClick={() => onApproveHeadToHead(item)} className="w-full bg-green-600 text-white rounded-xl h-11 gap-2 shadow-md"><CheckCircle className="w-4 h-4" /> אשר החלפה זו</Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 font-bold text-gray-800"><Calendar className="w-4 h-4 text-gray-400" /> {item.shift_date}</div>
+                      <p className="text-sm text-gray-600 mt-1">{item.user_name}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {item.requesting_user_id === currentUser?.serial_id && (
+                        <>
+                          <Button variant="outline" size="icon" className="rounded-full text-red-500 border-red-100" onClick={() => onCancelRequest(item)}><XCircle className="w-5 h-5" /></Button>
+                          <Button variant="outline" size="icon" className="rounded-full text-green-600 border-green-100" onClick={() => handleWhatsapp(item)}><MessageCircle className="w-5 h-5" /></Button>
+                        </>
+                      )}
+                      {type === 'swap_requests' && item.requesting_user_id !== currentUser?.serial_id && (
+                        <Button onClick={() => { onClose(); onOfferCover(item); }} size="sm" className="bg-blue-500 text-white rounded-xl h-9 px-4">אחליף <ArrowRight className="w-4 h-4 mr-1" /></Button>
+                      )}
+                      {item.is_shift && (
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="icon" className="rounded-full text-blue-500 border-blue-100"><CalendarPlus className="w-5 h-5" /></Button>
+                          <Button variant="outline" size="icon" className="rounded-full text-red-500 border-red-100" onClick={() => onRequestSwap(item)}><ArrowLeftRight className="w-5 h-5" /></Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
   );
 }
