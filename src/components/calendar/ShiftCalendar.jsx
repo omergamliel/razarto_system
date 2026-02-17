@@ -64,12 +64,13 @@ export default function ShiftCalendar() {
     queryFn: async () => {
       if (!currentUser?.email) return null;
       const all = await base44.entities.AuthorizedPerson.list();
-      return all.find(p => p.email?.toLowerCase() === currentUser.email.toLowerCase()) || null;
+      const match = all.find(p => p.email?.toLowerCase() === currentUser.email.toLowerCase());
+      return match || null;
     },
     enabled: !!currentUser?.email
   });
 
-  // --- DATA QUERIES ---
+  // --- DATA ---
   const { data: shifts = [], isLoading: isShiftsLoading } = useQuery({ queryKey: ['shifts'], queryFn: () => base44.entities.Shift.list(), enabled: !!authorizedPerson });
   const { data: allUsers = [] } = useQuery({ queryKey: ['all-users'], queryFn: () => base44.entities.AuthorizedPerson.list(), enabled: !!authorizedPerson });
   const { data: swapRequests = [] } = useQuery({ queryKey: ['swap-requests'], queryFn: () => base44.entities.SwapRequest.list(), enabled: !!authorizedPerson });
@@ -77,19 +78,20 @@ export default function ShiftCalendar() {
 
   const enrichedShifts = shifts.map(s => normalizeShiftContext(s, { allUsers, swapRequests, coverages, currentUser: authorizedPerson }));
 
-  // --- MUTATIONS ---
+  // --- MUTATIONS (תיקון: הוספה מחדש של הפעולות שחסרו) ---
   const deleteShiftMutation = useMutation({
     mutationFn: async (id) => await base44.entities.Shift.delete(id),
     onSuccess: () => { queryClient.invalidateQueries(['shifts']); toast.success('המשמרת נמחקה'); closeAllModals(); }
   });
 
   const cancelSwapMutation = useMutation({
-    mutationFn: async (shiftId) => {
-      const req = swapRequests.find(sr => sr.shift_id === shiftId && sr.status === 'Open');
+    mutationFn: async (item) => {
+      const shiftId = item.shift_id || item.id;
+      const req = swapRequests.find(sr => sr.shift_id === shiftId && (sr.status === 'Open' || sr.status === 'Pending'));
       if (req) await base44.entities.SwapRequest.update(req.id, { status: 'Cancelled' });
       return await base44.entities.Shift.update(shiftId, { status: 'Active' });
     },
-    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('הבקשה בוטלה'); closeAllModals(); }
+    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('הבקשה בוטלה'); }
   });
 
   const headToHeadSwapMutation = useMutation({
@@ -106,22 +108,6 @@ export default function ShiftCalendar() {
     onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('ההחלפה בוצעה!'); closeAllModals(); }
   });
 
-  // (שאר המוטציות קיימות כרגיל...)
-  const requestSwapMutation = useMutation({
-    mutationFn: async ({ shiftId, type, dates }) => {
-      const shift = shifts.find(s => s.id === shiftId);
-      const isFull = type === 'full';
-      await base44.entities.SwapRequest.create({
-        shift_id: shiftId, requesting_user_id: authorizedPerson.serial_id, request_type: isFull ? 'Full' : 'Partial',
-        req_start_date: isFull ? shift.start_date : dates.startDate, req_end_date: isFull ? shift.start_date : dates.endDate,
-        req_start_time: '09:00', req_end_time: '09:00', status: 'Open'
-      });
-      return await base44.entities.Shift.update(shiftId, { status: 'Swap_Requested' });
-    },
-    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('בקשה נשלחה'); closeAllModals(); setShowSuccessModal(true); }
-  });
-
-  // --- HANDLERS ---
   const closeAllModals = () => {
     setShowSwapRequestModal(false); setShowAddShiftModal(false); setShowAcceptSwapModal(false);
     setShowActionModal(false); setShowEditRoleModal(false); setShowDetailsModal(false);
@@ -130,10 +116,8 @@ export default function ShiftCalendar() {
   };
 
   const handleOpenH2HApprovalFromList = (request) => {
-    setH2hTargetId(request.shift_id);
-    setH2hOfferId(request.offered_shift_id);
-    setShowKPIListModal(false);
-    setShowHeadToHeadApproval(true);
+    setH2hTargetId(request.shift_id); setH2hOfferId(request.offered_shift_id);
+    setShowKPIListModal(false); setShowHeadToHeadApproval(true);
   };
 
   if (isUserLoading || isAuthCheckLoading || isShiftsLoading) return <LoadingSkeleton className="h-screen w-full" />;
@@ -152,13 +136,18 @@ export default function ShiftCalendar() {
         </div>
       </div>
 
-      {/* MODALS */}
-      <KPIListModal isOpen={showKPIListModal} onClose={closeAllModals} type={kpiListType} currentUser={authorizedPerson} onCancelRequest={(s) => cancelSwapMutation.mutate(s.id)} onDeleteShift={(id) => deleteShiftMutation.mutate(id)} onApproveHeadToHead={handleOpenH2HApprovalFromList} onOfferCover={(s) => { setSelectedShift(s); setShowAcceptSwapModal(true); }} />
+      <KPIListModal 
+        isOpen={showKPIListModal} onClose={closeAllModals} type={kpiListType} currentUser={authorizedPerson} 
+        onCancelRequest={(item) => cancelSwapMutation.mutate(item)} 
+        onApproveHeadToHead={handleOpenH2HApprovalFromList} 
+        onOfferCover={(s) => { setSelectedShift(s); setShowAcceptSwapModal(true); }} 
+        onRequestSwap={(s) => { setSelectedShift(s); setShowSwapRequestModal(true); }}
+      />
+      
       <HeadToHeadApprovalModal isOpen={showHeadToHeadApproval} onClose={closeAllModals} targetShiftId={h2hTargetId} offerShiftId={h2hOfferId} currentUser={authorizedPerson} onApprove={() => headToHeadSwapMutation.mutate()} onDecline={closeAllModals} />
-      <ShiftDetailsModal isOpen={showDetailsModal} onClose={closeAllModals} shift={selectedShift} onHeadToHead={(s) => { setSelectedShift(s); setShowHeadToHeadSelector(true); }} onCancelRequest={(s) => cancelSwapMutation.mutate(s.id)} currentUser={authorizedPerson} isAdmin={isAdmin} />
+      <ShiftDetailsModal isOpen={showDetailsModal} onClose={closeAllModals} shift={selectedShift} onHeadToHead={(s) => { setSelectedShift(s); setShowHeadToHeadSelector(true); }} onCancelRequest={(item) => cancelSwapMutation.mutate(item)} currentUser={authorizedPerson} isAdmin={isAdmin} />
       <HeadToHeadSelectorModal isOpen={showHeadToHeadSelector} onClose={closeAllModals} targetShift={selectedShift} currentUser={authorizedPerson} />
       <ShiftActionModal isOpen={showActionModal} onClose={closeAllModals} shift={selectedShift} onDelete={(id) => deleteShiftMutation.mutate(id)} onRequestSwap={() => setShowSwapRequestModal(true)} isAdmin={isAdmin} />
-      <SwapRequestModal isOpen={showSwapRequestModal} onClose={closeAllModals} shift={selectedShift} onSubmit={(data) => requestSwapMutation.mutate({ shiftId: selectedShift.id, type: data.type, dates: data })} />
     </div>
   );
 }
