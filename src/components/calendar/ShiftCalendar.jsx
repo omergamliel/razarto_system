@@ -38,14 +38,14 @@ import LoadingSkeleton from '../LoadingSkeleton';
 export default function ShiftCalendar() {
   const queryClient = useQueryClient();
   
-  // --- STATES ---
+  // --- מצבים (States) ---
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clickedDate, setClickedDate] = useState(null);
   const [viewMode, setViewMode] = useState('month');
   
+  // מודאלים רגילים
   const [selectedShift, setSelectedShift] = useState(null);
   const [showSwapRequestModal, setShowSwapRequestModal] = useState(false);
-  const [showPendingRequestsModal, setShowPendingRequestsModal] = useState(false);
   const [showAddShiftModal, setShowAddShiftModal] = useState(false);
   const [showAcceptSwapModal, setShowAcceptSwapModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
@@ -57,18 +57,21 @@ export default function ShiftCalendar() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [deepLinkShiftId, setDeepLinkShiftId] = useState(null);
   
+  // מודאלים של KPI והצלחה
   const [showKPIListModal, setShowKPIListModal] = useState(false);
   const [kpiListType, setKpiListType] = useState('swap_requests');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastUpdatedShift, setLastUpdatedShift] = useState(null);
 
+  // מצבים להחלפת ראש בראש (H2H)
   const [showHeadToHeadSelector, setShowHeadToHeadSelector] = useState(false);
   const [showHeadToHeadApproval, setShowHeadToHeadApproval] = useState(false);
   const [h2hTargetId, setH2hTargetId] = useState(null);
   const [h2hOfferId, setH2hOfferId] = useState(null);
 
-  // --- AUTH & USER IDENTIFICATION ---
+  // --- זיהוי משתמש ואבטחה ---
 
+  // 1. שליפת המשתמש המחובר מהמערכת
   const { data: currentUser, isLoading: isUserLoading } = useQuery({
     queryKey: ['current-user'],
     queryFn: async () => await base44.auth.me(),
@@ -76,6 +79,7 @@ export default function ShiftCalendar() {
 
   const userEmail = currentUser?.email || currentUser?.Email;
 
+  // 2. הצלבה מול טבלת המורשים (AuthorizedPerson)
   const { 
     data: authorizedPerson, 
     isLoading: isAuthCheckLoading,
@@ -86,18 +90,19 @@ export default function ShiftCalendar() {
       if (!userEmail) return null;
       const allPeople = await base44.entities.AuthorizedPerson.list();
       const normalizedUserEmail = userEmail.toLowerCase();
+      // חיפוש המייל בטבלה תוך התעלמות מאותיות גדולות/קטנות
       return allPeople.find(person => person.email && person.email.toLowerCase() === normalizedUserEmail) || null; 
     },
     enabled: !!userEmail
   });
 
-  // --- MUTATION: Link User (תיקון לאוטומציה של כניסת משתמש חדש) ---
+  // --- פונקציית כניסה למשתמש חדש (Onboarding) ---
   const linkUserMutation = useMutation({
     mutationFn: async () => {
       const serialId = currentUser?.serial_id || currentUser?.SerialId;
       if (!authorizedPerson?.id || !serialId) throw new Error("Missing identification");
 
-      // עדכון ה-ID של המשתמש בטבלת המורשים באופן אוטומטי
+      // קישור אוטומטי של ה-ID למייל בטבלה
       await base44.entities.AuthorizedPerson.update(authorizedPerson.id, {
         linked_user_id: Number(serialId) 
       });
@@ -105,14 +110,13 @@ export default function ShiftCalendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['check-authorization']);
-      toast.success("החיבור בוצע! מרענן דף...");
-      // רענון כפוי כדי להכניס את המשתמש למערכת מיד
-      setTimeout(() => window.location.reload(), 1000);
+      toast.success("החיבור בוצע בהצלחה! המערכת תתרענן כעת.");
+      setTimeout(() => window.location.reload(), 1000); // רענון כפוי כדי להכניס את המשתמש פנימה
     },
-    onError: () => toast.error("שגיאה בחיבור האוטומטי.")
+    onError: () => toast.error("שגיאה בחיבור האוטומטי. פנה למנהל.")
   });
 
-  // --- DATA QUERIES ---
+  // --- שאילתות נתונים מרכזיות ---
   const { data: shifts = [], isLoading: isShiftsLoading } = useQuery({
     queryKey: ['shifts'],
     queryFn: () => base44.entities.Shift.list(),
@@ -137,18 +141,20 @@ export default function ShiftCalendar() {
     enabled: !!authorizedPerson
   });
 
+  // העשרת המשמרות בנתוני משתמשים וסטטוס החלפה
   const enrichedShifts = shifts.map(shift => normalizeShiftContext(shift, {
     allUsers, swapRequests, coverages, currentUser: authorizedPerson
   }));
 
-  // --- DEEP LINK LOGIC ---
+  // --- לוגיקת קישורים עמוקים (Deep Links) ---
   useEffect(() => {
     if (typeof window === 'undefined' || !authorizedPerson) return;
     const params = new URLSearchParams(window.location.search);
-    const openShiftId = params.get('openShiftId');
     const headToHeadTarget = params.get('headToHeadTarget');
     const headToHeadOffer = params.get('headToHeadOffer');
+    const openShiftId = params.get('openShiftId');
 
+    // אם הקישור הגיע מהודעת WhatsApp של ראש בראש
     if (headToHeadTarget && headToHeadOffer) {
       setH2hTargetId(headToHeadTarget);
       setH2hOfferId(headToHeadOffer);
@@ -156,43 +162,47 @@ export default function ShiftCalendar() {
     } else if (openShiftId) {
       setDeepLinkShiftId(openShiftId);
     }
+    // ניקוי ה-URL אחרי הקריאה
     window.history.replaceState({}, document.title, window.location.pathname);
   }, [authorizedPerson]);
 
-  // --- MUTATIONS ---
+  // --- פעולות (Mutations) ---
 
+  // החלפת ראש בראש - הביצוע הסופי
   const headToHeadSwapMutation = useMutation({
     mutationFn: async () => {
       if (!h2hTargetId || !h2hOfferId) return;
       const targetShift = shifts.find(s => s.id === h2hTargetId);
       const offerShift = shifts.find(s => s.id === h2hOfferId);
 
-      // הגנת אבטחה: רק בעל המשמרת המקורית (הנמען) יכול לאשר
+      // בדיקת אבטחה: רק בעל המשמרת המקורית (דניאל) יכול לאשר את ההצעה ששלח חיים
       if (authorizedPerson.serial_id !== targetShift.original_user_id) {
-        throw new Error("רק הנמען יכול לאשר החלפה זו");
+        throw new Error("רק בעל המשמרת המקורית יכול לאשר את ההחלפה הזו!");
       }
 
-      // החלפת בעלים בטבלה
+      if (!targetShift || !offerShift) throw new Error('המשמרות לא נמצאו במערכת');
+
+      // 1. החלפת הבעלים של שתי המשמרות
       await base44.entities.Shift.update(h2hTargetId, { original_user_id: offerShift.original_user_id, status: 'Active' });
       await base44.entities.Shift.update(h2hOfferId, { original_user_id: targetShift.original_user_id, status: 'Active' });
 
+      // 2. עדכון סטטוס הבקשה ל'Approved'
       const h2hReq = swapRequests.find(r => r.shift_id === h2hTargetId && r.offered_shift_id === h2hOfferId && r.status === 'Pending');
       if (h2hReq) await base44.entities.SwapRequest.update(h2hReq.id, { status: 'Approved' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
       queryClient.invalidateQueries(['swap-requests']);
-      toast.success('ההחלפה בוצעה בהצלחה!');
+      toast.success('ההחלפה בוצעה בהצלחה! השמות בלוח התעדכנו.');
       closeAllModals();
     },
     onError: (err) => toast.error(err.message || "שגיאה בביצוע ההחלפה")
   });
 
-  // (שאר המוטציות הקיימות: requestSwapMutation, cancelSwapMutation, offerCoverMutation, וכו' נשארות ללא שינוי)
+  // בקשת החלפה רגילה (אדומה)
   const requestSwapMutation = useMutation({
     mutationFn: async ({ shiftId, type, dates }) => {
       const shift = shifts.find(s => s.id === shiftId);
-      if (!shift) throw new Error('Shift not found');
       const isFull = type === 'full';
       const payload = {
         shift_id: shiftId,
@@ -210,14 +220,14 @@ export default function ShiftCalendar() {
     onSuccess: (data) => {
       queryClient.invalidateQueries(['shifts']);
       queryClient.invalidateQueries(['swap-requests']);
-      toast.success('בקשת ההחלפה נשלחה!');
+      toast.success('בקשת ההחלפה פורסמה!');
       setLastUpdatedShift(data);
-      setShowSwapRequestModal(false);
-      setShowActionModal(false);
+      closeAllModals();
       setShowSuccessModal(true);
     }
   });
 
+  // ביטול בקשת החלפה
   const cancelSwapMutation = useMutation({
     mutationFn: async (shiftId) => {
       const activeRequest = swapRequests.find(sr => sr.shift_id === shiftId && sr.status === 'Open');
@@ -232,45 +242,10 @@ export default function ShiftCalendar() {
     }
   });
 
-  const offerCoverMutation = useMutation({
-    mutationFn: async ({ shift, coverData }) => {
-      const activeRequest = swapRequests.find(sr => sr.shift_id === shift.id && sr.status === 'Open');
-      if (!activeRequest) throw new Error('No active request');
-      await base44.entities.ShiftCoverage.create({
-        request_id: activeRequest.id,
-        shift_id: shift.id,
-        covering_user_id: authorizedPerson.serial_id,
-        cover_start_date: shift.start_date,
-        cover_end_date: shift.end_date || shift.start_date,
-        cover_start_time: shift.start_time || '09:00',
-        cover_end_time: shift.end_time || '09:00',
-        status: 'Approved'
-      });
-      await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
-      await base44.entities.Shift.update(shift.id, { status: 'Covered' });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['shifts']);
-      queryClient.invalidateQueries(['swap-requests']);
-      toast.success('הכיסוי בוצע בהצלחה!');
-      setShowAcceptSwapModal(false);
-      setShowDetailsModal(false);
-    }
-  });
-
+  // הוספת משמרת חדשה (מנהלים בלבד)
   const addShiftMutation = useMutation({
     mutationFn: async (data) => await base44.entities.Shift.create({ ...data, status: 'Active' }),
     onSuccess: () => { queryClient.invalidateQueries(['shifts']); toast.success('המשמרת נוספה'); setShowAddShiftModal(false); }
-  });
-
-  const editRoleMutation = useMutation({
-    mutationFn: async ({ id, ...data }) => await base44.entities.Shift.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries(['shifts']); toast.success('עודכן'); closeAllModals(); }
-  });
-
-  const deleteShiftMutation = useMutation({
-    mutationFn: async (id) => await base44.entities.Shift.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries(['shifts']); toast.success('נמחק'); closeAllModals(); }
   });
 
   const logoutMutation = useMutation({
@@ -278,9 +253,9 @@ export default function ShiftCalendar() {
     onSuccess: () => window.location.href = '/'
   });
 
-  // --- HANDLERS ---
+  // --- מטפלי אירועים (Handlers) ---
   const closeAllModals = () => {
-    setShowSwapRequestModal(false); setShowPendingRequestsModal(false); setShowAddShiftModal(false);
+    setShowSwapRequestModal(false); setShowAddShiftModal(false);
     setShowAcceptSwapModal(false); setShowActionModal(false); setShowEditRoleModal(false);
     setShowDetailsModal(false); setShowAdminSettings(false); setShowHallOfFame(false);
     setShowHelpSupport(false); setShowLogoutConfirm(false); setShowSuccessModal(false);
@@ -301,26 +276,27 @@ export default function ShiftCalendar() {
     else setShowDetailsModal(true);
   };
 
-  // פונקציית עזר לחיבור בין ה-KPI למודאל האישור
+  // פונקציית הקסם: מחברת בין הכפתור הירוק ברשימה הצהובה לבין מודאל האישור
   const handleOpenH2HApprovalFromList = (request) => {
     setH2hTargetId(request.shift_id);
     setH2hOfferId(request.offered_shift_id);
-    setShowHeadToHeadApproval(true);
+    setShowKPIListModal(false); // סוגרים את הרשימה כדי שלא תפריע
+    setShowHeadToHeadApproval(true); // פותחים את מודאל האישור (המסך שמופיע בתמונה שלך)
   };
 
-  // --- RENDER ---
-  if (isUserLoading || isAuthCheckLoading) return <div className="min-h-screen flex items-center justify-center">טוען...</div>;
+  // --- רינדור המסך ---
+  if (isUserLoading || isAuthCheckLoading) return <div className="min-h-screen flex items-center justify-center text-gray-500">מאמת נתונים...</div>;
   if (!authorizedPerson) return <UserNotRegisteredError onRefresh={refreshAuthCheck} />;
 
   const isAdmin = authorizedPerson.permissions === 'Admin' || authorizedPerson.permissions === 'Manager';
   const isViewOnly = authorizedPerson.permissions === 'View';
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] relative" dir="rtl">
+    <div className="min-h-screen bg-[#F9FAFB] relative font-sans" dir="rtl">
       <BackgroundShapes />
       <SeedRolesData />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 py-6 md:py-8 relative z-10">
         <CalendarHeader 
           currentDate={currentDate} setCurrentDate={setCurrentDate} viewMode={viewMode} setViewMode={setViewMode}
           isAdmin={isAdmin} onOpenAdminSettings={() => setShowAdminSettings(true)}
@@ -335,7 +311,7 @@ export default function ShiftCalendar() {
            />
         </div>
 
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-6 mt-4">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-4 md:p-6 mt-4 border border-white/50">
           <CalendarGrid 
             currentDate={currentDate} viewMode={viewMode} shifts={enrichedShifts}
             onCellClick={handleCellClick} currentUserEmail={authorizedPerson.email}
@@ -344,14 +320,15 @@ export default function ShiftCalendar() {
         </div>
       </div>
 
-      {/* --- MODALS --- */}
-      <OnboardingModal isOpen={!authorizedPerson.linked_user_id} authorizedData={authorizedPerson} onConfirm={() => linkUserMutation.mutate()} isLoading={linkUserMutation.isPending} />
-      <AdminSettingsModal isOpen={showAdminSettings} onClose={closeAllModals} />
-      <ShiftActionModal isOpen={showActionModal} onClose={closeAllModals} shift={selectedShift} date={currentDate} onRequestSwap={() => { closeAllModals(); setShowSwapRequestModal(true); }} onEditRole={() => { closeAllModals(); setShowEditRoleModal(true); }} onDelete={deleteShiftMutation.mutate} isAdmin={isAdmin} />
-      <SwapRequestModal isOpen={showSwapRequestModal} onClose={closeAllModals} date={currentDate} shift={selectedShift} onSubmit={(data) => requestSwapMutation.mutate({ shiftId: selectedShift.id, type: data.type, dates: data })} isSubmitting={requestSwapMutation.isPending} />
-      <AddShiftModal isOpen={showAddShiftModal} onClose={closeAllModals} date={clickedDate || currentDate} onSubmit={(data) => addShiftMutation.mutate(data)} isSubmitting={addShiftMutation.isPending} />
-      <EditRoleModal isOpen={showEditRoleModal} onClose={closeAllModals} shift={selectedShift} date={currentDate} onSubmit={(data) => editRoleMutation.mutate({ id: selectedShift.id, ...data })} isSubmitting={editRoleMutation.isPending} />
+      {/* --- מודאלים --- */}
       
+      {/* מסך הצטרפות למשתמש חדש */}
+      <OnboardingModal isOpen={!authorizedPerson.linked_user_id} authorizedData={authorizedPerson} onConfirm={() => linkUserMutation.mutate()} isLoading={linkUserMutation.isPending} />
+
+      {/* מודאל פעולות על משמרת (החלפה/עריכה) */}
+      <ShiftActionModal isOpen={showActionModal} onClose={closeAllModals} shift={selectedShift} date={currentDate} onRequestSwap={() => { closeAllModals(); setShowSwapRequestModal(true); }} onEditRole={() => { closeAllModals(); setShowEditRoleModal(true); }} onDelete={deleteShiftMutation.mutate} isAdmin={isAdmin} />
+      
+      {/* מודאל פרטי משמרת (צפייה לאחרים) */}
       <ShiftDetailsModal 
         isOpen={showDetailsModal} onClose={closeAllModals} shift={selectedShift} date={currentDate} 
         onOfferCover={(s) => { setSelectedShift(s); setShowAcceptSwapModal(true); }}
@@ -361,10 +338,10 @@ export default function ShiftCalendar() {
         currentUser={authorizedPerson} isAdmin={isAdmin}
       />
 
-      <AcceptSwapModal isOpen={showAcceptSwapModal && !!selectedShift} onClose={closeAllModals} shift={selectedShift} onAccept={(data) => offerCoverMutation.mutate({ shift: selectedShift, coverData: data })} isAccepting={offerCoverMutation.isPending} />
+      {/* מודאל בחירת משמרת להחלפת ראש בראש (חיים בוחר משמרת) */}
       <HeadToHeadSelectorModal isOpen={showHeadToHeadSelector} onClose={closeAllModals} targetShift={selectedShift} currentUser={authorizedPerson} />
       
-      {/* עדכון מודאל אישור ראש בראש עם פרמטר המשתמש הנוכחי לבדיקת אבטחה */}
+      {/* מודאל אישור החלפת ראש בראש (דניאל מאשרת) - כולל בדיקת זהות */}
       <HeadToHeadApprovalModal 
         isOpen={showHeadToHeadApproval} onClose={closeAllModals} 
         targetShiftId={h2hTargetId} offerShiftId={h2hOfferId}
@@ -372,25 +349,30 @@ export default function ShiftCalendar() {
         onApprove={() => headToHeadSwapMutation.mutate()} onDecline={closeAllModals}
       />
 
-      {/* חיבור ה-KPI הצהוב לפונקציית האישור */}
+      {/* מודאל רשימת ה-KPI (החלונות הצהוב/אדום/כחול) */}
       <KPIListModal 
         isOpen={showKPIListModal} onClose={closeAllModals} type={kpiListType} currentUser={authorizedPerson}
         onOfferCover={(s) => { setSelectedShift(s); setShowAcceptSwapModal(true); }}
+        // החיבור הקריטי שביקשת:
         onApproveHeadToHead={handleOpenH2HApprovalFromList}
         actionsDisabled={isViewOnly}
       />
 
+      {/* מודאלים נוספים */}
+      <AddShiftModal isOpen={showAddShiftModal} onClose={closeAllModals} date={clickedDate || currentDate} onSubmit={(data) => addShiftMutation.mutate(data)} isSubmitting={addShiftMutation.isPending} />
+      <SwapRequestModal isOpen={showSwapRequestModal} onClose={closeAllModals} date={currentDate} shift={selectedShift} onSubmit={(data) => requestSwapMutation.mutate({ shiftId: selectedShift.id, type: data.type, dates: data })} isSubmitting={requestSwapMutation.isPending} />
       <SwapSuccessModal isOpen={showSuccessModal} onClose={closeAllModals} shift={lastUpdatedShift} />
       <HallOfFameModal isOpen={showHallOfFame} onClose={closeAllModals} />
       <HelpSupportModal isOpen={showHelpSupport} onClose={closeAllModals} />
       
+      {/* מודאל התנתקות */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full text-center">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full text-center shadow-2xl border border-gray-100">
             <h3 className="text-xl font-bold mb-4">להתנתק מהמערכת?</h3>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setShowLogoutConfirm(false)}>לא</Button>
-              <Button className="flex-1 bg-red-500 text-white" onClick={() => logoutMutation.mutate()}>כן</Button>
+              <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => setShowLogoutConfirm(false)}>ביטול</Button>
+              <Button className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 shadow-md" onClick={() => logoutMutation.mutate()}>התנתק</Button>
             </div>
           </div>
         </div>
