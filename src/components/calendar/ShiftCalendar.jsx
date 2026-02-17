@@ -64,13 +64,12 @@ export default function ShiftCalendar() {
     queryFn: async () => {
       if (!currentUser?.email) return null;
       const all = await base44.entities.AuthorizedPerson.list();
-      const match = all.find(p => p.email?.toLowerCase() === currentUser.email.toLowerCase());
-      return match || null;
+      return all.find(p => p.email?.toLowerCase() === currentUser.email.toLowerCase()) || null;
     },
     enabled: !!currentUser?.email
   });
 
-  // --- DATA ---
+  // --- DATA QUERIES ---
   const { data: shifts = [], isLoading: isShiftsLoading } = useQuery({ queryKey: ['shifts'], queryFn: () => base44.entities.Shift.list(), enabled: !!authorizedPerson });
   const { data: allUsers = [] } = useQuery({ queryKey: ['all-users'], queryFn: () => base44.entities.AuthorizedPerson.list(), enabled: !!authorizedPerson });
   const { data: swapRequests = [] } = useQuery({ queryKey: ['swap-requests'], queryFn: () => base44.entities.SwapRequest.list(), enabled: !!authorizedPerson });
@@ -78,10 +77,15 @@ export default function ShiftCalendar() {
 
   const enrichedShifts = shifts.map(s => normalizeShiftContext(s, { allUsers, swapRequests, coverages, currentUser: authorizedPerson }));
 
-  // --- MUTATIONS (תיקון: הוספה מחדש של הפעולות שחסרו) ---
+  // --- MUTATIONS (החזרת פונקציית המחיקה והביטול שנעלמו) ---
+  
   const deleteShiftMutation = useMutation({
     mutationFn: async (id) => await base44.entities.Shift.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries(['shifts']); toast.success('המשמרת נמחקה'); closeAllModals(); }
+    onSuccess: () => { 
+      queryClient.invalidateQueries(['shifts']); 
+      toast.success('המשמרת נמחקה בהצלחה'); 
+      closeAllModals(); 
+    }
   });
 
   const cancelSwapMutation = useMutation({
@@ -91,7 +95,11 @@ export default function ShiftCalendar() {
       if (req) await base44.entities.SwapRequest.update(req.id, { status: 'Cancelled' });
       return await base44.entities.Shift.update(shiftId, { status: 'Active' });
     },
-    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('הבקשה בוטלה'); }
+    onSuccess: () => { 
+      queryClient.invalidateQueries(['shifts', 'swap-requests']); 
+      toast.success('הבקשה בוטלה והמשמרת חזרה ללוח'); 
+      closeAllModals();
+    }
   });
 
   const headToHeadSwapMutation = useMutation({
@@ -108,6 +116,21 @@ export default function ShiftCalendar() {
     onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('ההחלפה בוצעה!'); closeAllModals(); }
   });
 
+  const requestSwapMutation = useMutation({
+    mutationFn: async ({ shiftId, type, dates }) => {
+      const shift = shifts.find(s => s.id === shiftId);
+      const isFull = type === 'full';
+      await base44.entities.SwapRequest.create({
+        shift_id: shiftId, requesting_user_id: authorizedPerson.serial_id, request_type: isFull ? 'Full' : 'Partial',
+        req_start_date: isFull ? shift.start_date : dates.startDate, req_end_date: isFull ? shift.start_date : dates.endDate,
+        req_start_time: '09:00', req_end_time: '09:00', status: 'Open'
+      });
+      return await base44.entities.Shift.update(shiftId, { status: 'Swap_Requested' });
+    },
+    onSuccess: () => { queryClient.invalidateQueries(['shifts', 'swap-requests']); toast.success('בקשה נשלחה'); closeAllModals(); setShowSuccessModal(true); }
+  });
+
+  // --- HANDLERS ---
   const closeAllModals = () => {
     setShowSwapRequestModal(false); setShowAddShiftModal(false); setShowAcceptSwapModal(false);
     setShowActionModal(false); setShowEditRoleModal(false); setShowDetailsModal(false);
@@ -136,18 +159,36 @@ export default function ShiftCalendar() {
         </div>
       </div>
 
+      {/* --- MODALS (חיבור הפקודות מחדש) --- */}
       <KPIListModal 
         isOpen={showKPIListModal} onClose={closeAllModals} type={kpiListType} currentUser={authorizedPerson} 
         onCancelRequest={(item) => cancelSwapMutation.mutate(item)} 
+        onDeleteShift={(id) => deleteShiftMutation.mutate(id)} 
         onApproveHeadToHead={handleOpenH2HApprovalFromList} 
         onOfferCover={(s) => { setSelectedShift(s); setShowAcceptSwapModal(true); }} 
         onRequestSwap={(s) => { setSelectedShift(s); setShowSwapRequestModal(true); }}
       />
       
       <HeadToHeadApprovalModal isOpen={showHeadToHeadApproval} onClose={closeAllModals} targetShiftId={h2hTargetId} offerShiftId={h2hOfferId} currentUser={authorizedPerson} onApprove={() => headToHeadSwapMutation.mutate()} onDecline={closeAllModals} />
-      <ShiftDetailsModal isOpen={showDetailsModal} onClose={closeAllModals} shift={selectedShift} onHeadToHead={(s) => { setSelectedShift(s); setShowHeadToHeadSelector(true); }} onCancelRequest={(item) => cancelSwapMutation.mutate(item)} currentUser={authorizedPerson} isAdmin={isAdmin} />
+      
+      <ShiftDetailsModal 
+        isOpen={showDetailsModal} onClose={closeAllModals} shift={selectedShift} 
+        onHeadToHead={(s) => { setSelectedShift(s); setShowHeadToHeadSelector(true); }} 
+        onCancelRequest={(item) => cancelSwapMutation.mutate(item)} 
+        onDelete={(id) => deleteShiftMutation.mutate(id)}
+        currentUser={authorizedPerson} isAdmin={isAdmin} 
+      />
+      
       <HeadToHeadSelectorModal isOpen={showHeadToHeadSelector} onClose={closeAllModals} targetShift={selectedShift} currentUser={authorizedPerson} />
-      <ShiftActionModal isOpen={showActionModal} onClose={closeAllModals} shift={selectedShift} onDelete={(id) => deleteShiftMutation.mutate(id)} onRequestSwap={() => setShowSwapRequestModal(true)} isAdmin={isAdmin} />
+      
+      <ShiftActionModal 
+        isOpen={showActionModal} onClose={closeAllModals} shift={selectedShift} 
+        onDelete={(id) => deleteShiftMutation.mutate(id)} 
+        onRequestSwap={() => setShowSwapRequestModal(true)} 
+        isAdmin={isAdmin} 
+      />
+
+      <SwapRequestModal isOpen={showSwapRequestModal} onClose={closeAllModals} shift={selectedShift} onSubmit={(data) => requestSwapMutation.mutate({ shiftId: selectedShift.id, type: data.type, dates: data })} />
     </div>
   );
 }
