@@ -1,16 +1,16 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, ArrowRight, ArrowLeftRight, CheckCircle, XCircle, MessageCircle, CalendarPlus, Send } from 'lucide-react';
+import { X, Calendar, ArrowRight, ArrowLeftRight, CheckCircle, XCircle, MessageCircle, CalendarPlus } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import LoadingSkeleton from '../LoadingSkeleton';
-// תיקון נתיב הייבוא
+// תיקון נתיב הייבוא - עכשיו המערכת תמצא את הקובץ
 import { buildSwapTemplate } from '../calendar/whatsappTemplates';
 
-export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onCancelRequest, onApproveHeadToHead, onRequestSwap }) {
+export default function KPIListModal({ isOpen, onClose, type, currentUser, onOfferCover, onCancelRequest, onDeleteShift, onApproveHeadToHead, onRequestSwap }) {
   const [visibleCount, setVisibleCount] = useState(10);
 
   const { data: swapRequestsAll = [], isLoading: isSwapLoading } = useQuery({ queryKey: ['kpi-swap-reqs'], queryFn: () => base44.entities.SwapRequest.list(), enabled: isOpen });
@@ -53,8 +53,16 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
     }
   }, [type, swapRequestsAll, shiftsAll, currentUser, enrichData]);
 
+  // פונקציה לשיתוף חוזר בווצאפ
   const handleWhatsapp = (item) => {
-    const msg = buildSwapTemplate({ employeeName: item.user_name, startDate: item.shift_date, startTime: item.start_time, endDate: item.shift_date, endTime: item.end_time, approvalUrl: window.location.origin });
+    const msg = buildSwapTemplate({ 
+        employeeName: item.user_name, 
+        startDate: item.shift_date, 
+        startTime: item.start_time, 
+        endDate: item.shift_date, 
+        endTime: item.end_time, 
+        approvalUrl: window.location.origin 
+    });
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -64,7 +72,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm text-right" dir="rtl">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" dir="rtl">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <div className={`p-6 text-white bg-gradient-to-r ${headerColors[type]}`}>
             <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/20"><X className="w-5 h-5" /></button>
@@ -76,7 +84,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
               <div key={item.id || idx} className={`p-4 rounded-2xl border ${item.is_h2h ? 'bg-yellow-50 border-yellow-100' : 'bg-gray-50 border-gray-200'}`}>
                 {item.is_h2h ? (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-2 gap-3 text-sm text-right">
                       <div className="bg-white p-2 rounded-lg border">
                         <p className="text-[10px] text-gray-400 font-bold uppercase">מציע</p>
                         <p className="font-bold">{item.offered_name}</p>
@@ -94,7 +102,7 @@ export default function KPIListModal({ isOpen, onClose, type, currentUser, onOff
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="text-right">
                       <div className="flex items-center gap-2 font-bold text-gray-800"><Calendar className="w-4 h-4 text-gray-400" /> {item.shift_date}</div>
                       <p className="text-sm text-gray-600 mt-1">{item.user_name}</p>
                     </div>
