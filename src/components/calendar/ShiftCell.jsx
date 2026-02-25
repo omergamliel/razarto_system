@@ -35,6 +35,15 @@ export default function ShiftCell({
       };
     }
 
+    if (status === 'partial' || (status === 'requested' && coverageType === 'partial')) {
+      return {
+        bg: 'bg-yellow-50',
+        border: 'border-yellow-300',
+        badge: 'bg-yellow-500',
+        icon: AlertCircle
+      };
+    }
+
     if (status === 'covered') {
       return {
         bg: 'bg-green-50',
@@ -63,12 +72,27 @@ export default function ShiftCell({
 
   const styles = getStatusStyles();
 
-  const displayName = React.useMemo(() => {
-    if (!shift) return '';
-    return shift.user_name || shift.role || 'לא ידוע';
+  const nameLines = React.useMemo(() => {
+    if (!shift) return [];
+    const fallbackOwner = shift.user_name || shift.role || 'לא ידוע';
+    const coverageNames = (shift.coverages || [])
+      .filter(cov => cov.status !== 'Cancelled')
+      .map(cov => cov.covering_name || cov.covering_user_name)
+      .filter(Boolean);
+    const participants = shift.coverage_participants?.length
+      ? shift.coverage_participants
+      : [fallbackOwner, ...coverageNames];
+    const uniqueNames = [];
+    participants.forEach((name) => {
+      if (name && !uniqueNames.includes(name)) {
+        uniqueNames.push(name);
+      }
+    });
+    return uniqueNames;
   }, [shift]);
 
-
+  const mobileNames = nameLines.slice(0, 2);
+  const hiddenCount = Math.max(nameLines.length - mobileNames.length, 0);
 
   return (
     <motion.div
@@ -95,10 +119,27 @@ export default function ShiftCell({
       </div>
 
       {shift && (
-        <div className="mt-6 md:mt-10">
-          <p className="text-center font-normal md:font-semibold text-[10px] md:text-base leading-tight text-gray-800 break-words px-0.5">
-            {displayName}
-          </p>
+        <div className="mt-6 md:mt-10 space-y-1 md:space-y-1.5">
+          {/* Assignees / Covering Users */}
+          <div className="space-y-0.5">
+            <div className="md:hidden space-y-0.5">
+              {mobileNames.map((name) => (
+                <p key={name} className="text-center font-normal text-[10px] leading-tight text-gray-800 break-words px-0.5">
+                  {name}
+                </p>
+              ))}
+              {hiddenCount > 0 && (
+                <p className="text-center text-[9px] text-gray-500 font-medium">{`+${hiddenCount} נוספים`}</p>
+              )}
+            </div>
+            <div className="hidden md:block space-y-0.5">
+              {nameLines.map((name) => (
+                <p key={name} className="text-center font-semibold text-base text-gray-800 break-words px-0.5">
+                  {name}
+                </p>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

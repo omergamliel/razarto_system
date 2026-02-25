@@ -347,8 +347,8 @@ export default function ShiftDetailsModal({
                   />
                 </div>
                 {isSwapMode && (
-                  <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-tight backdrop-blur-sm bg-red-100 text-red-900 border border-red-200">
-                    בקשה להחלפה
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-tight backdrop-blur-sm ${statusLabelClasses}`}>
+                    {isPartial ? 'בקשה לכיסוי חלקי' : 'בקשה לכיסוי מלא'}
                   </span>
                 )}
               </div>
@@ -391,7 +391,93 @@ export default function ShiftDetailsModal({
               </div>
             </div>
 
-            {/* Removed partial coverage UI - full swaps only */}
+            {isPartialLike && (
+              <div className="space-y-3">
+                <div className="rounded-2xl bg-yellow-50 border border-yellow-200 p-4 text-sm text-yellow-900 leading-relaxed shadow-sm">
+                  <p>
+                    המשתמש {ownerDisplayName} ביקש סיוע בהחלפה חלקית בטווח השעות <span dir="ltr">{requestStartStr}–{requestEndStr}</span> בתאריך {format(new Date(requestStartDate), 'dd.MM.yyyy')}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-white text-gray-700 border border-gray-200">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-900">{ownerDisplayName}</p>
+                          <span className="px-2 py-0.5 rounded-full bg-gray-200 text-[11px] text-gray-700">בעל המשמרת</span>
+                        </div>
+                        {ownerSegments.length > 0 ? (
+                          ownerSegments.map((seg, idx) => (
+                            <p key={`owner-seg-${idx}`} className="text-xs text-gray-700">
+                              <span className="font-semibold">בעל המשמרת עושה</span>{' '}
+                              <span dir="ltr">{formatSegmentNarrative(seg.start, seg.end)}</span>
+                            </p>
+                          ))
+                        ) : (
+                          <p className="text-xs text-gray-600">אין חלון כיסוי פעיל לבעל המשמרת</p>
+                        )}
+                        {shift.department && <p className="text-[11px] text-gray-500">מחלקה {shift.department}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {hasCoverages && (
+                    <div className="rounded-2xl border border-green-200 bg-green-50 p-4 shadow-sm space-y-2">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <CheckCircle className="w-4 h-4" />
+                        <p className="text-sm font-semibold">מי מכסה?</p>
+                      </div>
+                      <div className="space-y-2">
+                        {coverageRows.map(row => (
+                          <div key={row.id} className="flex gap-3 rounded-xl bg-white border border-green-200 p-3 shadow-sm">
+                            <div className="h-10 w-10 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center">
+                              {row.name?.slice(0, 2) || 'מת'}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-green-900">{row.name}</p>
+                                <span className="text-xs text-green-700 font-mono" dir="ltr">{format(row.start, 'HH:mm')} - {format(row.end, 'HH:mm')}</span>
+                              </div>
+                              {row.department && <p className="text-[11px] text-green-700">מחלקה {row.department}</p>}
+                              <p className="text-xs text-green-700">
+                                <span className="font-semibold">{row.name}</span>{' '}
+                                עוזר/ת ל{ownerDisplayName}{' '}
+                                <span dir="ltr">{formatSegmentNarrative(row.start, row.end)}</span>
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {isRequestFullyCovered && (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl text-green-800 shadow-sm">
+                      <CheckCircle className="w-5 h-5" />
+                      <div className="space-y-1 text-sm">
+                        <p className="font-semibold">הבקשה מאוישת במלואה</p>
+                        <p className="text-xs">כל חלון ההחלפה כוסה בהצלחה על ידי המתנדבים.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {missingSegments.map((seg, idx) => (
+                    <div key={`${seg.start}-${idx}`} className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl shadow-sm">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-red-700">שעות חסרות</p>
+                        <p className="text-xs text-red-700" dir="ltr">{formatSegment(seg.start, seg.end)}</p>
+                        <p className="text-[11px] text-red-600">בעל המשמרת המקורי ({ownerDisplayName}) יישאר משויך עד שיושלם כיסוי</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* FIXED: History logs */}
             {isCoveredSwap && (

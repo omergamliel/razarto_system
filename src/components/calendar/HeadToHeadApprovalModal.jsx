@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, ArrowDown, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -15,30 +15,6 @@ export default function HeadToHeadApprovalModal({
   onApprove,
   onDecline 
 }) {
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleDecline = async () => {
-    setIsProcessing(true);
-    try {
-      // Find and update the SwapRequest to 'Cancelled'
-      const swapRequests = await base44.entities.SwapRequest.filter({
-        shift_id: targetShiftId,
-        offered_shift_id: offerShiftId,
-        status: 'Pending'
-      });
-
-      if (swapRequests.length > 0) {
-        await base44.entities.SwapRequest.update(swapRequests[0].id, { status: 'Cancelled' });
-      }
-
-      onDecline?.();
-    } catch (error) {
-      console.error('Error declining head-to-head:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   // Fetch Shifts
   const { data: allShifts = [], isLoading } = useQuery({
     queryKey: ['all-shifts-h2h-approve'],
@@ -115,12 +91,8 @@ export default function HeadToHeadApprovalModal({
             </div>
           </div>
           <div className="p-5 pt-0 mt-auto flex gap-3 shrink-0">
-            <Button onClick={handleDecline} disabled={isProcessing} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50">
-              <XCircle className="w-4 h-4 ml-1.5" /> {isProcessing ? 'מעבד...' : 'לא עכשיו'}
-            </Button>
-            <Button onClick={onApprove} disabled={isProcessing} className="flex-1 h-12 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl shadow-md">
-              <CheckCircle className="w-4 h-4 ml-1.5" /> {isProcessing ? 'מעבד...' : 'אשר החלפה'}
-            </Button>
+            <Button onClick={onDecline} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50"><XCircle className="w-4 h-4 ml-1.5" /> לא עכשיו</Button>
+            <Button onClick={onApprove} className="flex-1 h-12 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl shadow-md"><CheckCircle className="w-4 h-4 ml-1.5" /> אשר החלפה</Button>
           </div>
         </motion.div>
       </div>

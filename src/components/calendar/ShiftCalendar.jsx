@@ -349,9 +349,19 @@ export default function ShiftCalendar() {
         payload
       ];
 
-      // Full coverage always - update swap request and shift
-      await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
-      await base44.entities.Shift.update(shift.id, { status: 'Covered' });
+      const { missingSegments } = computeCoverageSummary({
+        shift: normalizedShift,
+        activeRequest,
+        coverages: shiftCoverages
+      });
+
+      if (missingSegments.length === 0) {
+        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Closed' });
+        await base44.entities.Shift.update(shift.id, { status: 'Covered' });
+      } else {
+        await base44.entities.SwapRequest.update(activeRequest.id, { status: 'Partially_Covered' });
+        await base44.entities.Shift.update(shift.id, { status: 'Swap_Requested' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
@@ -371,32 +381,25 @@ export default function ShiftCalendar() {
       const targetShift = shifts.find(s => s.id === h2hTargetId);
       const offerShift = shifts.find(s => s.id === h2hOfferId);
 
-      if (!targetShift || !offerShift) throw new Error('Shifts not found');
-
-      // 2. Find the pending SwapRequest for this head-to-head
-      const h2hRequest = swapRequests.find(
-        sr => sr.shift_id === h2hTargetId && sr.offered_shift_id === h2hOfferId && sr.status === 'Pending'
-      );
-
-      // 3. Swap original_user_id (ownership)
+      // 2. Swap Assignees
       await base44.entities.Shift.update(h2hTargetId, {
-        original_user_id: offerShift.original_user_id,
-        status: 'Active'
+        assigned_person: offerShift.assigned_person,
+        assigned_email: offerShift.assigned_email,
+        role: offerShift.role,
+        department: offerShift.department,
+        status: 'regular'
       });
 
       await base44.entities.Shift.update(h2hOfferId, {
-        original_user_id: targetShift.original_user_id,
-        status: 'Active'
+        assigned_person: targetShift.assigned_person,
+        assigned_email: targetShift.assigned_email,
+        role: targetShift.role,
+        department: targetShift.department,
+        status: 'regular'
       });
-
-      // 4. Update SwapRequest status to 'Approved'
-      if (h2hRequest) {
-        await base44.entities.SwapRequest.update(h2hRequest.id, { status: 'Approved' });
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
-      queryClient.invalidateQueries(['swap-requests']);
       toast.success('החלפה ראש בראש בוצעה בהצלחה!');
       setShowHeadToHeadApproval(false);
       setH2hTargetId(null);
