@@ -137,11 +137,11 @@ export default function CalendarGrid({
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9] border border-[#66BB6A]" />
-          <span className="text-gray-600">החלפות שאושרו</span>
+          <span className="text-gray-600">החלפה אושרה</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-gradient-to-br from-[#FFFDE7] to-[#FFF9C4] border border-[#FDD835]" />
-          <span className="text-gray-600">ראש בראש בהמתנה</span>
+          <span className="text-gray-600">כיסוי חלקי - פער</span>
         </div>
       </div>
     </motion.div>
