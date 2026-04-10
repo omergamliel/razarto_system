@@ -62,7 +62,7 @@ export default function EditRoleModal({
   if (!isOpen || !shift) return null;
 
   // Get unique departments from AuthorizedPerson list
-  const departments = ['ש', 'מ', 'ת']; // Hardcoded or derived from list
+  const departments = ['א', 'מ', 'ת']; // Hardcoded or derived from list
   
   // Filter users by selected department
   const departmentUsers = authorizedPeople.filter(u => u.department === department);
