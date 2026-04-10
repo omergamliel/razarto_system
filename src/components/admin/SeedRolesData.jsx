@@ -3,16 +3,16 @@ import { base44 } from '@/api/base44Client';
 
 const INITIAL_ROLES = [
   // Department 'ש'
-  { department: 'ש', role_name: 'אוה"ד', assigned_user_name: 'ספיר לוי' },
-  { department: 'ש', role_name: 'שליטה', assigned_user_name: 'ספיר הרשקו' },
-  { department: 'ש', role_name: 'ביטחון', assigned_user_name: 'אלעד פסל' },
-  { department: 'ש', role_name: 'דיגיטל', assigned_user_name: 'חן שבתאי' },
-  { department: 'ש', role_name: 'צבאי מערכתי', assigned_user_name: 'צבאי מערכתי' },
+  { department: 'א', role_name: 'אינטגרציה מבצעית', assigned_user_name: 'ספיר לוי' },
+  { department: 'א', role_name: 'ביטחון', assigned_user_name: 'אלעד פסל' },
+  { department: 'א', role_name: 'דיגיטל', assigned_user_name: 'חן שבתאי' },
+  { department: 'א', role_name: 'צבאי מערכתי', assigned_user_name: 'צבאי מערכתי' },
   // Department 'מ'
   { department: 'מ', role_name: 'דרום', assigned_user_name: 'איתי תורג\'מן' },
   { department: 'מ', role_name: 'מרכז', assigned_user_name: 'שמעון עורקבי' },
   { department: 'מ', role_name: 'צפון', assigned_user_name: 'רוני בורשטיין' },
   { department: 'מ', role_name: 'עורף', assigned_user_name: 'שיראל כהן' },
+  { department: 'מ', role_name: 'שליטה', assigned_user_name: 'ספיר הרשקו' },
   { department: 'מ', role_name: 'מבצעים', assigned_user_name: 'דורון מיכאלי' },
   { department: 'מ', role_name: 'סייבר', assigned_user_name: 'עינבל זיגר' },
   { department: 'מ', role_name: 'תה"ם', assigned_user_name: 'מאיה סולטן' },
