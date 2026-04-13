@@ -416,7 +416,7 @@ export default function AdminSettingsModal({ isOpen, onClose }) {
                     <span className="text-sm text-gray-500 ml-2 whitespace-nowrap flex items-center gap-1 shrink-0 hidden md:flex">
                       <Filter className="w-4 h-4" /> סינון:
                     </span>
-                    {['ש', 'מ', 'ת'].map(dept => (
+                    {['א', 'מ', 'ת'].map(dept => (
                       <button
                         key={dept}
                         onClick={() => {
